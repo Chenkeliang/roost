@@ -425,6 +425,110 @@ describe("projectsModule.apply", () => {
     expect(miseCall!.opts?.cwd).toBe(targetPath);
   });
 
+  it("clone returning non-zero puts path in skipped, not applied", async () => {
+    const home = tmpDir;
+    const repoDir = path.join(tmpDir, "roost-repo-clone-fail");
+    const targetPath = path.join(tmpDir, "clone-fail-proj");
+
+    const { saveProjects } = await import("../projects.js");
+    saveProjects(repoDir, {
+      schemaVersion: 1,
+      projects: [{ path: targetPath, repo: "https://github.com/u/fail.git", envTool: "none" }],
+    });
+
+    const { exec } = makeFakeExec([
+      // git clone returns non-zero
+      { code: 1, stdout: "", stderr: "fatal: repository not found" },
+    ]);
+    const warnMessages: string[] = [];
+    const ctx = makeCtx({
+      exec,
+      home,
+      repoDir,
+      dryRun: false,
+      log: { info: () => {}, warn: (m) => warnMessages.push(m), error: () => {} },
+    });
+    const plan = makePlan([targetPath]);
+    const result = await projectsModule.apply(ctx, plan);
+
+    expect(result.skipped).toContain(targetPath);
+    expect(result.applied).not.toContain(targetPath);
+    expect(warnMessages.some((m) => m.includes("clone failed"))).toBe(true);
+  });
+
+  it("existing repo with no remote is skipped without pulling", async () => {
+    const home = tmpDir;
+    const repoDir = path.join(tmpDir, "roost-repo-no-remote");
+    const existingRepo = path.join(tmpDir, "local-only-repo");
+    fs.mkdirSync(path.join(existingRepo, ".git"), { recursive: true });
+
+    const { saveProjects } = await import("../projects.js");
+    saveProjects(repoDir, {
+      schemaVersion: 1,
+      projects: [{ path: existingRepo, repo: null, envTool: "none" }],
+    });
+
+    const { exec, calls } = makeFakeExec([
+      // repoInfo: remote=null, branch, clean
+      { code: 128, stdout: "", stderr: "error: No such remote 'origin'" },
+      { code: 0, stdout: "main\n", stderr: "" },
+      { code: 0, stdout: "", stderr: "" },
+    ]);
+    const warnMessages: string[] = [];
+    const ctx = makeCtx({
+      exec,
+      home,
+      repoDir,
+      dryRun: false,
+      log: { info: () => {}, warn: (m) => warnMessages.push(m), error: () => {} },
+    });
+    const plan = makePlan([existingRepo]);
+    const result = await projectsModule.apply(ctx, plan);
+
+    // No pull attempted
+    const pullCall = calls.find((c) => c.cmd === "git" && c.args.includes("pull"));
+    expect(pullCall).toBeUndefined();
+    expect(result.skipped).toContain(existingRepo);
+    expect(result.applied).not.toContain(existingRepo);
+    expect(warnMessages.some((m) => m.includes("no remote"))).toBe(true);
+  });
+
+  it("pull returning non-zero puts path in skipped, not applied", async () => {
+    const home = tmpDir;
+    const repoDir = path.join(tmpDir, "roost-repo-pull-fail");
+    const existingRepo = path.join(tmpDir, "pull-fail-repo");
+    fs.mkdirSync(path.join(existingRepo, ".git"), { recursive: true });
+
+    const { saveProjects } = await import("../projects.js");
+    saveProjects(repoDir, {
+      schemaVersion: 1,
+      projects: [{ path: existingRepo, repo: "https://github.com/u/r.git", envTool: "none" }],
+    });
+
+    const { exec } = makeFakeExec([
+      // repoInfo: remote, branch, clean
+      { code: 0, stdout: "https://github.com/u/r.git\n", stderr: "" },
+      { code: 0, stdout: "main\n", stderr: "" },
+      { code: 0, stdout: "", stderr: "" },
+      // git pull --ff-only fails
+      { code: 1, stdout: "", stderr: "fatal: Not possible to fast-forward" },
+    ]);
+    const warnMessages: string[] = [];
+    const ctx = makeCtx({
+      exec,
+      home,
+      repoDir,
+      dryRun: false,
+      log: { info: () => {}, warn: (m) => warnMessages.push(m), error: () => {} },
+    });
+    const plan = makePlan([existingRepo]);
+    const result = await projectsModule.apply(ctx, plan);
+
+    expect(result.skipped).toContain(existingRepo);
+    expect(result.applied).not.toContain(existingRepo);
+    expect(warnMessages.some((m) => m.includes("pull failed"))).toBe(true);
+  });
+
   it("dryRun=true: skips all operations", async () => {
     const home = tmpDir;
     const repoDir = path.join(tmpDir, "roost-repo7");

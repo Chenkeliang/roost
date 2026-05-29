@@ -177,23 +177,41 @@ export const projectsModule: SyncModule = {
           skipped.push(targetPath);
           continue;
         }
-        await ctx.exec.run("git", ["clone", entry.repo, targetPath]);
+        const cloneResult = await ctx.exec.run("git", ["clone", entry.repo, targetPath]);
+        if (cloneResult.code !== 0) {
+          ctx.log.warn(`git clone failed (code ${cloneResult.code}): ${targetPath}`);
+          skipped.push(targetPath);
+          continue;
+        }
         applied.push(targetPath);
       } else {
         const info = await repoInfo(ctx.exec, targetPath);
+        if (info.remote === null) {
+          ctx.log.warn(`skipping repo with no remote: ${targetPath}`);
+          skipped.push(targetPath);
+          continue;
+        }
         if (info.dirty) {
           ctx.log.warn(`skipping dirty repo: ${targetPath}`);
           skipped.push(targetPath);
           continue;
         }
-        await ctx.exec.run("git", ["-C", targetPath, "pull", "--ff-only"]);
+        const pullResult = await ctx.exec.run("git", ["-C", targetPath, "pull", "--ff-only"]);
+        if (pullResult.code !== 0) {
+          ctx.log.warn(`git pull failed (code ${pullResult.code}): ${targetPath}`);
+          skipped.push(targetPath);
+          continue;
+        }
         applied.push(targetPath);
       }
 
-      // mise install if applicable
+      // mise install if applicable — failure is non-fatal (warn but don't crash)
       const entryEnvTool = entry?.envTool ?? "none";
       if (entryEnvTool === "mise" && fs.existsSync(path.join(targetPath, ".mise.toml"))) {
-        await ctx.exec.run("mise", ["install"], { cwd: targetPath });
+        const miseResult = await ctx.exec.run("mise", ["install"], { cwd: targetPath });
+        if (miseResult.code !== 0) {
+          ctx.log.warn(`mise install failed (code ${miseResult.code}): ${targetPath}`);
+        }
       }
     }
 
