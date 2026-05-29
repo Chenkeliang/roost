@@ -17,3 +17,5 @@ export {
 export type { SelectionDoc } from "./selection.js";
 export { createOpBackend, createRbwBackend } from "./secrets/backend.js";
 export type { SecretBackend } from "./secrets/backend.js";
+export { ensureAgeKey } from "./secrets/agekey.js";
+export type { AgeKeyResult } from "./secrets/agekey.js";
