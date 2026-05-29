@@ -2,7 +2,7 @@
 import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
-import { ModuleRegistry, exampleModule, createExec, createLogger, createT } from "@roost/core";
+import { ModuleRegistry, exampleModule, createExec, createLogger, createT, defaultRegistry } from "@roost/core";
 import * as readline from "node:readline";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
@@ -15,6 +15,8 @@ import { runDiff } from "./commands/diff.js";
 import { runLearn } from "./commands/learn.js";
 import { runImport } from "./commands/import.js";
 import { runAudit } from "./commands/audit.js";
+import { runKeyRotate } from "./commands/keyRotate.js";
+import { runPlugins } from "./commands/plugins.js";
 
 const program = new Command();
 program.name("roost").description("Back up and migrate your Mac setup").version("0.0.0");
@@ -187,6 +189,39 @@ program
       ctx.log.error(`Audit FAILED — ${report.plaintextFindings.length} finding(s).`);
       process.exit(1);
     }
+  });
+
+// ── key <sub-command group> ───────────────────────────────────────────────────
+
+const keyCmd = program.command("key").description("Age key management commands");
+
+keyCmd
+  .command("rotate")
+  .description("Re-encrypt all .age files in the repo to a new age recipient")
+  .requiredOption("--new-recipient <age1...>", "New age recipient public key")
+  .option("--old-key <path>", "Path to the existing age private key", path.join(os.homedir(), ".config", "age", "key.txt"))
+  .option("--repo <dir>", "Path to the config repo directory")
+  .action(async (opts: { newRecipient: string; oldKey: string; repo?: string }) => {
+    const { repoDir, ctx } = buildCtx();
+    const resolvedRepo = opts.repo ?? repoDir;
+    await runKeyRotate({
+      exec: ctx.exec,
+      repoDir: resolvedRepo,
+      oldKeyPath: opts.oldKey,
+      newRecipient: opts.newRecipient,
+      log: (msg) => ctx.log.info(msg),
+    });
+  });
+
+// ── plugins ───────────────────────────────────────────────────────────────────
+
+program
+  .command("plugins")
+  .description("List currently registered module names")
+  .action(() => {
+    const reg = defaultRegistry();
+    const { ctx } = buildCtx();
+    runPlugins({ registry: reg, log: (msg) => ctx.log.info(msg) });
   });
 
 program.parseAsync();
