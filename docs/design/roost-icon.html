@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roost · Icon</title>
+<style>
+:root{--bg:#0B0B0D;--surface:#161618;--text:#ECECEE;--muted:#8A8A8F;--accent:#FF6363;
+  --font:'Geist','SF Pro Text',-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);padding:40px}
+h1{font-weight:600;letter-spacing:-.02em;font-size:20px;margin:0 0 4px}
+.muted{color:var(--muted);font-size:13px}
+.row{display:flex;align-items:flex-end;gap:28px;flex-wrap:wrap;margin:22px 0;padding:24px;
+  background:var(--surface);border:1px solid #232327;border-radius:16px}
+.row.light{background:#F1F1F3;border-color:#E2E2E6}
+.cell{display:flex;flex-direction:column;align-items:center;gap:8px}
+.cell .cap{font-size:11px;color:var(--muted)}
+.row.light .cap{color:#777}
+.brand{display:flex;align-items:center;gap:14px;margin-top:10px}
+.brand .name{font-size:34px;font-weight:600;letter-spacing:-.02em}
+.mono path,.mono ellipse,.mono rect{fill:var(--accent)}
+</style>
+</head>
+<body>
+<h1>Roost — App Icon</h1>
+<p class="muted">珊瑚红栖息小鸟 · 暗色圆角方形 tile · Raycast 调性。资源:<code>roost-icon.svg</code></p>
+
+<div class="row">
+  <div class="cell"><img src="roost-icon.svg" width="256" height="256" alt="256"><span class="cap">256</span></div>
+  <div class="cell"><img src="roost-icon.svg" width="128" height="128" alt="128"><span class="cap">128</span></div>
+  <div class="cell"><img src="roost-icon.svg" width="64" height="64" alt="64"><span class="cap">64</span></div>
+  <div class="cell"><img src="roost-icon.svg" width="32" height="32" alt="32"><span class="cap">32</span></div>
+  <div class="cell"><img src="roost-icon.svg" width="16" height="16" alt="16"><span class="cap">16 · list/menu</span></div>
+</div>
+
+<div class="row light">
+  <div class="cell"><img src="roost-icon.svg" width="96" height="96" alt="on light"><span class="cap">在浅色背景</span></div>
+  <div class="cell">
+    <svg class="mono" width="40" height="40" viewBox="0 0 512 512" aria-label="menubar silhouette">
+      <path d="M196 252 L118 196 Q142 230 178 246 Z"/>
+      <ellipse cx="262" cy="248" rx="86" ry="94"/>
+      <path d="M344 224 L384 240 L344 256 Z"/>
+      <rect x="240" y="320" width="7" height="48" rx="3.5"/>
+      <rect x="266" y="320" width="7" height="48" rx="3.5"/>
+    </svg>
+    <span class="cap">菜单栏剪影(单色模板)</span>
+  </div>
+</div>
+
+<div class="brand">
+  <img src="roost-icon.svg" width="44" height="44" alt="">
+  <span class="name">Roost</span>
+  <span class="muted">— settle into any Mac</span>
+</div>
+</body>
+</html>

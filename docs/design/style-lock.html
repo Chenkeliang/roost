@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roost · Style Lock</title>
+<!--
+  Roost 视觉锁定页 · conforms to docs/.../roost-frontend.md
+  单文件、无依赖、浏览器直接打开。图标为内联 SVG(禁 emoji)。按 ⌘K / Ctrl+K 试命令面板。
+-->
+<style>
+:root{
+  --bg:#0B0B0D; --surface:#161618; --surface-2:#1C1C20; --raise:#212126;
+  --border:#2A2A2E; --border-soft:#242428;
+  --text:#ECECEE; --muted:#8A8A8F; --faint:#5C5C62;
+  --accent:#FF6363; --accent-dim:#D9534F;
+  --green:#34D399; --amber:#FBBF24; --red:#F2555A; --blue:#7FB0E8; --violet:#A99BE0;
+  --rc:14px; --rr:9px; --rt:8px; --rk:6px; --row:40px;
+  --font:'Geist','SF Pro Text',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --mono:'Geist Mono','SF Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--text); font-family:var(--font);
+  font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased;
+  padding-bottom:64px;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:20px 24px 40px}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .faint{color:var(--faint)}
+.small{font-size:12px} .sectit{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600}
+.ic{width:18px;height:18px;display:inline-block;vertical-align:middle;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ic.sm{width:15px;height:15px}
+
+/* top bar */
+.topbar{display:flex; align-items:center; gap:18px; padding:6px 4px 16px}
+.brand{display:flex; align-items:center; gap:9px; font-weight:600; letter-spacing:-.01em}
+.brand .logo{width:22px;height:22px;color:var(--accent)}
+.tabs{display:flex; gap:2px; margin-left:6px}
+.tab{appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;
+  padding:6px 11px;border-radius:var(--rr);cursor:pointer;transition:background .12s,color .12s}
+.tab:hover{background:var(--surface);color:var(--text)}
+.tab.active{background:var(--raise);color:var(--text)}
+.topright{margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--border);
+  border-radius:999px;color:var(--muted);font-size:12px}
+.chip .ic{width:13px;height:13px;color:var(--green)}
+
+/* cards */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--rc);
+  padding:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.m-head{display:flex;align-items:center;gap:11px}
+.m-name{font-weight:560} .m-head .dot{margin-left:auto}
+.m-stats{display:flex;gap:22px;margin:14px 0 6px}
+.m-stats .big{font-family:var(--mono);font-size:22px;margin-right:6px}
+.tile{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:var(--rt);
+  background:var(--raise);color:var(--text)}
+.tile.sm{width:24px;height:24px;border-radius:7px}
+.tile.blue{background:rgba(127,176,232,.16);color:var(--blue)}
+.tile.slate{background:rgba(148,163,184,.15);color:#A7B0BE}
+.tile.amber{background:rgba(251,191,36,.15);color:var(--amber)}
+.tile.coral{background:rgba(255,99,99,.16);color:var(--accent)}
+.tile.violet{background:rgba(169,155,224,.16);color:var(--violet)}
+.tile.green{background:rgba(52,211,153,.16);color:var(--green)}
+.dot{width:8px;height:8px;border-radius:999px;background:var(--faint);display:inline-block}
+.dot.green{background:var(--green)} .dot.amber{background:var(--amber)} .dot.red{background:var(--red)}
+
+/* actions */
+.actions{display:flex;align-items:center;gap:10px;margin:18px 0 22px}
+.btn{appearance:none;font:inherit;font-size:13px;font-weight:540;cursor:pointer;
+  display:inline-flex;align-items:center;gap:8px;padding:8px 13px;border-radius:var(--rr);
+  background:var(--raise);color:var(--text);border:1px solid var(--border);
+  transition:transform .08s,background .12s,border-color .12s}
+.btn:hover{background:#27272c}
+.btn:active{transform:scale(.975)}
+.btn.primary{background:var(--accent);border-color:transparent;color:#1a0c0c}
+.btn.primary:hover{background:#ff7676}
+.hint{margin-left:auto;color:var(--muted);font-size:12px}
+
+/* panel + modules */
+.panel{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--rc);overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;border-bottom:1px solid var(--border-soft)}
+.search{display:flex;align-items:center;gap:7px;color:var(--faint);font-size:12px;background:var(--bg);
+  border:1px solid var(--border);border-radius:var(--rr);padding:5px 9px;min-width:160px}
+.mod{border-bottom:1px solid var(--border-soft)}
+.mod:last-child{border-bottom:0}
+.mod-head{display:flex;align-items:center;gap:9px;padding:11px 14px;font-weight:540;cursor:default}
+.mod-head .count{color:var(--muted);font-weight:400;font-size:12px}
+.mod-head .right{margin-left:auto}
+.mod-head .note{margin-left:auto;color:var(--amber);font-size:12px;font-family:var(--mono)}
+.rows{padding:2px 8px 8px}
+.row{display:flex;align-items:center;gap:10px;height:var(--row);padding:0 8px;border-radius:var(--rr);
+  position:relative;transition:background .12s}
+.row:hover{background:var(--surface-2)}
+.row .r-name{font-size:13px}
+.row .accessory{margin-left:auto;color:var(--muted);font-size:12px;font-family:var(--mono)}
+.row .accessory.enc{color:var(--accent)}
+.row-actions{display:none;gap:4px;margin-left:12px}
+.row:hover .row-actions{display:flex}
+.row:hover .accessory{margin-left:auto}
+.row-actions button{appearance:none;border:1px solid var(--border);background:var(--raise);color:var(--muted);
+  font:inherit;font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;transition:color .12s,border-color .12s}
+.row-actions button:hover{color:var(--text);border-color:#3a3a40}
+.row.selected{background:var(--surface-2)}
+.row.selected::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--accent)}
+
+/* kbd */
+kbd{font-family:var(--mono);font-size:11px;background:var(--raise);border:1px solid var(--border);
+  border-bottom-width:2px;border-radius:var(--rk);padding:1px 6px;color:var(--muted);min-width:18px;display:inline-block;text-align:center}
+
+/* command palette */
+.cmdk-bd{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(3px);
+  display:none;align-items:flex-start;justify-content:center;padding-top:14vh;z-index:50}
+.cmdk-bd.open{display:flex}
+.cmdk{width:min(560px,92vw);background:#161619;border:1px solid #313137;border-radius:var(--rc);
+  box-shadow:0 24px 60px -20px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);overflow:hidden;
+  animation:pop .14s cubic-bezier(.16,1,.3,1)}
+@keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.cmdk input{width:100%;border:0;background:transparent;color:var(--text);font:inherit;font-size:15px;
+  padding:15px 16px;outline:none;border-bottom:1px solid var(--border-soft)}
+.cmdk-list{padding:6px}
+.cmdk-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--rr);cursor:pointer}
+.cmdk-item .kr{margin-left:auto;display:flex;gap:3px}
+.cmdk-item[aria-selected=true]{background:var(--surface-2)}
+.cmdk-item[aria-selected=true]::before{content:"";position:absolute}
+.cmdk-hint{padding:8px 12px;border-top:1px solid var(--border-soft);color:var(--faint);font-size:11px;display:flex;gap:14px}
+
+/* HUD toast */
+.hud{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);display:flex;align-items:center;gap:9px;
+  background:#1b1b1f;border:1px solid #313137;border-radius:999px;padding:7px 14px 7px 8px;font-size:13px;
+  box-shadow:0 14px 30px -12px rgba(0,0,0,.6);z-index:40;animation:hud .18s cubic-bezier(.16,1,.3,1)}
+@keyframes hud{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translateX(-50%)}}
+
+/* bottom action bar */
+.actionbar{position:fixed;left:0;right:0;bottom:0;height:44px;background:rgba(16,16,18,.92);
+  backdrop-filter:blur(8px);border-top:1px solid var(--border-soft);display:flex;align-items:center;gap:20px;
+  padding:0 20px;font-size:12px;color:var(--muted);z-index:30}
+.actionbar .sp{margin-left:auto}
+
+/* tokens showcase */
+.tok{margin-top:28px}
+.swatches{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.sw{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border-soft);
+  border-radius:10px;padding:7px 11px;font-size:12px}
+.sw i{width:18px;height:18px;border-radius:6px;display:inline-block}
+.tiles{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.badges{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--border)}
+.scale>div{padding:4px 0;border-bottom:1px solid var(--border-soft)}
+.empty{margin-top:14px;display:grid;place-items:center;text-align:center;gap:8px;padding:34px;
+  background:var(--surface);border:1px dashed var(--border);border-radius:var(--rc);color:var(--muted)}
+.empty .tile{width:44px;height:44px;border-radius:12px}
+.empty .ic{width:24px;height:24px}
+.skel{height:14px;border-radius:6px;background:linear-gradient(90deg,#1c1c20,#26262b,#1c1c20);
+  background-size:200% 100%;animation:sh 1.2s linear infinite}
+@keyframes sh{to{background-position:-200% 0}}
+h2.blk{font-size:13px;margin:26px 0 4px;font-weight:600}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}.tabs{display:none}}
+</style>
+</head>
+<body>
+
+<!-- icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 20h20l-1.5-2H3.5L2 20Z"/></symbol>
+  <symbol id="i-desktop" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h7l5 5v13H6z"/><path d="M13 3v5h5M9.5 13l-1.5 1.5L9.5 16M14.5 13l1.5 1.5-1.5 1.5"/></symbol>
+  <symbol id="i-pkg" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+  <symbol id="i-git" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 4-6 2-6 5"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 12l5-5"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H5z"/><path d="M8 3v5h8M8 21v-6h8v6"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10M8 11l4 4 4-4M5 20h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v3h3"/><path d="M12 8v4l3 2"/></symbol>
+</svg>
+
+<div class="wrap">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2.5" y="6" width="9" height="6.5" rx="1.3"/><rect x="13" y="11.5" width="8.5" height="6" rx="1.3"/><path d="M11.5 9.2c4 0 .5 5 5.5 5" stroke-dasharray="1 2"/></svg>
+      Roost
+    </div>
+    <nav class="tabs">
+      <button class="tab active">Overview</button>
+      <button class="tab">Manage</button>
+      <button class="tab">Drift</button>
+      <button class="tab">Timeline</button>
+      <button class="tab">Settings</button>
+    </nav>
+    <div class="topright">
+      <span class="chip"><svg class="ic"><use href="#i-shield"/></svg> local</span>
+      <span>synced <span class="mono">2m</span> ago</span>
+    </div>
+  </header>
+
+  <!-- MACHINE CARDS -->
+  <section class="grid2">
+    <article class="card machine">
+      <div class="m-head">
+        <span class="tile blue"><svg class="ic"><use href="#i-laptop"/></svg></span>
+        <div><div class="m-name">主力 · MacBook Pro</div><div class="muted mono small">macbook-pro.local</div></div>
+        <span class="dot green" title="in sync"></span>
+      </div>
+      <div class="m-stats">
+        <div><span class="big">12</span><span class="muted">tracked</span></div>
+        <div><span class="big" style="color:var(--green)">0</span><span class="muted">drift</span></div>
+      </div>
+      <div class="muted small">capture <span class="mono">2m ago</span></div>
+    </article>
+    <article class="card machine">
+      <div class="m-head">
+        <span class="tile slate"><svg class="ic"><use href="#i-desktop"/></svg></span>
+        <div><div class="m-name">从机 · Mac mini</div><div class="muted mono small">mac-mini.local</div></div>
+        <span class="dot amber" title="drift"></span>
+      </div>
+      <div class="m-stats">
+        <div><span class="big">12</span><span class="muted">tracked</span></div>
+        <div><span class="big" style="color:var(--amber)">3</span><span class="muted">drift</span></div>
+      </div>
+      <div class="muted small">load <span class="mono">1d ago</span></div>
+    </article>
+  </section>
+
+  <!-- ACTIONS -->
+  <div class="actions">
+    <button class="btn primary" id="capBtn"><svg class="ic"><use href="#i-save"/></svg> Capture 主力</button>
+    <button class="btn"><svg class="ic"><use href="#i-download"/></svg> Load → 从机</button>
+    <span class="hint">↵ to capture · <kbd>⌘K</kbd> actions</span>
+  </div>
+
+  <!-- MODULES PANEL -->
+  <section class="panel">
+    <div class="panel-head">
+      <span class="sectit">Modules</span>
+      <span class="search"><svg class="ic sm"><use href="#i-search"/></svg> filter…</span>
+    </div>
+
+    <div class="mod">
+      <div class="mod-head"><svg class="ic"><use href="#i-file"/></svg> dotfiles <span class="count">8</span><span class="dot green right"></span></div>
+      <div class="rows">
+        <div class="row">
+          <span class="tile slate sm"><svg class="ic sm"><use href="#i-file"/></svg></span>
+          <span class="r-name mono">~/.zshrc</span>
+          <span class="accessory">track</span>
+          <div class="row-actions"><button>diff</button><button>unmanage</button></div>
+        </div>
+        <div class="row selected">
+          <span class="tile slate sm"><svg class="ic sm"><use href="#i-file"/></svg></span>
+          <span class="r-name mono">~/.gitconfig</span>
+          <span class="accessory">track</span>
+          <div class="row-actions"><button>diff</button><button>unmanage</button></div>
+        </div>
+        <div class="row">
+          <span class="tile coral sm"><svg class="ic sm"><use href="#i-lock"/></svg></span>
+          <span class="r-name mono">~/.config/env.sh</span>
+          <span class="accessory enc">encrypted</span>
+          <div class="row-actions"><button>diff</button><button>unmanage</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mod"><div class="mod-head"><svg class="ic"><use href="#i-pkg"/></svg> packages <span class="count">Brewfile · 54</span><span class="dot green right"></span></div></div>
+    <div class="mod"><div class="mod-head"><svg class="ic"><use href="#i-sliders"/></svg> appconfig <span class="count">3</span><span class="note">▲ 3 drift</span></div></div>
+    <div class="mod"><div class="mod-head"><svg class="ic"><use href="#i-git"/></svg> projects <span class="note">1 no-remote · 14 dirty</span></div></div>
+    <div class="mod"><div class="mod-head"><svg class="ic"><use href="#i-radar"/></svg> secrets <span class="count">5 encrypted</span><span class="right muted small">scanner: no plaintext</span></div></div>
+  </section>
+
+  <!-- TOKENS SHOWCASE -->
+  <section class="tok">
+    <h2 class="blk">Design tokens</h2>
+    <div class="swatches">
+      <span class="sw"><i style="background:#0B0B0D;border:1px solid #2a2a2e"></i> bg</span>
+      <span class="sw"><i style="background:#161618"></i> surface</span>
+      <span class="sw"><i style="background:#FF6363"></i> accent · coral</span>
+      <span class="sw"><i style="background:#34D399"></i> synced</span>
+      <span class="sw"><i style="background:#FBBF24"></i> drift</span>
+      <span class="sw"><i style="background:#F2555A"></i> conflict</span>
+    </div>
+    <div class="tiles">
+      <span class="tile blue"><svg class="ic"><use href="#i-laptop"/></svg></span>
+      <span class="tile slate"><svg class="ic"><use href="#i-file"/></svg></span>
+      <span class="tile amber"><svg class="ic"><use href="#i-pkg"/></svg></span>
+      <span class="tile coral"><svg class="ic"><use href="#i-lock"/></svg></span>
+      <span class="tile violet"><svg class="ic"><use href="#i-git"/></svg></span>
+      <span class="tile green"><svg class="ic"><use href="#i-check"/></svg></span>
+    </div>
+    <div class="badges">
+      <span class="badge"><span class="dot green"></span> synced</span>
+      <span class="badge"><span class="dot amber"></span> drift</span>
+      <span class="badge"><span class="dot red"></span> conflict</span>
+      <kbd>⌘</kbd><kbd>K</kbd><kbd>↵</kbd>
+    </div>
+    <div class="scale" style="margin-top:14px">
+      <div style="font-size:20px;letter-spacing:-.02em">页标题 18–20 · Geist</div>
+      <div style="font-size:14px">行标题 / 正文 14</div>
+      <div class="muted small">accessory 12 muted · <span class="mono">~/path · 47.2% · a1b2c3</span></div>
+      <div class="sectit" style="border:0">区块标题 11 大写</div>
+    </div>
+
+    <h2 class="blk">空状态 · 加载骨架</h2>
+    <div class="empty">
+      <span class="tile coral"><svg class="ic"><use href="#i-radar"/></svg></span>
+      <div>还没有纳管任何项</div>
+      <button class="btn primary"><svg class="ic"><use href="#i-radar"/></svg> 扫描本机并选择</button>
+    </div>
+    <div class="panel" style="margin-top:12px"><div class="rows" style="padding:8px">
+      <div class="row"><span class="tile slate sm"></span><span class="skel" style="width:160px"></span><span class="skel" style="width:48px;margin-left:auto"></span></div>
+      <div class="row"><span class="tile slate sm"></span><span class="skel" style="width:200px"></span><span class="skel" style="width:48px;margin-left:auto"></span></div>
+    </div></div>
+  </section>
+</div>
+
+<!-- COMMAND PALETTE -->
+<div class="cmdk-bd" id="cmdk">
+  <div class="cmdk" role="dialog" aria-label="Command palette">
+    <input placeholder="Run a command…  (Capture, Load, Diff, Learn…)" autofocus>
+    <div class="cmdk-list">
+      <div class="cmdk-item" aria-selected="true"><span class="tile blue sm"><svg class="ic sm"><use href="#i-save"/></svg></span> Capture current Mac <span class="kr"><kbd>⌘</kbd><kbd>S</kbd></span></div>
+      <div class="cmdk-item"><span class="tile slate sm"><svg class="ic sm"><use href="#i-download"/></svg></span> Load to follower <span class="kr"><kbd>⌘</kbd><kbd>L</kbd></span></div>
+      <div class="cmdk-item"><span class="tile amber sm"><svg class="ic sm"><use href="#i-sliders"/></svg></span> Learn app config… <span class="kr"><kbd>⌘</kbd><kbd>E</kbd></span></div>
+      <div class="cmdk-item"><span class="tile violet sm"><svg class="ic sm"><use href="#i-clock"/></svg></span> Open timeline <span class="kr"><kbd>⌘</kbd><kbd>T</kbd></span></div>
+    </div>
+    <div class="cmdk-hint"><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span><span class="sp"></span></div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div class="hud" id="hud" style="display:none"><span class="tile green sm"><svg class="ic sm"><use href="#i-check"/></svg></span> Captured 12 items</div>
+
+<!-- ACTION BAR -->
+<footer class="actionbar">
+  <span><kbd>↵</kbd> Apply selected</span>
+  <span>Actions <kbd>⌘K</kbd></span>
+  <span class="sp"></span>
+  <span><kbd>⌘</kbd><kbd>Z</kbd> Undo</span>
+</footer>
+
+<script>
+const bd=document.getElementById('cmdk');
+addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();bd.classList.toggle('open');if(bd.classList.contains('open'))bd.querySelector('input').focus();}
+  if(e.key==='Escape')bd.classList.remove('open');
+});
+bd.addEventListener('click',e=>{if(e.target===bd)bd.classList.remove('open')});
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelector('.tab.active').classList.remove('active');t.classList.add('active');});
+const hud=document.getElementById('hud');
+document.getElementById('capBtn').onclick=()=>{hud.style.display='flex';hud.style.animation='none';hud.offsetHeight;hud.style.animation='';setTimeout(()=>hud.style.display='none',2200);};
+</script>
+</body>
+</html>

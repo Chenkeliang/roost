@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Roost">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1C1C22"/>
+      <stop offset="1" stop-color="#0C0C0E"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="1.5" y="1.5" width="509" height="509" rx="114.5" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="3"/>
+  <!-- perch -->
+  <rect x="150" y="356" width="212" height="16" rx="8" fill="#3A3A42"/>
+  <!-- legs -->
+  <rect x="240" y="320" width="7" height="40" rx="3.5" fill="#C24F4C"/>
+  <rect x="266" y="320" width="7" height="40" rx="3.5" fill="#C24F4C"/>
+  <!-- cocked tail -->
+  <path d="M196 252 L118 196 Q142 230 178 246 Z" fill="#FF6363"/>
+  <!-- body -->
+  <ellipse cx="262" cy="248" rx="86" ry="94" fill="#FF6363"/>
+  <!-- folded wing -->
+  <path d="M252 196 Q320 228 300 312 Q266 300 248 252 Z" fill="#EA5A5A"/>
+  <!-- beak -->
+  <path d="M344 224 L384 240 L344 256 Z" fill="#C24F4C"/>
+  <!-- eye -->
+  <circle cx="312" cy="226" r="12" fill="#121214"/>
+  <circle cx="316.5" cy="222" r="3.6" fill="#ffffff" fill-opacity="0.9"/>
+</svg>

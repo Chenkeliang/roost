@@ -1,0 +1,132 @@
+# Roost 草稿 Brewfile —— 由 `brew bundle dump` 盘点生成（2026-05-30）
+# 用法：核对后 `brew bundle --file=Brewfile.draft`
+# 注意：
+#  - vscode 条目实为 Cursor 扩展，brew bundle 默认装进 VS Code；如用 Cursor 请改 `cursor --install-extension`。
+#  - homebrew/services tap 指向 USTC 镜像（机器相关），迁移时确认是否保留。
+#  - go/npm 工具不是 Brewfile 原生指令，已移到文件末尾注释区，需单独脚本安装。
+
+tap "farion1231/ccswitch"
+tap "fwartner/tap"
+tap "homebrew/bundle"
+tap "homebrew/services", "https://mirrors.ustc.edu.cn/homebrew-services.git"
+tap "sunnyyoung/repo"
+
+brew "ca-certificates"
+brew "glib"
+brew "create-dmg"
+brew "libnghttp2"
+brew "libssh2"
+brew "docker"
+brew "docker-compose"
+brew "fd"
+brew "libidn2"
+brew "p11-kit"
+brew "gnutls"
+brew "ffmpeg"
+brew "fzf"
+brew "geckodriver"
+brew "gh"
+brew "git"
+brew "go"
+brew "go@1.18"
+brew "go@1.20"
+brew "go@1.21"
+brew "gvp"
+brew "imagemagick"
+brew "ipython"
+brew "jq"
+brew "libffi"
+brew "libicns"
+brew "librsvg"
+brew "libslirp"
+brew "lux"
+brew "mackup"
+brew "mas"
+brew "mysql-client"
+brew "openssl@1.1"
+brew "php"
+brew "pipx"
+brew "podman"
+brew "podman-compose"
+brew "poppler"
+brew "pyenv"
+brew "python-setuptools"
+brew "python@3.11"
+brew "qemu"
+brew "ripgrep"
+brew "sevenzip"
+brew "telnet"
+brew "tlrc"
+brew "wget"
+brew "yazi"
+brew "yt-dlp"
+brew "zbar"
+brew "zoxide"
+
+cask "farion1231/ccswitch/cc-switch"
+cask "chromedriver"
+cask "clash-verge-rev"
+cask "coda"
+cask "fig"
+cask "font-symbols-only-nerd-font"
+cask "hiddenbar"
+cask "input-source-pro"
+cask "qq"
+cask "raycast"
+cask "shortcutdetective"
+cask "tunnelblick"
+
+vscode "anysphere.cursorpyright"
+vscode "anysphere.pyright"
+vscode "anysphere.remote-ssh"
+vscode "beilunyang.cursor-rules"
+vscode "devsense.composer-php-vscode"
+vscode "devsense.intelli-php-vscode"
+vscode "devsense.phptools-vscode"
+vscode "devsense.profiler-php-vscode"
+vscode "eighthundreds.vscode-drawio"
+vscode "golang.go"
+vscode "jebbs.plantuml"
+vscode "k--kato.intellij-idea-keybindings"
+vscode "kevinrose.vsc-python-indent"
+vscode "lkrms.inifmt"
+vscode "mechatroner.rainbow-csv"
+vscode "mikoz.black-py"
+vscode "ms-ceintl.vscode-language-pack-zh-hans"
+vscode "ms-python.black-formatter"
+vscode "ms-python.debugpy"
+vscode "ms-python.python"
+vscode "ms-python.vscode-pylance"
+vscode "ms-toolsai.datawrangler"
+vscode "ms-toolsai.jupyter"
+vscode "ms-toolsai.jupyter-keymap"
+vscode "ms-toolsai.jupyter-renderers"
+vscode "ms-toolsai.vscode-jupyter-cell-tags"
+vscode "ms-toolsai.vscode-jupyter-slideshow"
+vscode "ryu1kn.partial-diff"
+vscode "shd101wyy.markdown-preview-enhanced"
+vscode "vue.volar"
+vscode "withfig.fig"
+vscode "yzhang.dictionary-completion"
+vscode "zainchen.json"
+
+# =========================================================================
+# 非 Brewfile 管理（需单独脚本，Roost packages 模块的扩展项）
+# =========================================================================
+# go install:
+#   gitlab.luojilab.com/zeroteam/artemis/cmd/artemis
+#   github.com/stamblerre/gocode
+#   golang.org/x/tools/gopls
+#   honnef.co/go/tools/cmd/staticcheck
+#   github.com/swaggo/swag/cmd/swag
+#
+# npm i -g:
+#   @anthropic-ai/claude-code  @google/gemini-cli  @modelcontextprotocol/server-memory
+#   @openai/codex  claude-cli  corepack  gitnexus
+#   （eslint-plugin-duckquery 是本地路径软链，跳过）
+#
+# 已安装但未在 brew、可考虑补成 cask（需 `brew search` 确认名称）:
+#   google-chrome microsoft-edge zed cursor datagrip intellij-idea karabiner-elements
+#   orbstack iina sourcetree iterm2 telegram discord wpsoffice wechat dingtalk lark
+#   netease-music apifox another-redis-desktop-manager baidunetdisk shottr the-unarchiver
+# App Store（需 mas + 已购买）: rednote 夸克网盘 得到 infuse menubarx bob 优酷 numbers(系统自带)
