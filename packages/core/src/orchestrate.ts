@@ -4,6 +4,7 @@ import { ModuleRegistry } from "./registry.js";
 import { dotfilesModule } from "./modules/dotfiles.js";
 import { packagesModule } from "./modules/packages.js";
 import { appconfigModule } from "./modules/appconfig.js";
+import { projectsModule } from "./modules/projects.js";
 import { assertNoPlaintextSecrets } from "./secrets/scanner.js";
 import { createChezmoi } from "./adapters/chezmoi.js";
 import { backupFiles } from "./apply.js";
@@ -13,6 +14,7 @@ export function defaultRegistry(): ModuleRegistry {
   reg.register(dotfilesModule);
   reg.register(packagesModule);
   reg.register(appconfigModule);
+  reg.register(projectsModule);
   return reg;
 }
 

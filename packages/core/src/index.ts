@@ -26,6 +26,14 @@ export type { ScanCandidate } from "./discovery/scan.js";
 export { dotfilesModule, classifyDotfile, isSensitivePath } from "./modules/dotfiles.js";
 export { packagesModule } from "./modules/packages.js";
 export { appconfigModule, classifyDomain } from "./modules/appconfig.js";
+export { projectsModule, findGitRepos, repoInfo } from "./modules/projects.js";
+export {
+  emptyProjects,
+  loadProjects,
+  saveProjects,
+  PROJECTS_SCHEMA_VERSION,
+} from "./projects.js";
+export type { ProjectEntry, ProjectsDoc } from "./projects.js";
 export { snapshotDomains, diffSnapshots, quitApp } from "./discovery/learn.js";
 export type { DomainSnapshot } from "./discovery/learn.js";
 export {
