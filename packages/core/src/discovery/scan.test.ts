@@ -88,7 +88,7 @@ describe("scanDir", () => {
       path: filePath,
       isDir: false,
     });
-    expect(results[0].sizeBytes).toBeGreaterThan(0);
+    expect(results[0]!.sizeBytes).toBeGreaterThan(0);
   });
 
   it("excludes node_modules", () => {
