@@ -68,6 +68,9 @@ importers:
 
   packages/web:
     dependencies:
+      '@roost/shared':
+        specifier: workspace:^
+        version: link:../shared
       react:
         specifier: ^19.2.6
         version: 19.2.6

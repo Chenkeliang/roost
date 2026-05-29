@@ -7,9 +7,9 @@ vi.mock("./api", () => ({
   getHealth: vi.fn().mockResolvedValue({ ok: true, name: "roost" }),
   getMachines: vi.fn().mockResolvedValue({ hosts: [], states: {} }),
   getStatus: vi.fn().mockResolvedValue({ reports: [] }),
-  getSelection: vi.fn().mockResolvedValue({}),
+  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
   postCapture: vi.fn().mockResolvedValue({ changes: [] }),
-  postLoad: vi.fn().mockResolvedValue({ changes: [], dryRun: true }),
+  postLoad: vi.fn().mockResolvedValue({ results: [] }),
 }));
 
 describe("App", () => {
@@ -19,7 +19,8 @@ describe("App", () => {
 
   it("renders all nav tabs", () => {
     render(<App />);
-    expect(screen.getByRole("button", { name: "Overview" })).toBeTruthy();
+    // Multiple "Overview" buttons exist (nav tab + action bar) — use getAllByRole
+    expect(screen.getAllByRole("button", { name: "Overview" }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Manage" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Drift" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Timeline" })).toBeTruthy();

@@ -18,3 +18,4 @@ jobs:
       - run: pnpm -r build
       - run: pnpm -r typecheck
       - run: pnpm test
+      - run: pnpm --filter @roost/web test

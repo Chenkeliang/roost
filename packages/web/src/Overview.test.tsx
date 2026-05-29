@@ -2,18 +2,33 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { Overview } from "./views/Overview";
 
-// Mock the api module
+// Mock with realistic server shapes matching server.ts actual responses
 vi.mock("./api", () => ({
   getHealth: vi.fn().mockResolvedValue({ ok: true, name: "roost" }),
   getMachines: vi.fn().mockResolvedValue({ hosts: ["macbook.local"], states: {} }),
   getStatus: vi.fn().mockResolvedValue({
     reports: [
-      { module: "dotfiles", status: "synced", items: [{ id: "~/.zshrc", status: "synced" }] },
-      { module: "packages", status: "drift", items: [] },
+      {
+        module: "dotfiles",
+        items: [
+          { id: "~/.zshrc", state: "synced" },
+          { id: "~/.vimrc", state: "drift" },
+        ],
+      },
+      {
+        module: "packages",
+        items: [
+          { id: "homebrew", state: "synced" },
+        ],
+      },
     ],
   }),
-  postCapture: vi.fn().mockResolvedValue({ changes: [{ module: "dotfiles", id: "~/.zshrc", action: "update" }] }),
-  postLoad: vi.fn().mockResolvedValue({ changes: [], dryRun: true }),
+  postCapture: vi.fn().mockResolvedValue({
+    changes: [{ module: "dotfiles", written: ["~/.zshrc"], encrypted: [] }],
+  }),
+  postLoad: vi.fn().mockResolvedValue({
+    results: [{ module: "dotfiles", applied: ["~/.zshrc"], backedUp: [], skipped: [] }],
+  }),
 }));
 
 describe("Overview", () => {
@@ -30,21 +45,46 @@ describe("Overview", () => {
     });
   });
 
-  it("renders module status chips after loading", async () => {
+  it("renders module status chips after loading — using server item.state", async () => {
     render(<Overview showHud={noop} />);
     await waitFor(() => {
-      // Both module names should appear in the health chips
+      // Both module names appear in health chips
       expect(screen.getByText("dotfiles")).toBeTruthy();
       expect(screen.getByText("packages")).toBeTruthy();
     });
   });
 
+  it("derives drift status from items (dotfiles has a drift item)", async () => {
+    render(<Overview showHud={noop} />);
+    await waitFor(() => {
+      // dotfiles module has a drift item — StatusDot aria-label should include "drift"
+      const driftDots = screen.getAllByRole("status", { name: "drift" });
+      expect(driftDots.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   it("renders capture and load buttons", async () => {
     render(<Overview showHud={noop} />);
-    // Capture button is always in the DOM; wait for loading to settle
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Capture/i })).toBeTruthy();
       expect(screen.getByRole("button", { name: /Load/i })).toBeTruthy();
+    });
+  });
+
+  it("does not render with old shape: result.changes (must use result.results)", async () => {
+    // The mock returns { results: [...] } not { changes: [...] } — if Overview
+    // accidentally reads .changes it would get undefined and show "0 results"
+    // or crash. This test confirms the HUD fires with the results count.
+    const showHud = vi.fn();
+    const { getByRole } = render(<Overview showHud={showHud} />);
+    await waitFor(() => getByRole("button", { name: /Load/i }));
+    // Trigger load
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.click(getByRole("button", { name: /Load \(dry-run\)/i }));
+    await waitFor(() => {
+      expect(showHud).toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("1") })
+      );
     });
   });
 });

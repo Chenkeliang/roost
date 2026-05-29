@@ -45,7 +45,7 @@ export function Hud({ message, onDismiss }: HudProps) {
       }}
     >
       {isError ? (
-        <CheckCircle size={16} style={{ color: "var(--red)" }} />
+        <WarningCircle size={16} style={{ color: "var(--red)" }} />
       ) : (
         <CheckCircle size={16} style={{ color: "var(--green)" }} weight="fill" />
       )}

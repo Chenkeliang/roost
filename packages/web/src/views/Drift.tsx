@@ -1,12 +1,21 @@
 import { useState, useEffect } from "react";
 import { GitDiff } from "@phosphor-icons/react";
+import type { DriftReport } from "@roost/shared";
 import { EmptyState } from "../components/EmptyState";
 import { StatusDot } from "../components/StatusDot";
 import { Skeleton } from "../components/Skeleton";
-import { getStatus, type StatusReport } from "../api";
+import { getStatus } from "../api";
+
+// Derive a display status from a report's items
+function deriveStatus(report: DriftReport): "synced" | "drift" | "conflict" {
+  const items = report.items ?? [];
+  if (items.some((i) => i.state === "conflict")) return "conflict";
+  if (items.some((i) => i.state === "drift")) return "drift";
+  return "synced";
+}
 
 export function Drift() {
-  const [reports, setReports] = useState<StatusReport[]>([]);
+  const [reports, setReports] = useState<DriftReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,9 +30,10 @@ export function Drift() {
       .finally(() => setLoading(false));
   }, []);
 
-  const drifted = reports.filter(
-    (r) => r.status === "drift" || r.status === "conflict"
-  );
+  const drifted = reports.filter((r) => {
+    const s = deriveStatus(r);
+    return s === "drift" || s === "conflict";
+  });
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
@@ -116,25 +126,28 @@ export function Drift() {
             <span>Module</span>
             <span>Status</span>
           </div>
-          {drifted.map((r) => (
-            <div
-              key={r.module}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                padding: "10px 14px",
-                borderBottom: "1px solid var(--border-soft)",
-                alignItems: "center",
-                fontSize: 13,
-              }}
-            >
-              <span style={{ fontFamily: "var(--mono)" }}>{r.module}</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <StatusDot status={r.status} />
-                <span style={{ color: "var(--muted)", fontSize: 12 }}>{r.status}</span>
-              </span>
-            </div>
-          ))}
+          {drifted.map((r) => {
+            const derivedStatus = deriveStatus(r);
+            return (
+              <div
+                key={r.module}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  padding: "10px 14px",
+                  borderBottom: "1px solid var(--border-soft)",
+                  alignItems: "center",
+                  fontSize: 13,
+                }}
+              >
+                <span style={{ fontFamily: "var(--mono)" }}>{r.module}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <StatusDot status={derivedStatus} />
+                  <span style={{ color: "var(--muted)", fontSize: 12 }}>{derivedStatus}</span>
+                </span>
+              </div>
+            );
+          })}
         </section>
       )}
 

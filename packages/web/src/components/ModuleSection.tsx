@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { CaretRight } from "@phosphor-icons/react";
+import type { DriftItem } from "@roost/shared";
 import { StatusDot } from "./StatusDot";
 import { ItemRow } from "./ItemRow";
-import type { StatusItem } from "../api";
 
 interface ModuleSectionProps {
   name: string;
   status: string;
-  items?: StatusItem[];
+  items?: DriftItem[];
   icon: React.ReactNode;
   note?: string;
 }
@@ -83,8 +83,7 @@ export function ModuleSection({ name, status, items, icon, note }: ModuleSection
               key={item.id}
               id={item.id}
               module={name}
-              status={item.status}
-              encrypted={item.encrypted}
+              status={item.state}
             />
           ))}
         </div>

@@ -5,13 +5,13 @@ import { StatusDot } from "../components/StatusDot";
 import { Tile } from "../components/Tile";
 import { Skeleton } from "../components/Skeleton";
 import type { HudMessage } from "../components/Hud";
+import type { DriftReport } from "@roost/shared";
 import {
   getHealth,
   getMachines,
   getStatus,
   postCapture,
   postLoad,
-  type StatusReport,
   type HealthResponse,
   type MachinesResponse,
   type StatusResponse,
@@ -22,7 +22,15 @@ interface OverviewProps {
 }
 
 interface ModuleHealthProps {
-  report: StatusReport;
+  report: DriftReport;
+}
+
+// Derive a single status string from a DriftReport's items
+function deriveModuleStatus(report: DriftReport): "synced" | "drift" | "conflict" {
+  const items = report.items ?? [];
+  if (items.some((i) => i.state === "conflict")) return "conflict";
+  if (items.some((i) => i.state === "drift")) return "drift";
+  return "synced";
 }
 
 function moduleIcon(name: string) {
@@ -48,6 +56,7 @@ function moduleTileColor(name: string): "slate" | "amber" | "blue" | "violet" | 
 }
 
 function ModuleHealthChip({ report }: ModuleHealthProps) {
+  const derivedStatus = deriveModuleStatus(report);
   return (
     <div
       style={{
@@ -65,7 +74,7 @@ function ModuleHealthChip({ report }: ModuleHealthProps) {
         {moduleIcon(report.module)}
       </Tile>
       <span style={{ color: "var(--muted)" }}>{report.module}</span>
-      <StatusDot status={report.status} />
+      <StatusDot status={derivedStatus} />
     </div>
   );
 }
@@ -106,7 +115,7 @@ export function Overview({ showHud }: OverviewProps) {
     setCapturing(true);
     try {
       const result = await postCapture();
-      showHud({ text: `Captured ${result.changes.length} items`, type: "success" });
+      showHud({ text: `Captured ${result.changes.length} item${result.changes.length === 1 ? "" : "s"}`, type: "success" });
       void fetchData();
     } catch (e) {
       showHud({ text: e instanceof Error ? e.message : "Capture failed", type: "error" });
@@ -119,7 +128,7 @@ export function Overview({ showHud }: OverviewProps) {
     setLoading(true);
     try {
       const result = await postLoad(false);
-      showHud({ text: `Load preview: ${result.changes.length} changes`, type: "success" });
+      showHud({ text: `Load preview: ${result.results.length} result${result.results.length === 1 ? "" : "s"}`, type: "success" });
     } catch (e) {
       showHud({ text: e instanceof Error ? e.message : "Load failed", type: "error" });
     } finally {
@@ -129,6 +138,15 @@ export function Overview({ showHud }: OverviewProps) {
 
   const primaryHost = machines?.hosts[0];
   const followerHost = machines?.hosts[1];
+
+  // Derive overall status from items
+  const hasConflict = statusData?.reports.some((r) => deriveModuleStatus(r) === "conflict") ?? false;
+  const hasDrift = statusData?.reports.some((r) => deriveModuleStatus(r) === "drift") ?? false;
+  const driftedCount = statusData?.reports.filter((r) => {
+    const s = deriveModuleStatus(r);
+    return s === "drift" || s === "conflict";
+  }).length;
+  const trackedCount = statusData?.reports.reduce((n, r) => n + (r.items?.length ?? 0), 0);
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
@@ -176,14 +194,14 @@ export function Overview({ showHud }: OverviewProps) {
           type="primary"
           name={primaryHost ?? health?.name ?? "this machine"}
           hostname={primaryHost}
-          tracked={statusData?.reports.reduce((n, r) => n + (r.items?.length ?? 0), 0)}
-          drift={statusData?.reports.filter((r) => r.status === "drift" || r.status === "conflict").length}
+          tracked={trackedCount}
+          drift={driftedCount}
           lastActionLabel="capture"
           lastAction={primaryHost ? "now" : undefined}
           status={
-            statusData?.reports.some((r) => r.status === "conflict")
+            hasConflict
               ? "conflict"
-              : statusData?.reports.some((r) => r.status === "drift")
+              : hasDrift
               ? "drift"
               : "synced"
           }
@@ -193,8 +211,8 @@ export function Overview({ showHud }: OverviewProps) {
           type="follower"
           name={followerHost ?? "Mac mini"}
           hostname={followerHost}
-          tracked={statusData?.reports.reduce((n, r) => n + (r.items?.length ?? 0), 0)}
-          drift={statusData?.reports.filter((r) => r.status === "drift").length}
+          tracked={trackedCount}
+          drift={driftedCount}
           lastActionLabel="load"
           status={followerHost ? "drift" : "unmanaged"}
           loading={loadingData}

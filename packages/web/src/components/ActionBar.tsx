@@ -40,7 +40,7 @@ export function ActionBar({ onApply, onOpenPalette }: ActionBarProps) {
             padding: 0,
           }}
         >
-          Apply
+          Overview
         </button>
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>

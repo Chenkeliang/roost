@@ -1,4 +1,8 @@
 // Typed fetch wrapper for Roost API endpoints
+import type { ChangeSet, ApplyResult, DriftReport, DriftItem } from "@roost/shared";
+
+// Re-export shared types for component use
+export type { ChangeSet, ApplyResult, DriftReport, DriftItem };
 
 export interface HealthResponse {
   ok: boolean;
@@ -9,28 +13,15 @@ export interface ModulesResponse {
   modules: string[];
 }
 
-export interface SelectionItem {
-  module: string;
-  ids: string[];
+// Server GET /api/selection returns SelectionDoc: { schemaVersion: number; modules: Record<string, string[]> }
+export interface SelectionResponse {
+  schemaVersion: number;
+  modules: Record<string, string[]>;
 }
 
-export type SelectionResponse = Record<string, string[]>;
-
-export interface StatusReport {
-  module: string;
-  status: "synced" | "drift" | "conflict" | "unmanaged" | string;
-  items?: StatusItem[];
-  error?: string;
-}
-
-export interface StatusItem {
-  id: string;
-  status: "synced" | "drift" | "conflict" | "unmanaged" | string;
-  encrypted?: boolean;
-}
-
+// Server GET /api/status returns { reports: DriftReport[] }
 export interface StatusResponse {
-  reports: StatusReport[];
+  reports: DriftReport[];
 }
 
 export interface MachinesResponse {
@@ -38,25 +29,14 @@ export interface MachinesResponse {
   states: Record<string, unknown>;
 }
 
-export interface CaptureChange {
-  module: string;
-  id: string;
-  action: string;
-}
-
+// Server POST /api/capture returns { changes: ChangeSet[] }
 export interface CaptureResponse {
-  changes: CaptureChange[];
+  changes: ChangeSet[];
 }
 
-export interface LoadChange {
-  module: string;
-  id: string;
-  action: string;
-}
-
+// Server POST /api/load returns { results: ApplyResult[] }
 export interface LoadResponse {
-  changes: LoadChange[];
-  dryRun?: boolean;
+  results: ApplyResult[];
 }
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {

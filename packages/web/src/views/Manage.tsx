@@ -6,10 +6,11 @@ import {
   GitBranch,
   Scan,
 } from "@phosphor-icons/react";
+import type { DriftItem } from "@roost/shared";
 import { ModuleSection } from "../components/ModuleSection";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
-import { getSelection, getStatus, type SelectionResponse, type StatusResponse, type StatusItem } from "../api";
+import { getSelection, getStatus, type SelectionResponse, type StatusResponse } from "../api";
 
 function getModuleIcon(module: string) {
   switch (module) {
@@ -49,26 +50,31 @@ export function Manage() {
     void fetchData();
   }, [fetchData]);
 
-  const modules = Object.keys(selection ?? {});
+  // Server returns { schemaVersion, modules: Record<string, string[]> }
+  const modules = Object.keys(selection?.modules ?? {});
 
-  function getItemsForModule(moduleName: string): StatusItem[] {
+  function getItemsForModule(moduleName: string): DriftItem[] {
     const statusReport = statusData?.reports.find((r) => r.module === moduleName);
-    const selectionIds = selection?.[moduleName] ?? [];
+    const selectionIds = selection?.modules[moduleName] ?? [];
 
     if (statusReport?.items?.length) {
       return statusReport.items;
     }
 
-    // Fallback: build from selection IDs with unknown status
+    // Fallback: build from selection IDs with untracked state
     return selectionIds.map((id) => ({
       id,
-      status: "unmanaged",
-      encrypted: id.includes("env") || id.includes("secret"),
+      state: "untracked" as const,
     }));
   }
 
   function getModuleStatus(moduleName: string): string {
-    return statusData?.reports.find((r) => r.module === moduleName)?.status ?? "unmanaged";
+    const report = statusData?.reports.find((r) => r.module === moduleName);
+    if (!report) return "untracked";
+    const items = report.items ?? [];
+    if (items.some((i) => i.state === "conflict")) return "conflict";
+    if (items.some((i) => i.state === "drift")) return "drift";
+    return "synced";
   }
 
   if (loading) {
