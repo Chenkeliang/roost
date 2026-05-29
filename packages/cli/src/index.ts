@@ -13,6 +13,8 @@ import { runList } from "./commands/list.js";
 import { runStatus } from "./commands/status.js";
 import { runDiff } from "./commands/diff.js";
 import { runLearn } from "./commands/learn.js";
+import { runImport } from "./commands/import.js";
+import { runAudit } from "./commands/audit.js";
 
 const program = new Command();
 program.name("roost").description("Back up and migrate your Mac setup").version("0.0.0");
@@ -136,6 +138,54 @@ appCmd
       ctx.log.info("No domains changed.");
     } else {
       ctx.log.info(`Captured ${changedDomains.length} changed domain(s): ${changedDomains.join(", ")}`);
+    }
+  });
+
+program
+  .command("import")
+  .description("Import candidates from an existing dotfiles repo or mackup setup")
+  .option("--source <source>", "Source to import from: auto, dotfiles, mackup", "auto")
+  .option("--path <dir>", "Path to dotfiles repo (required when --source dotfiles)")
+  .action(async (opts: { source: string; path?: string }) => {
+    const { ctx } = buildCtx();
+    const source = opts.source as "auto" | "dotfiles" | "mackup";
+    const results = await runImport({ home: ctx.home, source, path: opts.path });
+    if (results.length === 0) {
+      ctx.log.info("No importers detected.");
+      return;
+    }
+    for (const result of results) {
+      ctx.log.info(`\n[${result.source}] ${result.candidates.length} candidate(s)`);
+      for (const c of result.candidates) {
+        ctx.log.info(`  ${c.recommendation}  ${c.path}`);
+      }
+      for (const note of result.notes) {
+        ctx.log.warn(`  note: ${note}`);
+      }
+    }
+  });
+
+program
+  .command("audit")
+  .description("Audit the config repo for plaintext secrets")
+  .option("--repo <dir>", "Path to the config repo directory")
+  .action(async (opts: { repo?: string }) => {
+    const { repoDir, ctx } = buildCtx();
+    const resolvedRepo = opts.repo ?? repoDir;
+    const report = await runAudit({ repoDir: resolvedRepo });
+    ctx.log.info(`Encrypted files : ${report.encryptedFiles}`);
+    ctx.log.info(`Scanned files   : ${report.scannedFiles}`);
+    if (report.plaintextFindings.length > 0) {
+      ctx.log.warn("Plaintext secret findings:");
+      for (const f of report.plaintextFindings) {
+        ctx.log.warn(`  ${f.path} (${f.rule})`);
+      }
+    }
+    if (report.ok) {
+      ctx.log.info("Audit passed — no plaintext secrets found.");
+    } else {
+      ctx.log.error(`Audit FAILED — ${report.plaintextFindings.length} finding(s).`);
+      process.exit(1);
     }
   });
 
