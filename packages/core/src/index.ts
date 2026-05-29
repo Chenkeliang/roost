@@ -6,3 +6,12 @@ export { ModuleRegistry } from "./registry.js";
 export { exampleModule } from "./modules/example.js";
 export { createChezmoi } from "./adapters/chezmoi.js";
 export type { Chezmoi } from "./adapters/chezmoi.js";
+export {
+  emptySelection,
+  loadSelection,
+  saveSelection,
+  addItem,
+  removeItem,
+  SELECTION_SCHEMA_VERSION,
+} from "./selection.js";
+export type { SelectionDoc } from "./selection.js";
