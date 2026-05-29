@@ -19,3 +19,5 @@ export { createOpBackend, createRbwBackend } from "./secrets/backend.js";
 export type { SecretBackend } from "./secrets/backend.js";
 export { ensureAgeKey } from "./secrets/agekey.js";
 export type { AgeKeyResult } from "./secrets/agekey.js";
+export { scanForSecrets, hasSecret, assertNoPlaintextSecrets } from "./secrets/scanner.js";
+export type { SecretFinding } from "./secrets/scanner.js";
