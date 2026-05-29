@@ -9,4 +9,8 @@ describe("i18n", () => {
     const t = createT("zh");
     expect(t("nonexistent_key")).toBe("nonexistent_key");
   });
+  it("uses the zh catalog with interpolation", () => {
+    const t = createT("zh");
+    expect(t("captured", { n: "12" })).toBe("已备份 12 项");
+  });
 });

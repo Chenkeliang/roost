@@ -8,5 +8,7 @@ describe("redacting logger", () => {
     log.info("Authorization: Bearer sk-supersecretvalue");
     expect(sink).toHaveBeenCalledWith("info", "token=*** done");
     expect(sink).toHaveBeenCalledWith("info", "Authorization: Bearer ***");
+    log.info("pulled with ghp_ABCDEF123");
+    expect(sink).toHaveBeenCalledWith("info", "pulled with ghp_***");
   });
 });

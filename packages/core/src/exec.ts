@@ -4,7 +4,8 @@ export function createExec(): Exec {
   return {
     async run(cmd, args, opts): Promise<ExecResult> {
       const r = await execa(cmd, args, { cwd: opts?.cwd, reject: false });
-      return { code: r.exitCode ?? 0, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+      // exitCode is null when killed by a signal — report failure, never 0
+      return { code: r.exitCode ?? (r.signal ? -1 : 0), stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
     },
   };
 }

@@ -12,4 +12,9 @@ describe("exec adapter", () => {
     const r = await exec.run("bash", ["-c", "exit 3"]);
     expect(r.code).toBe(3);
   });
+  it("reports failure (not 0) for signal-killed processes", async () => {
+    const exec = createExec();
+    const r = await exec.run("bash", ["-c", "kill -TERM $$"]);
+    expect(r.code).toBe(-1);
+  });
 });
