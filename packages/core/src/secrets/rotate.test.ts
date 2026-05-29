@@ -228,6 +228,41 @@ describe("rotateAgeKey", () => {
     }
   });
 
+  it("encrypted temp is written adjacent to target (same dir, avoids EXDEV)", async () => {
+    const subdir = path.join(tmpDir, "secrets");
+    fs.mkdirSync(subdir, { recursive: true });
+    const ageFile = path.join(subdir, "data.age");
+    fs.writeFileSync(ageFile, "encrypted", "utf8");
+
+    const encTmpPaths: string[] = [];
+
+    const { exec } = makeFakeExec((cmd, args) => {
+      const oIdx = args.indexOf("-o");
+      if (oIdx >= 0) {
+        const dest = args[oIdx + 1];
+        if (dest) {
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          fs.writeFileSync(dest, "payload", "utf8");
+          // Capture the encrypt call's output path
+          if (cmd === "age" && args.includes("-r")) {
+            encTmpPaths.push(dest);
+          }
+        }
+      }
+      return { code: 0, stdout: "", stderr: "" };
+    });
+
+    await rotateAgeKey(exec, {
+      repoDir: tmpDir,
+      oldKeyPath: "/old.key",
+      newRecipient: "age1rec",
+    });
+
+    // The encrypted temp must be in the same directory as the target .age file
+    expect(encTmpPaths).toHaveLength(1);
+    expect(path.dirname(encTmpPaths[0]!)).toBe(path.dirname(ageFile));
+  });
+
   it("skips .git and node_modules directories", async () => {
     const gitFile = path.join(tmpDir, ".git", "COMMIT_EDITMSG.age");
     const nmFile = path.join(tmpDir, "node_modules", "some-pkg", "secret.age");

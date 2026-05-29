@@ -50,11 +50,13 @@ export async function rotateAgeKey(
   const rotated: string[] = [];
   const failed: { path: string; reason: string }[] = [];
 
-  for (const file of ageFiles) {
-    // Allocate temp paths in the OS temp dir so they are on the same FS or at
-    // least cleanly removable. We manage them manually to ensure cleanup.
-    const tmpDecrypted = path.join(os.tmpdir(), `roost-rotate-dec-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    const tmpEncrypted = path.join(os.tmpdir(), `roost-rotate-enc-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  for (let i = 0; i < ageFiles.length; i++) {
+    const file = ageFiles[i]!;
+    // Decrypted plaintext lives in os.tmpdir() — short-lived, never renamed.
+    const tmpDecrypted = path.join(os.tmpdir(), `roost-rotate-dec-${process.pid}-${i}.tmp`);
+    // Encrypted temp MUST be adjacent to the target (same directory = same filesystem)
+    // so the final renameSync is always same-fs and never throws EXDEV.
+    const tmpEncrypted = path.join(path.dirname(file), `.roost-rotate-${process.pid}-${i}.tmp`);
 
     try {
       // Step 1: decrypt original → tmpDecrypted
