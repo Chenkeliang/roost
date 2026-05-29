@@ -56,3 +56,11 @@ export {
   statusAll,
   loadAll,
 } from "./orchestrate.js";
+export {
+  createDotfilesRepoImporter,
+  createMackupImporter,
+  detectImporters,
+} from "./import/index.js";
+export type { Importer, ImportResult } from "./import/index.js";
+export { auditRepo } from "./secrets/audit.js";
+export type { AuditReport, AuditFinding } from "./secrets/audit.js";
