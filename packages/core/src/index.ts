@@ -15,3 +15,5 @@ export {
   SELECTION_SCHEMA_VERSION,
 } from "./selection.js";
 export type { SelectionDoc } from "./selection.js";
+export { createOpBackend, createRbwBackend } from "./secrets/backend.js";
+export type { SecretBackend } from "./secrets/backend.js";
