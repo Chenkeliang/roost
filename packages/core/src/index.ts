@@ -34,3 +34,4 @@ export {
   commitRepo,
 } from "./state.js";
 export type { MachineState } from "./state.js";
+export { backupFiles } from "./apply.js";
