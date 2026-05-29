@@ -1,0 +1,253 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+import type {
+  Exec,
+  ExecResult,
+  ModuleContext,
+  SyncModule,
+  Selection,
+  DriftReport,
+  ChangeSet,
+  ApplyResult,
+  Health,
+  Candidate,
+  ApplyPlan,
+} from "@roost/shared";
+import { ModuleRegistry, saveSelection, emptySelection, addItem } from "@roost/core";
+import { buildServer } from "./server.js";
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function makeFakeExec(): Exec {
+  const ok: ExecResult = { code: 0, stdout: "", stderr: "" };
+  return { async run(): Promise<ExecResult> { return ok; } };
+}
+
+function makeCtx(repoDir: string, dryRun = false): ModuleContext {
+  return {
+    repoDir,
+    home: os.homedir(),
+    profile: "base",
+    dryRun,
+    exec: makeFakeExec(),
+    log: { info: () => {}, warn: () => {}, error: () => {} },
+    t: (k: string) => k,
+  };
+}
+
+/**
+ * Builds a fake SyncModule with configurable status/capture/apply callbacks.
+ */
+function makeFakeModule(opts: {
+  name: string;
+  statusFn?: (ctx: ModuleContext, sel: Selection) => Promise<DriftReport>;
+  captureFn?: (ctx: ModuleContext, sel: Selection) => Promise<ChangeSet>;
+  applyFn?: (ctx: ModuleContext, plan: ApplyPlan) => Promise<ApplyResult>;
+}): SyncModule {
+  return {
+    name: opts.name,
+    async discover(): Promise<Candidate[]> { return []; },
+    async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {
+      if (opts.statusFn) return opts.statusFn(ctx, sel);
+      return { module: opts.name, items: [] };
+    },
+    async capture(ctx: ModuleContext, sel: Selection): Promise<ChangeSet> {
+      if (opts.captureFn) return opts.captureFn(ctx, sel);
+      return { module: opts.name, written: [], encrypted: [] };
+    },
+    async apply(ctx: ModuleContext, plan: ApplyPlan): Promise<ApplyResult> {
+      if (opts.applyFn) return opts.applyFn(ctx, plan);
+      const ids = plan.actions.map((a) => a.id);
+      if (ctx.dryRun) return { module: opts.name, applied: [], backedUp: [], skipped: ids };
+      return { module: opts.name, applied: ids, backedUp: [], skipped: [] };
+    },
+    async diff(): Promise<string> { return ""; },
+    async unmanage(): Promise<ApplyResult> { return { module: opts.name, applied: [], backedUp: [], skipped: [] }; },
+    async doctor(): Promise<Health[]> { return []; },
+  };
+}
+
+// ── test state ────────────────────────────────────────────────────────────────
+
+let tmpDir: string;
+
+beforeEach(() => {
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-server-test-"));
+});
+
+afterEach(() => {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+// ── tests ─────────────────────────────────────────────────────────────────────
+
+describe("buildServer", () => {
+  it("GET /api/health → 200 { ok: true, name: 'roost' }", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/health" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, name: "roost" });
+    await server.close();
+  });
+
+  it("GET /api/modules → 200 lists registered module names", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(makeFakeModule({ name: "alpha" }));
+    reg.register(makeFakeModule({ name: "beta" }));
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/modules" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ modules: ["alpha", "beta"] });
+    await server.close();
+  });
+
+  it("GET /api/selection → 200 returns the saved selection document", async () => {
+    let sel = emptySelection();
+    sel = addItem(sel, "dotfiles", "/home/user/.zshrc");
+    saveSelection(tmpDir, sel);
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/selection" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { schemaVersion: number; modules: Record<string, string[]> };
+    expect(body.modules["dotfiles"]).toContain("/home/user/.zshrc");
+    await server.close();
+  });
+
+  it("GET /api/status → 200 { reports: DriftReport[] }", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        statusFn: async () => ({
+          module: "dotfiles",
+          items: [{ id: "~/.zshrc", state: "synced" as const }],
+        }),
+      }),
+    );
+    // save a selection so statusAll has something to report
+    const sel = emptySelection();
+    saveSelection(tmpDir, sel);
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/status" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { reports: DriftReport[] };
+    expect(Array.isArray(body.reports)).toBe(true);
+    expect(body.reports.some((r) => r.module === "dotfiles")).toBe(true);
+    await server.close();
+  });
+
+  it("GET /api/machines → 200 { hosts: string[], states: Record<string, unknown> }", async () => {
+    // Write a fake state file
+    const stateDir = path.join(tmpDir, "state");
+    fs.mkdirSync(stateDir, { recursive: true });
+    const stateObj = { host: "myhost", schemaVersion: 1, capturedAt: null, modules: {} };
+    fs.writeFileSync(path.join(stateDir, "myhost.json"), JSON.stringify(stateObj));
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/machines" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { hosts: string[]; states: Record<string, unknown> };
+    expect(body.hosts).toContain("myhost");
+    expect(body.states["myhost"]).toBeDefined();
+    await server.close();
+  });
+
+  it("POST /api/capture → 200 { changes: ChangeSet[] }", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        captureFn: async () => ({
+          module: "dotfiles",
+          written: ["~/.zshrc"],
+          encrypted: [],
+        }),
+      }),
+    );
+    // Put dotfiles in the selection so captureAll visits it
+    let sel = emptySelection();
+    sel = addItem(sel, "dotfiles", "~/.zshrc");
+    saveSelection(tmpDir, sel);
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/capture" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { changes: ChangeSet[] };
+    expect(Array.isArray(body.changes)).toBe(true);
+    expect(body.changes.some((c) => c.module === "dotfiles")).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/load with no body → dry-run: returns results with skipped items", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(makeFakeModule({ name: "packages" }));
+    let sel = emptySelection();
+    sel = addItem(sel, "packages", "Brewfile");
+    saveSelection(tmpDir, sel);
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/load" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { results: ApplyResult[] };
+    expect(Array.isArray(body.results)).toBe(true);
+    const pkgResult = body.results.find((r) => r.module === "packages");
+    expect(pkgResult).toBeDefined();
+    // dry-run so items should be skipped
+    expect(pkgResult?.skipped).toContain("Brewfile");
+    expect(pkgResult?.applied).toHaveLength(0);
+    await server.close();
+  });
+
+  it("POST /api/load with { apply: true } → real path: returns results with applied items", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(makeFakeModule({ name: "packages" }));
+    let sel = emptySelection();
+    sel = addItem(sel, "packages", "Brewfile");
+    saveSelection(tmpDir, sel);
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/load",
+      payload: { apply: true },
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { results: ApplyResult[] };
+    const pkgResult = body.results.find((r) => r.module === "packages");
+    expect(pkgResult).toBeDefined();
+    expect(pkgResult?.applied).toContain("Brewfile");
+    expect(pkgResult?.skipped).toHaveLength(0);
+    await server.close();
+  });
+
+  it("handler error → 500 { error: string }", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        statusFn: async () => { throw new Error("module exploded"); },
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/status" });
+    expect(res.statusCode).toBe(500);
+    const body = res.json() as { error: string };
+    expect(typeof body.error).toBe("string");
+    expect(body.error).toMatch(/module exploded/);
+    await server.close();
+  });
+
+  it("GET / with no webDir → 200 fallback hint JSON", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { name: string; hint: string };
+    expect(body.name).toBe("roost");
+    expect(typeof body.hint).toBe("string");
+    await server.close();
+  });
+});

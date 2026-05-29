@@ -1,0 +1,156 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+import Fastify from "fastify";
+import type { FastifyInstance } from "fastify";
+import type { ModuleContext } from "@roost/shared";
+import type { ModuleRegistry } from "@roost/core";
+import {
+  loadSelection,
+  listStateHosts,
+  readState,
+  captureAll,
+  loadAll,
+  statusAll,
+  defaultRegistry,
+  createExec,
+  createLogger,
+  createT,
+} from "@roost/core";
+
+export interface ServerDeps {
+  repoDir: string;
+  registry: ModuleRegistry;
+  makeCtx: (dryRun: boolean) => ModuleContext;
+  webDir?: string;
+}
+
+export function buildServer(deps: ServerDeps): FastifyInstance {
+  const { repoDir, registry, makeCtx, webDir } = deps;
+
+  const server = Fastify({ logger: false });
+
+  // ── /api/health ─────────────────────────────────────────────────────────────
+  server.get("/api/health", async (_req, reply) => {
+    return reply.send({ ok: true, name: "roost" });
+  });
+
+  // ── /api/modules ─────────────────────────────────────────────────────────────
+  server.get("/api/modules", async (_req, reply) => {
+    const modules = registry.list().map((m) => m.name);
+    return reply.send({ modules });
+  });
+
+  // ── /api/selection ───────────────────────────────────────────────────────────
+  server.get("/api/selection", async (_req, reply) => {
+    try {
+      const sel = loadSelection(repoDir);
+      return reply.send(sel);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── /api/status ──────────────────────────────────────────────────────────────
+  server.get("/api/status", async (_req, reply) => {
+    try {
+      const sel = loadSelection(repoDir);
+      const reports = await statusAll(registry, makeCtx(true), sel);
+      return reply.send({ reports });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── /api/machines ────────────────────────────────────────────────────────────
+  server.get("/api/machines", async (_req, reply) => {
+    try {
+      const hosts = listStateHosts(repoDir);
+      const states: Record<string, unknown> = {};
+      for (const host of hosts) {
+        states[host] = readState(repoDir, host);
+      }
+      return reply.send({ hosts, states });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── POST /api/capture ────────────────────────────────────────────────────────
+  server.post("/api/capture", async (_req, reply) => {
+    try {
+      const sel = loadSelection(repoDir);
+      const changes = await captureAll(registry, makeCtx(false), sel);
+      return reply.send({ changes });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── POST /api/load ───────────────────────────────────────────────────────────
+  interface LoadBody { apply?: boolean }
+
+  server.post<{ Body: LoadBody }>("/api/load", async (req, reply) => {
+    try {
+      const apply = req.body?.apply === true;
+      const dryRun = !apply;
+      const backupDir = path.join(os.homedir(), ".roost-backups", "load");
+      const sel = loadSelection(repoDir);
+      const results = await loadAll(registry, makeCtx(dryRun), sel, { dryRun, backupDir });
+      return reply.send({ results });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── static / SPA ─────────────────────────────────────────────────────────────
+  if (webDir && fs.existsSync(webDir)) {
+    // Dynamic import to avoid touching this code path in tests that skip webDir
+    void server.register(import("@fastify/static"), {
+      root: webDir,
+      prefix: "/",
+    });
+  } else {
+    server.get("/", async (_req, reply) => {
+      return reply.send({
+        name: "roost",
+        hint: "build packages/web and pass webDir, or use the CLI",
+      });
+    });
+  }
+
+  return server;
+}
+
+// ── runServe ──────────────────────────────────────────────────────────────────
+
+export async function runServe(opts: {
+  repoDir: string;
+  port?: number;
+  webDir?: string;
+}): Promise<void> {
+  const { repoDir, port = 4317, webDir } = opts;
+  const home = os.homedir();
+
+  const makeCtx = (dryRun: boolean): ModuleContext => ({
+    repoDir,
+    home,
+    profile: "base",
+    dryRun,
+    exec: createExec(),
+    log: createLogger(),
+    t: createT(process.env["ROOST_LOCALE"] ?? "en"),
+  });
+
+  const registry = defaultRegistry();
+  const server = buildServer({ repoDir, registry, makeCtx, webDir });
+
+  await server.listen({ host: "127.0.0.1", port });
+  const url = `http://127.0.0.1:${port}`;
+  console.log(`roost serve listening on ${url}`);
+}

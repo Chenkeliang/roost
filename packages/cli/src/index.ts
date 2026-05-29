@@ -17,6 +17,7 @@ import { runImport } from "./commands/import.js";
 import { runAudit } from "./commands/audit.js";
 import { runKeyRotate } from "./commands/keyRotate.js";
 import { runPlugins } from "./commands/plugins.js";
+import { runServe } from "./server.js";
 
 const program = new Command();
 program.name("roost").description("Back up and migrate your Mac setup").version("0.0.0");
@@ -222,6 +223,21 @@ program
     const reg = defaultRegistry();
     const { ctx } = buildCtx();
     runPlugins({ registry: reg, log: (msg) => ctx.log.info(msg) });
+  });
+
+program
+  .command("serve")
+  .description("Start the local JSON API server (browser mode fallback)")
+  .option("--port <n>", "Port to listen on (default 4317)", (v) => parseInt(v, 10))
+  .option("--repo <dir>", "Path to the config repo directory")
+  .option("--web <dir>", "Path to the web build directory (packages/web/dist)")
+  .action(async (opts: { port?: number; repo?: string; web?: string }) => {
+    const { repoDir } = buildCtx();
+    await runServe({
+      repoDir: opts.repo ?? repoDir,
+      port: opts.port,
+      webDir: opts.web,
+    });
   });
 
 program.parseAsync();
