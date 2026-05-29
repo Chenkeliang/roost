@@ -1,6 +1,7 @@
 import tseslint from "typescript-eslint";
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**"] },
+  // packages/web uses JSX/TSX and its own tsconfig — lint is handled by tsc --noEmit in that package
+  { ignores: ["**/dist/**", "**/node_modules/**", "packages/web/**"] },
   ...tseslint.configs.recommended,
   {
     rules: {
