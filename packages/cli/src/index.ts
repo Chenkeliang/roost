@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
 import { ModuleRegistry, exampleModule, createExec, createLogger, createT } from "@roost/core";
+import * as readline from "node:readline";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
 import { runSelect } from "./commands/select.js";
@@ -11,6 +12,7 @@ import { runLoad } from "./commands/load.js";
 import { runList } from "./commands/list.js";
 import { runStatus } from "./commands/status.js";
 import { runDiff } from "./commands/diff.js";
+import { runLearn } from "./commands/learn.js";
 
 const program = new Command();
 program.name("roost").description("Back up and migrate your Mac setup").version("0.0.0");
@@ -110,6 +112,31 @@ program
   .action(async () => {
     const { repoDir, ctx } = buildCtx();
     await runDiff({ repoDir, ctx });
+  });
+
+// ── app <sub-command group> ───────────────────────────────────────────────────
+
+const appCmd = program.command("app").description("App-level commands");
+
+appCmd
+  .command("learn")
+  .description("Record which app domains changed while you edit a setting in a GUI app")
+  .action(async () => {
+    const { repoDir, ctx } = buildCtx();
+    const confirm = (): Promise<void> =>
+      new Promise((resolve) => {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        rl.question("Change the setting in the app, then press Enter…", () => {
+          rl.close();
+          resolve();
+        });
+      });
+    const { changedDomains } = await runLearn({ ctx, repoDir, confirm });
+    if (changedDomains.length === 0) {
+      ctx.log.info("No domains changed.");
+    } else {
+      ctx.log.info(`Captured ${changedDomains.length} changed domain(s): ${changedDomains.join(", ")}`);
+    }
   });
 
 program.parseAsync();

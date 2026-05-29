@@ -3,6 +3,7 @@ import type { ModuleContext, Candidate, ChangeSet, DriftReport, ApplyResult, Sel
 import { ModuleRegistry } from "./registry.js";
 import { dotfilesModule } from "./modules/dotfiles.js";
 import { packagesModule } from "./modules/packages.js";
+import { appconfigModule } from "./modules/appconfig.js";
 import { assertNoPlaintextSecrets } from "./secrets/scanner.js";
 import { createChezmoi } from "./adapters/chezmoi.js";
 import { backupFiles } from "./apply.js";
@@ -11,6 +12,7 @@ export function defaultRegistry(): ModuleRegistry {
   const reg = new ModuleRegistry();
   reg.register(dotfilesModule);
   reg.register(packagesModule);
+  reg.register(appconfigModule);
   return reg;
 }
 

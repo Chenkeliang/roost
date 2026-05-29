@@ -25,6 +25,9 @@ export { scanDir, isNoise } from "./discovery/scan.js";
 export type { ScanCandidate } from "./discovery/scan.js";
 export { dotfilesModule, classifyDotfile, isSensitivePath } from "./modules/dotfiles.js";
 export { packagesModule } from "./modules/packages.js";
+export { appconfigModule, classifyDomain } from "./modules/appconfig.js";
+export { snapshotDomains, diffSnapshots, quitApp } from "./discovery/learn.js";
+export type { DomainSnapshot } from "./discovery/learn.js";
 export {
   STATE_SCHEMA_VERSION,
   stateDir,

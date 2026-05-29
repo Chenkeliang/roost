@@ -52,12 +52,13 @@ afterEach(() => {
 // ── defaultRegistry ───────────────────────────────────────────────────────────
 
 describe("defaultRegistry", () => {
-  it("lists dotfiles and packages modules", () => {
+  it("lists dotfiles, packages, and appconfig modules", () => {
     const reg = defaultRegistry();
     const names = reg.list().map((m) => m.name);
     expect(names).toContain("dotfiles");
     expect(names).toContain("packages");
-    expect(names).toHaveLength(2);
+    expect(names).toContain("appconfig");
+    expect(names).toHaveLength(3);
   });
 });
 
