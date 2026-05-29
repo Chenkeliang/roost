@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import * as os from "os";
-import * as fs from "fs";
-import * as path from "path";
+import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
 import { packagesModule } from "./packages.js";
 

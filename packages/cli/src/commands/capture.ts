@@ -20,9 +20,7 @@ export async function runCapture(deps: CaptureDeps): Promise<ChangeSet[]> {
   const reg = defaultRegistry();
   const sel = loadSelection(repoDir);
 
-  const changeSets = await captureAll(reg, ctx, sel);
-
-  // Gate secrets: read each non-sensitive selected dotfile and check for secrets
+  // Gate secrets BEFORE capture: read each non-sensitive selected dotfile and check
   const dotfileIds = sel.modules["dotfiles"] ?? [];
   const toCheck: { path: string; content: string }[] = [];
   for (const id of dotfileIds) {
@@ -31,7 +29,9 @@ export async function runCapture(deps: CaptureDeps): Promise<ChangeSet[]> {
     const content = fs.readFileSync(id, "utf8");
     toCheck.push({ path: id, content });
   }
-  gateSecrets(toCheck);
+  gateSecrets(toCheck); // throws if a secret is found — nothing captured yet
+
+  const changeSets = await captureAll(reg, ctx, sel);
 
   await commitRepo(ctx.exec, repoDir, "roost: capture");
 

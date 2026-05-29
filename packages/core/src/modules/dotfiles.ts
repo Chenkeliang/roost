@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type {
   SyncModule,
   ModuleContext,
@@ -95,11 +95,12 @@ export const dotfilesModule: SyncModule = {
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const candidates: Candidate[] = [];
 
-    // Scan home dir for dot-entries
+    // Scan home dir for dot-entries (skip .config itself — scanned separately below)
     const homeEntries = scanDir(ctx.home);
     for (const entry of homeEntries) {
       const base = path.basename(entry.path);
       if (!base.startsWith(".")) continue; // only dotfiles/dotdirs at home level
+      if (base === ".config") continue; // scanned into separately below
       const rec = classifyDotfile(entry.path);
       if (rec === "exclude") continue;
       candidates.push({

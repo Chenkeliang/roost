@@ -4,6 +4,12 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { backupFiles } from "./apply.js";
 
+/** Derive where backupFiles will write a given source file. */
+function destFor(source: string, backupDir: string): string {
+  const relative = source.replace(/^[/\\]/, "");
+  return path.join(backupDir, relative);
+}
+
 describe("backupFiles", () => {
   let tmpDir: string;
   let backupDir: string;
@@ -34,24 +40,21 @@ describe("backupFiles", () => {
     expect(backed).not.toContain(missing);
   });
 
-  it("creates backupDir if it does not exist", () => {
+  it("creates backupDir (and intermediate dirs) if they do not exist", () => {
     expect(fs.existsSync(backupDir)).toBe(false);
     const existing1 = path.join(tmpDir, "file1.txt");
     backupFiles([existing1], backupDir);
-    expect(fs.existsSync(backupDir)).toBe(true);
+    expect(fs.existsSync(destFor(existing1, backupDir))).toBe(true);
   });
 
-  it("copies file contents into backupDir preserving basename", () => {
+  it("copies file contents preserving full path structure under backupDir", () => {
     const existing1 = path.join(tmpDir, "file1.txt");
     const existing2 = path.join(tmpDir, "file2.txt");
 
     backupFiles([existing1, existing2], backupDir);
 
-    const copiedContent1 = fs.readFileSync(path.join(backupDir, "file1.txt"), "utf8");
-    const copiedContent2 = fs.readFileSync(path.join(backupDir, "file2.txt"), "utf8");
-
-    expect(copiedContent1).toBe("content1");
-    expect(copiedContent2).toBe("content2");
+    expect(fs.readFileSync(destFor(existing1, backupDir), "utf8")).toBe("content1");
+    expect(fs.readFileSync(destFor(existing2, backupDir), "utf8")).toBe("content2");
   });
 
   it("returns empty array when all targets are nonexistent", () => {
@@ -66,5 +69,29 @@ describe("backupFiles", () => {
   it("returns empty array when targets list is empty", () => {
     const backed = backupFiles([], backupDir);
     expect(backed).toHaveLength(0);
+  });
+
+  it("two files sharing a basename in different dirs are both backed up without clobbering", () => {
+    // Create two files with the same basename in different directories
+    const dirA = path.join(tmpDir, "a");
+    const dirB = path.join(tmpDir, "b");
+    fs.mkdirSync(dirA, { recursive: true });
+    fs.mkdirSync(dirB, { recursive: true });
+    const fileA = path.join(dirA, ".zshrc");
+    const fileB = path.join(dirB, ".zshrc");
+    fs.writeFileSync(fileA, "content-from-a");
+    fs.writeFileSync(fileB, "content-from-b");
+
+    const backed = backupFiles([fileA, fileB], backupDir);
+
+    expect(backed).toHaveLength(2);
+    // Both destination paths exist
+    const destA = destFor(fileA, backupDir);
+    const destB = destFor(fileB, backupDir);
+    expect(fs.existsSync(destA)).toBe(true);
+    expect(fs.existsSync(destB)).toBe(true);
+    // Contents are not clobbered — each gets the right content
+    expect(fs.readFileSync(destA, "utf8")).toBe("content-from-a");
+    expect(fs.readFileSync(destB, "utf8")).toBe("content-from-b");
   });
 });

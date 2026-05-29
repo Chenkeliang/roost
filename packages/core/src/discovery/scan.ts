@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 export interface ScanCandidate {
   path: string;
@@ -33,7 +33,7 @@ export function isNoise(absPath: string): boolean {
 
 export function scanDir(
   root: string,
-  opts?: { maxEntries?: number; maxSizeBytes?: number },
+  opts?: { maxEntries?: number },
 ): ScanCandidate[] {
   const maxEntries = opts?.maxEntries ?? 500;
   const results: ScanCandidate[] = [];

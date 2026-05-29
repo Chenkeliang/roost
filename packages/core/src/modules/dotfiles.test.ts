@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection } from "@roost/shared";
 import { classifyDotfile, isSensitivePath, dotfilesModule } from "./dotfiles.js";
 
@@ -187,6 +187,19 @@ describe("dotfilesModule.discover", () => {
     const nvim = candidates.find((c) => c.path.endsWith("nvim"));
     expect(nvim).toBeDefined();
     expect(nvim!.recommendation).toBe("track");
+  });
+
+  it(".config dir itself is not a candidate but .config/<child> is", async () => {
+    fs.mkdirSync(path.join(tmpHome, ".config", "fish"), { recursive: true });
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome });
+    const candidates = await dotfilesModule.discover(ctx);
+    // .config entry at home level should not appear
+    const configEntry = candidates.find((c) => c.path === path.join(tmpHome, ".config"));
+    expect(configEntry).toBeUndefined();
+    // .config/fish child should appear
+    const fishEntry = candidates.find((c) => c.path.endsWith("fish"));
+    expect(fishEntry).toBeDefined();
   });
 
   it("assigns correct categories to known basenames", async () => {

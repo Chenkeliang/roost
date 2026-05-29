@@ -4,7 +4,6 @@ import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection } from "@roost/shared";
 import { defaultRegistry, discoverAll, captureAll, gateSecrets, statusAll, loadAll } from "./orchestrate.js";
-import { emptySelection, loadSelection, saveSelection } from "./selection.js";
 
 // ── fake exec ─────────────────────────────────────────────────────────────────
 
@@ -228,7 +227,8 @@ describe("loadAll", () => {
     expect(dotResult).toBeDefined();
     // backedUp should include zshrcPath since it exists
     expect(dotResult?.backedUp).toContain(zshrcPath);
-    // backup dir was created and file copied
-    expect(fs.existsSync(path.join(backupDir, ".zshrc"))).toBe(true);
+    // backup dir was created and file copied (full path mirrored under backupDir)
+    const zshrcRel = zshrcPath.replace(/^[/\\]/, "");
+    expect(fs.existsSync(path.join(backupDir, zshrcRel))).toBe(true);
   });
 });

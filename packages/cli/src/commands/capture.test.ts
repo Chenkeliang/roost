@@ -76,7 +76,7 @@ describe("runCapture", () => {
     expect(gitCommit).toBeDefined();
   });
 
-  it("throws (gateSecrets) when dotfile content has a secret", async () => {
+  it("throws (gateSecrets) when dotfile content has a secret AND chezmoi add is never called", async () => {
     const repoDir = path.join(tmpDir, "repo");
     const home = path.join(tmpDir, "home");
     fs.mkdirSync(repoDir, { recursive: true });
@@ -90,11 +90,15 @@ describe("runCapture", () => {
     sel = addItem(sel, "dotfiles", dotfileId);
     saveSelection(repoDir, sel);
 
-    const { exec } = makeFakeExec(
+    const { exec, calls } = makeFakeExec(
       Array.from({ length: 20 }, () => ({ code: 0, stdout: "", stderr: "" })),
     );
     const ctx = makeCtx({ exec, home, repoDir });
 
     await expect(runCapture({ repoDir, ctx })).rejects.toThrow(/secret/i);
+
+    // chezmoi add must NOT have been called — gate fired before capture
+    const chezmoiAdd = calls.find((c) => c.cmd === "chezmoi" && c.args.includes("add"));
+    expect(chezmoiAdd).toBeUndefined();
   });
 });
