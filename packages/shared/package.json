@@ -4,5 +4,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "scripts": { "build": "tsup src/index.ts --format esm --dts" }
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc --noEmit"
+  }
 }

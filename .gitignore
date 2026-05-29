@@ -7,3 +7,4 @@ coverage/
 # secrets / keys never committed
 *.age
 keys.txt
+*.tsbuildinfo
