@@ -2,16 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import * as crypto from "node:crypto";
 import type { Exec, ExecResult, ModuleContext } from "@roost/shared";
 import { saveSelection, emptySelection, loadSelection } from "@roost/core";
 import { runLearn } from "./learn.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function sha256(s: string): string {
-  return crypto.createHash("sha256").update(s).digest("hex");
-}
 
 type Call = { cmd: string; args: string[] };
 
@@ -62,8 +57,6 @@ describe("runLearn", () => {
     const domain = "com.apple.dock";
     const xmlBefore = "<plist><dict><key>before</key></dict></plist>";
     const xmlAfter = "<plist><dict><key>after</key></dict></plist>";
-    const hashBefore = sha256(xmlBefore);
-    const hashAfter = sha256(xmlAfter);
 
     // Exec sequence:
     //   1. defaults domains (before snapshot — returns only com.apple.dock)
@@ -78,9 +71,6 @@ describe("runLearn", () => {
       { code: 0, stdout: xmlAfter, stderr: "" },           // export after
       { code: 0, stdout: xmlAfter, stderr: "" },           // capture export
     ]);
-
-    // Suppress unused-variable TS warnings about sha hashes — they're used in assertions
-    void hashBefore; void hashAfter;
 
     const repoDir = path.join(tmpDir, "repo");
     fs.mkdirSync(repoDir, { recursive: true });

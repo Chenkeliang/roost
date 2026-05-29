@@ -184,6 +184,21 @@ describe("loadPlugins", () => {
     expect(result.rejected[0]!.reason).toMatch(/already registered/i);
   });
 
+  it("unwraps a default export (no top-level manifest) and loads successfully", async () => {
+    const reg = new ModuleRegistry();
+    const validPlugin = makeValidPlugin("roost-module-fonts", "fonts");
+
+    // Simulate a module that only has a default export (no top-level manifest)
+    const defaultExportModule = { default: validPlugin };
+    const importer = async (_spec: string): Promise<unknown> => defaultExportModule;
+
+    const result = await loadPlugins(reg, ["roost-module-fonts"], importer);
+
+    expect(result.loaded).toContain("roost-module-fonts");
+    expect(result.rejected).toHaveLength(0);
+    expect(reg.get("fonts")).toBeDefined();
+  });
+
   it("returns empty loaded/rejected for empty specs list", async () => {
     const reg = new ModuleRegistry();
     const result = await loadPlugins(reg, [], async (_s) => ({}));

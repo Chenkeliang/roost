@@ -105,7 +105,14 @@ export async function loadPlugins(
   for (const spec of specs) {
     try {
       const mod = await importer(spec);
-      const plugin = validatePlugin(mod);
+      // Unwrap a default export: if the namespace lacks a top-level `manifest`
+      // but has a `default` that looks like a plugin, use it instead.
+      const ns = mod as Record<string, unknown>;
+      const candidate =
+        ns && typeof ns === "object" && !("manifest" in ns) && "default" in ns
+          ? (ns as { default: unknown }).default
+          : ns;
+      const plugin = validatePlugin(candidate);
       registry.register(plugin.createModule());
       loaded.push(plugin.manifest.name);
     } catch (err: unknown) {
