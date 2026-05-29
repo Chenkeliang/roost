@@ -66,3 +66,13 @@ export { auditRepo } from "./secrets/audit.js";
 export type { AuditReport, AuditFinding } from "./secrets/audit.js";
 export { rotateAgeKey } from "./secrets/rotate.js";
 export type { RotateResult } from "./secrets/rotate.js";
+export {
+  ROOST_API_VERSION,
+  validatePlugin,
+  loadPlugins,
+} from "./plugins/loader.js";
+export type {
+  PluginManifest,
+  RoostPlugin,
+  LoadResult,
+} from "./plugins/loader.js";
