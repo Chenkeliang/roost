@@ -24,3 +24,4 @@ export type { SecretFinding } from "./secrets/scanner.js";
 export { scanDir, isNoise } from "./discovery/scan.js";
 export type { ScanCandidate } from "./discovery/scan.js";
 export { dotfilesModule, classifyDotfile, isSensitivePath } from "./modules/dotfiles.js";
+export { packagesModule } from "./modules/packages.js";
