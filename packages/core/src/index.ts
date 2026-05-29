@@ -35,3 +35,13 @@ export {
 } from "./state.js";
 export type { MachineState } from "./state.js";
 export { backupFiles } from "./apply.js";
+export { PRESETS, getPreset, applyPreset } from "./presets.js";
+export type { Preset } from "./presets.js";
+export {
+  defaultRegistry,
+  discoverAll,
+  captureAll,
+  gateSecrets,
+  statusAll,
+  loadAll,
+} from "./orchestrate.js";
