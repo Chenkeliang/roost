@@ -2,10 +2,12 @@
 import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
+import * as prompts from "@clack/prompts";
 import { ModuleRegistry, exampleModule, createExec, createLogger, createT, defaultRegistry } from "@roost/core";
 import * as readline from "node:readline";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
+import { runInitGithub } from "./initGithub.js";
 import { runSelect } from "./commands/select.js";
 import { runCapture } from "./commands/capture.js";
 import { runLoad } from "./commands/load.js";
@@ -39,6 +41,37 @@ function buildCtx(opts: { dryRun?: boolean } = {}) {
   };
 }
 
+// Resolve a GitHub PAT: prefer GITHUB_TOKEN env (non-interactive), else a masked
+// password prompt. The returned token is used once by the caller and discarded;
+// it is never logged or persisted here.
+async function promptGitHubToken(): Promise<string | null> {
+  const fromEnv = process.env["GITHUB_TOKEN"];
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+
+  const entered = await prompts.password({
+    message: "GitHub Personal Access Token (repo scope) — used once, never stored",
+    validate: (v) => (!v || v.length === 0 ? "Token is required" : undefined),
+  });
+  if (prompts.isCancel(entered)) {
+    prompts.cancel("Cancelled.");
+    process.exit(0);
+  }
+  return entered;
+}
+
+async function promptRepoName(defaultName: string): Promise<string> {
+  const entered = await prompts.text({
+    message: "Name for the new private GitHub repo",
+    defaultValue: defaultName,
+    placeholder: defaultName,
+  });
+  if (prompts.isCancel(entered)) {
+    prompts.cancel("Cancelled.");
+    process.exit(0);
+  }
+  return entered.length > 0 ? entered : defaultName;
+}
+
 program.command("doctor").description("Check dependencies and module health").action(async () => {
   const reg = new ModuleRegistry();
   reg.register(exampleModule);
@@ -52,9 +85,24 @@ program
   .command("init")
   .description("Scaffold the config repo with roost/ and chezmoi stubs")
   .option("--repo <dir>", "Path to the config repo directory")
-  .action(async (opts: { repo?: string }) => {
-    const { repoDir, ctx } = buildCtx();
+  .option("--github", "Also create a PRIVATE GitHub repo via the API, wire origin, and push")
+  .option("--dry-run", "With --github: print intent and make no API calls or pushes")
+  .action(async (opts: { repo?: string; github?: boolean; dryRun?: boolean }) => {
+    const { repoDir, ctx } = buildCtx({ dryRun: opts.dryRun });
     const resolvedRepo = opts.repo ?? repoDir;
+
+    if (opts.github) {
+      await runInitGithub({
+        repoDir: resolvedRepo,
+        exec: ctx.exec,
+        log: ctx.log,
+        dryRun: opts.dryRun ?? false,
+        getToken: promptGitHubToken,
+        getRepoName: promptRepoName,
+      });
+      return;
+    }
+
     const { created } = await runInit({ repoDir: resolvedRepo });
     if (created.length === 0) {
       ctx.log.info("roost init: already initialized, nothing to do");
