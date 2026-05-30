@@ -801,7 +801,7 @@ describe("buildServer", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json() as { index: Record<string, { managed: number; available: boolean }> };
     expect(body.index.projects).toBeDefined();
-    expect(typeof body.index.projects.managed).toBe("number");
+    expect(typeof body.index.projects!.managed).toBe("number");
     await server.close();
   });
 });
