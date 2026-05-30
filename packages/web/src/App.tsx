@@ -5,15 +5,17 @@ import { ActionBar } from "./components/ActionBar";
 import { Hud, type HudMessage } from "./components/Hud";
 import { Overview } from "./views/Overview";
 import { Manage } from "./views/Manage";
+import { AliasesEnv } from "./views/AliasesEnv";
 import { Drift } from "./views/Drift";
 import { Timeline } from "./views/Timeline";
 import { Settings } from "./views/Settings";
 
-type Tab = "overview" | "manage" | "drift" | "timeline" | "settings";
+type Tab = "overview" | "manage" | "env" | "drift" | "timeline" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "manage", label: "Manage" },
+  { id: "env", label: "Aliases & Env" },
   { id: "drift", label: "Drift" },
   { id: "timeline", label: "Timeline" },
   { id: "settings", label: "Settings" },
@@ -166,6 +168,7 @@ export function App() {
       <main style={{ paddingBottom: 60 }}>
         {activeTab === "overview" && <Overview showHud={showHud} />}
         {activeTab === "manage" && <Manage showHud={showHud} />}
+        {activeTab === "env" && <AliasesEnv showHud={showHud} />}
         {activeTab === "drift" && <Drift />}
         {activeTab === "timeline" && <Timeline />}
         {activeTab === "settings" && <Settings />}
