@@ -182,6 +182,17 @@ export function getDiscoverModule(module: string): Promise<DiscoverResponse> {
   return apiFetch<DiscoverResponse>(`/api/discover?module=${encodeURIComponent(module)}`);
 }
 
+// Server GET /api/packages/brewfile
+export interface BrewfileResponse {
+  available: boolean;
+  exists: boolean;
+  entries: { taps: string[]; formulae: string[]; casks: string[]; mas: string[] };
+}
+
+export function getBrewfile(): Promise<BrewfileResponse> {
+  return apiFetch<BrewfileResponse>("/api/packages/brewfile");
+}
+
 export function testProjectRemote(remote: string): Promise<{ reachable: boolean; message: string }> {
   return apiFetch("/api/projects/test", {
     method: "POST",
