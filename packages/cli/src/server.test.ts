@@ -844,6 +844,33 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/appconfig → 200 { available: true; managed: string[] } listing plist basenames", async () => {
+    const reg = new ModuleRegistry();
+    const acDir = path.join(tmpDir, "roost/appconfig");
+    fs.mkdirSync(acDir, { recursive: true });
+    fs.writeFileSync(path.join(acDir, "com.apple.dock.plist"), "x", "utf8");
+    fs.writeFileSync(path.join(acDir, "com.googlecode.iterm2.plist"), "x", "utf8");
+    fs.writeFileSync(path.join(acDir, "ignore.txt"), "x", "utf8");
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/appconfig" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { available: boolean; managed: string[] };
+    expect(body.available).toBe(true);
+    expect(body.managed.sort()).toEqual(["com.apple.dock", "com.googlecode.iterm2"]);
+    await server.close();
+  });
+
+  it("GET /api/appconfig → managed [] when appconfig dir absent", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/appconfig" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { available: boolean; managed: string[] };
+    expect(body.available).toBe(true);
+    expect(body.managed).toEqual([]);
+    await server.close();
+  });
+
   it("GET /api/index → 200 { index: { <module>: ModuleIndex } }", async () => {
     const reg = defaultRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });

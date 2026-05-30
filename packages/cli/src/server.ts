@@ -154,6 +154,30 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  // ── GET /api/appconfig ─────────────────────────────────────────────────────────
+  // Content-first: list managed domains = basenames (sans .plist) of files under
+  // roost/appconfig/. `defaults` is a macOS system tool, so available is always
+  // true — no probe needed. [] if the dir is absent.
+  server.get("/api/appconfig", async (_req, reply) => {
+    try {
+      const result = await cache.getOrCompute("appconfig:managed", async () => {
+        const dir = path.join(repoDir, "roost/appconfig");
+        let managed: string[] = [];
+        if (fs.existsSync(dir)) {
+          managed = fs
+            .readdirSync(dir)
+            .filter((f) => f.endsWith(".plist"))
+            .map((f) => f.slice(0, -".plist".length));
+        }
+        return { available: true, managed };
+      });
+      return reply.send(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
   // ── /api/machines ────────────────────────────────────────────────────────────
   server.get("/api/machines", async (_req, reply) => {
     try {
