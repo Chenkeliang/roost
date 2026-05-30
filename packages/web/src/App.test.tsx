@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { act } from "react";
 import { App } from "./App";
 
 // Mock the api module
@@ -17,8 +18,10 @@ describe("App", () => {
     vi.clearAllMocks();
   });
 
-  it("renders all nav tabs", () => {
-    render(<App />);
+  it("renders all nav tabs", async () => {
+    await act(async () => {
+      render(<App />);
+    });
     // Multiple "Overview" buttons exist (nav tab + action bar) — use getAllByRole
     expect(screen.getAllByRole("button", { name: "Overview" }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Manage" })).toBeTruthy();
@@ -27,25 +30,33 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
   });
 
-  it("shows the Roost brand name", () => {
-    render(<App />);
+  it("shows the Roost brand name", async () => {
+    await act(async () => {
+      render(<App />);
+    });
     expect(screen.getByText("Roost")).toBeTruthy();
   });
 
-  it("shows local shield chip", () => {
-    render(<App />);
+  it("shows local shield chip", async () => {
+    await act(async () => {
+      render(<App />);
+    });
     expect(screen.getByText("local")).toBeTruthy();
   });
 
-  it("command palette opens when Actions button is clicked in action bar", () => {
-    render(<App />);
+  it("command palette opens when Actions button is clicked in action bar", async () => {
+    await act(async () => {
+      render(<App />);
+    });
     const actionsBtn = screen.getByRole("button", { name: "Actions" });
     fireEvent.click(actionsBtn);
     expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
   });
 
-  it("command palette closes on Escape", () => {
-    render(<App />);
+  it("command palette closes on Escape", async () => {
+    await act(async () => {
+      render(<App />);
+    });
     const actionsBtn = screen.getByRole("button", { name: "Actions" });
     fireEvent.click(actionsBtn);
     expect(screen.getByRole("dialog")).toBeTruthy();
