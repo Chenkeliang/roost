@@ -1,0 +1,46 @@
+name: docs
+
+on:
+  push:
+    paths:
+      - "website/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "website/**"
+      - ".github/workflows/docs.yml"
+
+jobs:
+  # Build the Starlight docs on every change. Verifies the docs build for
+  # pushes and PRs (works on a private repo) and produces the Pages artifact.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 24 }
+      - run: pnpm --dir website install --frozen-lockfile
+      - run: pnpm --dir website build
+        env:
+          PAGES_BASE: /roost
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/dist
+
+  # Publish to GitHub Pages. Gated to pushes on main only, so it never runs on
+  # feature branches or PRs. Activates once work lands on main AND Pages is
+  # enabled (Settings -> Pages -> Source: GitHub Actions).
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

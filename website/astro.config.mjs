@@ -4,9 +4,16 @@ import starlight from "@astrojs/starlight";
 
 // Roost docs site (Starlight). Fully static / offline build; built-in Pagefind
 // search. Standalone from the product workspace.
+//
+// GitHub Pages serves this project site under a `/roost` sub-path. The deploy
+// workflow sets PAGES_BASE=/roost so the build emits the correct base; local
+// dev/build leaves it unset and serves from the root. Starlight rewrites
+// internal links and the sidebar to honor `base` automatically.
+const base = process.env.PAGES_BASE ?? undefined;
+
 export default defineConfig({
-  // Update to the real deploy URL when publishing.
-  site: "https://chenkeliang.github.io/roost",
+  site: "https://chenkeliang.github.io",
+  base,
   integrations: [
     starlight({
       title: "Roost",
@@ -33,6 +40,7 @@ export default defineConfig({
       sidebar: [
         {
           label: "Getting Started",
+          translations: { "zh-CN": "开始使用" },
           items: [
             { label: "Introduction", slug: "introduction" },
             { label: "Installation", slug: "installation" },
@@ -41,6 +49,7 @@ export default defineConfig({
         },
         {
           label: "Concepts",
+          translations: { "zh-CN": "核心概念" },
           items: [
             { label: "Core Concepts", slug: "core-concepts" },
             { label: "Modules", slug: "modules" },
@@ -50,6 +59,7 @@ export default defineConfig({
         },
         {
           label: "Using Roost",
+          translations: { "zh-CN": "使用 Roost" },
           items: [
             { label: "Dashboard", slug: "dashboard" },
             { label: "Safety & FAQ", slug: "safety-and-faq" },
