@@ -9,12 +9,14 @@ import { AliasesEnv } from "./views/AliasesEnv";
 import { Drift } from "./views/Drift";
 import { Timeline } from "./views/Timeline";
 import { Settings } from "./views/Settings";
+import { Projects } from "./views/Projects";
 
-type Tab = "overview" | "manage" | "env" | "drift" | "timeline" | "settings";
+type Tab = "overview" | "manage" | "projects" | "env" | "drift" | "timeline" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "manage", label: "Manage" },
+  { id: "projects", label: "Projects" },
   { id: "env", label: "Aliases & Env" },
   { id: "drift", label: "Drift" },
   { id: "timeline", label: "Timeline" },
@@ -175,6 +177,7 @@ export function App() {
       <main style={{ paddingBottom: 60 }}>
         {activeTab === "overview" && <Overview showHud={showHud} />}
         {activeTab === "manage" && <Manage showHud={showHud} />}
+        {activeTab === "projects" && <Projects showHud={showHud} />}
         {activeTab === "env" && <AliasesEnv showHud={showHud} />}
         {activeTab === "drift" && <Drift />}
         {activeTab === "timeline" && <Timeline />}
