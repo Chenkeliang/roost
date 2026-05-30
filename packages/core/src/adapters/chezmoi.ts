@@ -6,6 +6,7 @@ export interface Chezmoi {
   diff(): Promise<string>;
   verify(): Promise<boolean>;
   managed(): Promise<string[]>;
+  forget(path: string): Promise<void>;
 }
 
 export function createChezmoi(exec: Exec, opts: { sourceDir: string }): Chezmoi {
@@ -42,6 +43,10 @@ export function createChezmoi(exec: Exec, opts: { sourceDir: string }): Chezmoi 
     async managed(): Promise<string[]> {
       const { stdout } = await runChecked(["managed"]);
       return stdout.split("\n").filter((line) => line.length > 0);
+    },
+
+    async forget(forgetPath: string): Promise<void> {
+      await runChecked(["forget", "--force", forgetPath]);
     },
   };
 }

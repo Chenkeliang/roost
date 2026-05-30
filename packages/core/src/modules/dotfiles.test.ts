@@ -271,6 +271,41 @@ describe("dotfilesModule.capture", () => {
   });
 });
 
+// ── unmanage ──────────────────────────────────────────────────────────────────
+
+describe("dotfilesModule.unmanage", () => {
+  it("calls chezmoi forget --force for each selected id", async () => {
+    const ids = ["/home/user/.zshrc", "/home/user/.vimrc"];
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" }, // forget .zshrc
+      { code: 0, stdout: "", stderr: "" }, // forget .vimrc
+    ]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const sel: Selection = { modules: { dotfiles: ids } };
+    const result = await dotfilesModule.unmanage(ctx, sel);
+
+    for (const id of ids) {
+      const forgetCall = calls.find(
+        (c) => c.cmd === "chezmoi" && c.args.includes("forget") && c.args.includes("--force") && c.args.includes(id),
+      );
+      expect(forgetCall).toBeDefined();
+    }
+    expect(result.module).toBe("dotfiles");
+    expect(result.applied).toEqual(ids);
+    expect(result.backedUp).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+  });
+
+  it("handles empty selection gracefully", async () => {
+    const { exec, calls } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const sel: Selection = { modules: {} };
+    const result = await dotfilesModule.unmanage(ctx, sel);
+    expect(calls).toHaveLength(0);
+    expect(result.applied).toHaveLength(0);
+  });
+});
+
 // ── doctor ────────────────────────────────────────────────────────────────────
 
 describe("dotfilesModule.doctor", () => {

@@ -551,6 +551,54 @@ describe("projectsModule.apply", () => {
   });
 });
 
+// ── unmanage ──────────────────────────────────────────────────────────────────
+
+describe("projectsModule.unmanage", () => {
+  it("removes selected paths from projects.yaml and returns applied", async () => {
+    const repoDir = path.join(tmpDir, "roost-repo");
+    fs.mkdirSync(repoDir, { recursive: true });
+    const pathA = "/home/user/projects/alpha";
+    const pathB = "/home/user/projects/beta";
+
+    const { saveProjects } = await import("../projects.js");
+    saveProjects(repoDir, {
+      schemaVersion: 1,
+      projects: [
+        { path: pathA, repo: "https://github.com/u/alpha.git", envTool: "none" },
+        { path: pathB, repo: "https://github.com/u/beta.git", envTool: "none" },
+      ],
+    });
+
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpDir, repoDir });
+    const sel: Selection = { modules: { projects: [pathA] } };
+    const result = await projectsModule.unmanage(ctx, sel);
+
+    expect(result.module).toBe("projects");
+    expect(result.applied).toContain(pathA);
+    expect(result.applied).not.toContain(pathB);
+
+    // Verify on-disk state: only pathB remains
+    const { loadProjects } = await import("../projects.js");
+    const doc = loadProjects(repoDir);
+    expect(doc.projects.some((e) => e.path === pathA)).toBe(false);
+    expect(doc.projects.some((e) => e.path === pathB)).toBe(true);
+  });
+
+  it("returns empty result when no ids are in selection", async () => {
+    const repoDir = path.join(tmpDir, "roost-repo2");
+    fs.mkdirSync(repoDir, { recursive: true });
+
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpDir, repoDir });
+    const sel: Selection = { modules: {} };
+    const result = await projectsModule.unmanage(ctx, sel);
+
+    expect(result.applied).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+  });
+});
+
 // ── doctor ────────────────────────────────────────────────────────────────────
 
 describe("projectsModule.doctor", () => {

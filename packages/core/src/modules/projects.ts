@@ -232,13 +232,28 @@ export const projectsModule: SyncModule = {
     return "";
   },
 
-  async unmanage(_ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
-    return {
-      module: "projects",
-      applied: [],
-      backedUp: [],
-      skipped: sel.modules["projects"] ?? [],
-    };
+  async unmanage(ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
+    const ids = sel.modules["projects"] ?? [];
+    if (ids.length === 0) {
+      return { module: "projects", applied: [], backedUp: [], skipped: [] };
+    }
+
+    const doc = loadProjects(ctx.repoDir);
+    const idSet = new Set(ids);
+    const removed: string[] = [];
+
+    const remaining = doc.projects.filter((e) => {
+      if (idSet.has(e.path)) {
+        removed.push(e.path);
+        return false;
+      }
+      return true;
+    });
+
+    doc.projects = remaining;
+    saveProjects(ctx.repoDir, doc);
+
+    return { module: "projects", applied: removed, backedUp: [], skipped: [] };
   },
 
   async doctor(ctx: ModuleContext): Promise<Health[]> {

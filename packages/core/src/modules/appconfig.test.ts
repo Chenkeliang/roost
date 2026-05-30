@@ -329,6 +329,38 @@ describe("appconfigModule.status", () => {
   });
 });
 
+// ── unmanage ──────────────────────────────────────────────────────────────────
+
+describe("appconfigModule.unmanage", () => {
+  it("removes stored plist from repo and returns applied", async () => {
+    const domain = "com.apple.dock";
+    const plistFile = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
+    fs.mkdirSync(path.dirname(plistFile), { recursive: true });
+    fs.writeFileSync(plistFile, "<plist></plist>");
+
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, repoDir: tmpDir });
+    const sel: Selection = { modules: { appconfig: [`domain:${domain}`] } };
+    const result = await appconfigModule.unmanage(ctx, sel);
+
+    expect(result.module).toBe("appconfig");
+    expect(result.applied).toContain(`domain:${domain}`);
+    expect(result.skipped).toHaveLength(0);
+    expect(fs.existsSync(plistFile)).toBe(false);
+  });
+
+  it("skips when plist is already absent", async () => {
+    const domain = "com.apple.dock";
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, repoDir: tmpDir });
+    const sel: Selection = { modules: { appconfig: [`domain:${domain}`] } };
+    const result = await appconfigModule.unmanage(ctx, sel);
+
+    expect(result.applied).toHaveLength(0);
+    expect(result.skipped).toContain(`domain:${domain}`);
+  });
+});
+
 // ── doctor ────────────────────────────────────────────────────────────────────
 
 describe("appconfigModule.doctor", () => {

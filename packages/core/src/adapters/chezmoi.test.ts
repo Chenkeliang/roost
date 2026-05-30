@@ -107,4 +107,20 @@ describe("createChezmoi", () => {
     });
     expect(result).toEqual(["/home/user/.zshrc", "/home/user/.vimrc"]);
   });
+
+  it("forget: passes --source, forget, --force, and path", async () => {
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const chezmoi = createChezmoi(exec, { sourceDir });
+    await chezmoi.forget("/home/user/.zshrc");
+    expect(calls[0]).toEqual({
+      cmd: "chezmoi",
+      args: ["--source", sourceDir, "forget", "--force", "/home/user/.zshrc"],
+    });
+  });
+
+  it("forget: throws on non-zero exit", async () => {
+    const { exec } = makeFakeExec([{ code: 1, stdout: "", stderr: "forget failed" }]);
+    const chezmoi = createChezmoi(exec, { sourceDir });
+    await expect(chezmoi.forget("/home/user/.zshrc")).rejects.toThrow("forget failed");
+  });
 });

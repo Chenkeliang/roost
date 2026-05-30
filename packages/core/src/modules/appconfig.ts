@@ -135,13 +135,23 @@ export const appconfigModule: SyncModule = {
     return "";
   },
 
-  async unmanage(_ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
-    return {
-      module: "appconfig",
-      applied: [],
-      backedUp: [],
-      skipped: sel.modules["appconfig"] ?? [],
-    };
+  async unmanage(ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
+    const ids = sel.modules["appconfig"] ?? [];
+    const applied: string[] = [];
+    const skipped: string[] = [];
+
+    for (const id of ids) {
+      const domain = stripPrefix(id);
+      const file = plistPath(ctx.repoDir, domain);
+      if (fs.existsSync(file)) {
+        fs.rmSync(file);
+        applied.push(id);
+      } else {
+        skipped.push(id);
+      }
+    }
+
+    return { module: "appconfig", applied, backedUp: [], skipped };
   },
 
   async doctor(ctx: ModuleContext): Promise<Health[]> {

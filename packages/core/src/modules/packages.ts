@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
   SyncModule,
@@ -93,7 +94,16 @@ export const packagesModule: SyncModule = {
     return r.code === 0 ? "" : r.stdout;
   },
 
-  async unmanage(_ctx: ModuleContext, _sel: Selection): Promise<ApplyResult> {
+  async unmanage(ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
+    const selected = (sel.modules["packages"] ?? []).includes(BREWFILE_ID);
+    if (!selected) {
+      return { module: "packages", applied: [], backedUp: [], skipped: [] };
+    }
+    const filePath = brewfilePath(ctx.repoDir);
+    if (fs.existsSync(filePath)) {
+      fs.rmSync(filePath);
+      return { module: "packages", applied: [BREWFILE_ID], backedUp: [], skipped: [] };
+    }
     return { module: "packages", applied: [], backedUp: [], skipped: [BREWFILE_ID] };
   },
 

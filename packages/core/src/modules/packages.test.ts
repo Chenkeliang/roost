@@ -1,4 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
 import { packagesModule } from "./packages.js";
@@ -204,16 +206,52 @@ describe("packagesModule.diff", () => {
 
 // ── unmanage ──────────────────────────────────────────────────────────────────
 
+let tmpDir: string;
+
+beforeEach(() => {
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-packages-test-"));
+});
+
+afterEach(() => {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
 describe("packagesModule.unmanage", () => {
-  it("returns stub result with Brewfile skipped", async () => {
+  it("removes the Brewfile from the repo and returns applied", async () => {
+    // Create a Brewfile in the repo
+    const brewDir = path.join(tmpDir, "roost");
+    fs.mkdirSync(brewDir, { recursive: true });
+    fs.writeFileSync(path.join(brewDir, "Brewfile"), "brew 'jq'\n");
+
     const { exec } = makeFakeExec([]);
-    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo" });
+    const ctx = makeCtx({ exec, repoDir: tmpDir });
     const sel: Selection = { modules: { packages: ["Brewfile"] } };
     const result = await packagesModule.unmanage(ctx, sel);
+
     expect(result.module).toBe("packages");
+    expect(result.applied).toContain("Brewfile");
+    expect(result.skipped).toHaveLength(0);
+    expect(fs.existsSync(path.join(brewDir, "Brewfile"))).toBe(false);
+  });
+
+  it("returns skipped when Brewfile is absent (already removed)", async () => {
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, repoDir: tmpDir });
+    const sel: Selection = { modules: { packages: ["Brewfile"] } };
+    const result = await packagesModule.unmanage(ctx, sel);
+
     expect(result.applied).toHaveLength(0);
-    expect(result.backedUp).toHaveLength(0);
     expect(result.skipped).toContain("Brewfile");
+  });
+
+  it("returns empty result when Brewfile is not in selection", async () => {
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, repoDir: tmpDir });
+    const sel: Selection = { modules: {} };
+    const result = await packagesModule.unmanage(ctx, sel);
+
+    expect(result.applied).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
   });
 });
 

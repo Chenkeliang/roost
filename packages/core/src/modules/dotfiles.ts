@@ -177,13 +177,17 @@ export const dotfilesModule: SyncModule = {
     return chezmoi.diff();
   },
 
-  async unmanage(_ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
-    return {
-      module: "dotfiles",
-      applied: [],
-      backedUp: [],
-      skipped: sel.modules["dotfiles"] ?? [],
-    };
+  async unmanage(ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
+    const chezmoi = createChezmoi(ctx.exec, { sourceDir: ctx.repoDir });
+    const ids = sel.modules["dotfiles"] ?? [];
+    const applied: string[] = [];
+
+    for (const id of ids) {
+      await chezmoi.forget(id);
+      applied.push(id);
+    }
+
+    return { module: "dotfiles", applied, backedUp: [], skipped: [] };
   },
 
   async doctor(ctx: ModuleContext): Promise<Health[]> {

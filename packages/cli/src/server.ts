@@ -135,7 +135,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       let doc = loadSelection(repoDir);
       doc = removeItem(doc, mod, id);
       saveSelection(repoDir, doc);
-      return reply.send({ schemaVersion: doc.schemaVersion, modules: doc.modules });
+
+      // Also clean the item out of the repo (forget from chezmoi / remove stored file)
+      const owningModule = registry.get(mod);
+      let unmanaged: { module: string; applied: string[] } | undefined;
+      if (owningModule) {
+        const singleItemSel = { modules: { [mod]: [id] } };
+        const result = await owningModule.unmanage(makeCtx(false), singleItemSel);
+        unmanaged = { module: result.module, applied: result.applied };
+      }
+
+      return reply.send({ schemaVersion: doc.schemaVersion, modules: doc.modules, unmanaged });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });

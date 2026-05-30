@@ -300,6 +300,61 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("POST /api/selection/remove → also calls module.unmanage for the removed id", async () => {
+    const unmanageCalls: { id: string }[] = [];
+
+    let sel = emptySelection();
+    sel = addItem(sel, "dotfiles", "/home/.zshrc");
+    sel = addItem(sel, "dotfiles", "/home/.vimrc");
+    saveSelection(tmpDir, sel);
+
+    const fakeExecWithForget = makeFakeExec();
+    const dotfilesWithSpy: SyncModule = {
+      ...makeFakeModule({ name: "dotfiles" }),
+      async unmanage(_ctx: ModuleContext, unmanageSel: Selection): Promise<ApplyResult> {
+        const ids = unmanageSel.modules["dotfiles"] ?? [];
+        for (const id of ids) unmanageCalls.push({ id });
+        return { module: "dotfiles", applied: ids, backedUp: [], skipped: [] };
+      },
+    };
+
+    const reg = new ModuleRegistry();
+    reg.register(dotfilesWithSpy);
+
+    function makeCtxWithForget(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: fakeExecWithForget,
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtxWithForget(tmpDir, d) });
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/selection/remove",
+      payload: { module: "dotfiles", id: "/home/.zshrc" },
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).toBe(200);
+
+    // unmanage was called with just the removed id
+    expect(unmanageCalls).toHaveLength(1);
+    expect(unmanageCalls[0]!.id).toBe("/home/.zshrc");
+
+    // response includes unmanaged summary
+    const body = res.json() as { unmanaged?: { module: string; applied: string[] } };
+    expect(body.unmanaged).toBeDefined();
+    expect(body.unmanaged!.applied).toContain("/home/.zshrc");
+
+    await server.close();
+  });
+
   it("GET /api/timeline → parses git log output into entries", async () => {
     const sha = "abc123def456";
     const subject = "feat: add something";
