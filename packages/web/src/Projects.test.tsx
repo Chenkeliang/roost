@@ -37,9 +37,9 @@ describe("Projects", () => {
     await act(async () => { render(<Projects showHud={vi.fn()} />); });
     await act(async () => { fireEvent.click(await screen.findByRole("button", { name: /scan/i })); });
     await waitFor(() => screen.getByText(/work\/a/));
-    await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: /test/i })[0]); });
+    await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: /test/i })[0]!); });
     await waitFor(() => expect(api.testProjectRemote).toHaveBeenCalledWith("git@github.com:u/a.git"));
-    await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: /save/i })[0]); });
+    await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: /save/i })[0]!); });
     await waitFor(() => expect(api.addSelection).toHaveBeenCalledWith("projects", "/Users/k/work/a"));
   });
 });
