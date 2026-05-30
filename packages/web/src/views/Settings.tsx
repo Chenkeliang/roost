@@ -159,9 +159,10 @@ export function Settings() {
       <div style={sectionLabel}>Documentation</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {[
-          { label: "Architecture & design", href: "https://github.com/your-org/roost/tree/main/docs/superpowers/specs" },
-          { label: "Module development guide", href: "https://github.com/your-org/roost/tree/main/docs" },
-          { label: "Changelog", href: "https://github.com/your-org/roost/releases" },
+          { label: "Documentation (使用文档)", href: "https://github.com/Chenkeliang/roost/tree/main/website" },
+          { label: "Architecture & design", href: "https://github.com/Chenkeliang/roost/tree/main/docs/superpowers/specs" },
+          { label: "Module development guide", href: "https://github.com/Chenkeliang/roost/blob/main/CONTRIBUTING.md" },
+          { label: "Changelog", href: "https://github.com/Chenkeliang/roost/releases" },
         ].map(({ label, href }) => (
           <a
             key={label}

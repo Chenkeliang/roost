@@ -53,4 +53,18 @@ describe("Settings", () => {
       expect(screen.getByText("packages")).toBeTruthy();
     });
   });
+
+  it("links to the real repo and exposes a Documentation entry", async () => {
+    await act(async () => {
+      render(<Settings />);
+    });
+    const docsLinks = await screen.findAllByText(/Documentation/i);
+    const docsLink = docsLinks.find((el) => el.closest("a") !== null);
+    expect(docsLink).toBeDefined();
+    expect(docsLink!.closest("a")?.getAttribute("href")).toContain("github.com/Chenkeliang/roost");
+    // No placeholder org remains.
+    document.querySelectorAll("a").forEach((a) => {
+      expect(a.getAttribute("href") ?? "").not.toContain("your-org");
+    });
+  });
 });
