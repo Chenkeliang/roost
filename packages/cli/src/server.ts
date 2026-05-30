@@ -50,7 +50,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const home = makeCtx(true).home;
     const ageKeyPath = path.join(home, ".config", "sops", "age", "keys.txt");
     const ageKey = fs.existsSync(ageKeyPath);
-    return reply.send({ ok: true, name: "roost", repoDir, ageKey });
+    return reply.send({ ok: true, name: os.hostname(), repoDir, ageKey });
   });
 
   // ── /api/modules ─────────────────────────────────────────────────────────────

@@ -84,14 +84,14 @@ afterEach(() => {
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe("buildServer", () => {
-  it("GET /api/health → 200 { ok: true, name: 'roost', repoDir, ageKey }", async () => {
+  it("GET /api/health → 200 { ok: true, name: hostname, repoDir, ageKey }", async () => {
     const reg = new ModuleRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
     const res = await server.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { ok: boolean; name: string; repoDir: string; ageKey: boolean };
     expect(body.ok).toBe(true);
-    expect(body.name).toBe("roost");
+    expect(body.name).toBe(os.hostname());
     expect(body.repoDir).toBe(tmpDir);
     expect(typeof body.ageKey).toBe("boolean");
     await server.close();
