@@ -203,6 +203,16 @@ export function getDotfiles(): Promise<DotfilesResponse> {
   return apiFetch<DotfilesResponse>("/api/dotfiles");
 }
 
+// Server GET /api/appconfig returns defaults availability + managed domain names.
+export interface AppConfigResponse {
+  available: boolean;
+  managed: string[];
+}
+
+export function getAppConfig(): Promise<AppConfigResponse> {
+  return apiFetch<AppConfigResponse>("/api/appconfig");
+}
+
 export function testProjectRemote(remote: string): Promise<{ reachable: boolean; message: string }> {
   return apiFetch("/api/projects/test", {
     method: "POST",

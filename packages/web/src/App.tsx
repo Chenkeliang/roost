@@ -12,8 +12,9 @@ import { Settings } from "./views/Settings";
 import { Projects } from "./views/Projects";
 import { Packages } from "./views/Packages";
 import { Dotfiles } from "./views/Dotfiles";
+import { AppConfig } from "./views/AppConfig";
 
-type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "env" | "drift" | "timeline" | "settings";
+type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "env" | "drift" | "timeline" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -21,6 +22,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "projects", label: "Projects" },
   { id: "packages", label: "Packages" },
   { id: "dotfiles", label: "Dotfiles" },
+  { id: "appconfig", label: "App Config" },
   { id: "env", label: "Aliases & Env" },
   { id: "drift", label: "Drift" },
   { id: "timeline", label: "Timeline" },
@@ -184,6 +186,7 @@ export function App() {
         {activeTab === "projects" && <Projects showHud={showHud} />}
         {activeTab === "packages" && <Packages showHud={showHud} />}
         {activeTab === "dotfiles" && <Dotfiles showHud={showHud} />}
+        {activeTab === "appconfig" && <AppConfig showHud={showHud} />}
         {activeTab === "env" && <AliasesEnv showHud={showHud} />}
         {activeTab === "drift" && <Drift />}
         {activeTab === "timeline" && <Timeline />}
