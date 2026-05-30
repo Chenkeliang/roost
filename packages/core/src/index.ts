@@ -15,6 +15,8 @@ export {
   SELECTION_SCHEMA_VERSION,
 } from "./selection.js";
 export type { SelectionDoc } from "./selection.js";
+export { loadProfiles, resolveProfile, DEFAULT_PROFILE } from "./profiles.js";
+export type { Profile, ResolvedProfile, ProfileVia } from "./profiles.js";
 export { createOpBackend, createRbwBackend } from "./secrets/backend.js";
 export type { SecretBackend } from "./secrets/backend.js";
 export { ensureAgeKey } from "./secrets/agekey.js";
