@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act } from "react";
 import { Overview } from "./views/Overview";
 
 // Mock with realistic server shapes matching server.ts actual responses
@@ -39,14 +40,14 @@ describe("Overview", () => {
   });
 
   it("renders module health section header", async () => {
-    render(<Overview showHud={noop} />);
+    await act(async () => { render(<Overview showHud={noop} />); });
     await waitFor(() => {
       expect(screen.getByText("Module Health")).toBeTruthy();
     });
   });
 
   it("renders module status chips after loading — using server item.state", async () => {
-    render(<Overview showHud={noop} />);
+    await act(async () => { render(<Overview showHud={noop} />); });
     await waitFor(() => {
       // Both module names appear in health chips
       expect(screen.getByText("dotfiles")).toBeTruthy();
@@ -55,7 +56,7 @@ describe("Overview", () => {
   });
 
   it("derives drift status from items (dotfiles has a drift item)", async () => {
-    render(<Overview showHud={noop} />);
+    await act(async () => { render(<Overview showHud={noop} />); });
     await waitFor(() => {
       // dotfiles module has a drift item — StatusDot aria-label should include "drift"
       const driftDots = screen.getAllByRole("status", { name: "drift" });
@@ -64,7 +65,7 @@ describe("Overview", () => {
   });
 
   it("renders capture and load buttons", async () => {
-    render(<Overview showHud={noop} />);
+    await act(async () => { render(<Overview showHud={noop} />); });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Capture/i })).toBeTruthy();
       expect(screen.getByRole("button", { name: /Load/i })).toBeTruthy();
@@ -76,11 +77,9 @@ describe("Overview", () => {
     // accidentally reads .changes it would get undefined and show "0 results"
     // or crash. This test confirms the HUD fires with the results count.
     const showHud = vi.fn();
-    const { getByRole } = render(<Overview showHud={showHud} />);
-    await waitFor(() => getByRole("button", { name: /Load/i }));
-    // Trigger load
-    const { fireEvent } = await import("@testing-library/react");
-    fireEvent.click(getByRole("button", { name: /Load \(dry-run\)/i }));
+    await act(async () => { render(<Overview showHud={showHud} />); });
+    const loadBtn = await screen.findByRole("button", { name: /Load \(dry-run\)/i });
+    fireEvent.click(loadBtn);
     await waitFor(() => {
       expect(showHud).toHaveBeenCalledWith(
         expect.objectContaining({ text: expect.stringContaining("1") })
