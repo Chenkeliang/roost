@@ -288,6 +288,57 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  // ── GET /api/git/status ──────────────────────────────────────────────────────
+  server.get("/api/git/status", async (_req, reply) => {
+    const exec = makeCtx(true).exec;
+    const notRepo = { isRepo: false, remote: null, branch: null, ahead: 0, behind: 0, clean: true };
+
+    const isRepoResult = await exec.run("git", ["-C", repoDir, "rev-parse", "--is-inside-work-tree"]);
+    if (isRepoResult.code !== 0) {
+      return reply.send(notRepo);
+    }
+
+    const remoteResult = await exec.run("git", ["-C", repoDir, "remote", "get-url", "origin"]);
+    const remote = remoteResult.code === 0 ? remoteResult.stdout.trim() || null : null;
+
+    const branchResult = await exec.run("git", ["-C", repoDir, "rev-parse", "--abbrev-ref", "HEAD"]);
+    const branch = branchResult.code === 0 ? branchResult.stdout.trim() || null : null;
+
+    const abResult = await exec.run("git", ["-C", repoDir, "rev-list", "--left-right", "--count", "@{u}...HEAD"]);
+    let ahead = 0;
+    let behind = 0;
+    if (abResult.code === 0) {
+      const parts = abResult.stdout.trim().split("\t");
+      behind = parseInt(parts[0] ?? "0", 10) || 0;
+      ahead = parseInt(parts[1] ?? "0", 10) || 0;
+    }
+
+    const cleanResult = await exec.run("git", ["-C", repoDir, "status", "--porcelain"]);
+    const clean = cleanResult.code === 0 && cleanResult.stdout.trim() === "";
+
+    return reply.send({ isRepo: true, remote, branch, ahead, behind, clean });
+  });
+
+  // ── POST /api/git/push ────────────────────────────────────────────────────────
+  server.post("/api/git/push", async (_req, reply) => {
+    cache.invalidateAll();
+    const exec = makeCtx(false).exec;
+    const result = await exec.run("git", ["-C", repoDir, "push"]);
+    const ok = result.code === 0;
+    const output = `${result.stdout}\n${result.stderr}`.trim();
+    return reply.send({ ok, output });
+  });
+
+  // ── POST /api/git/pull ────────────────────────────────────────────────────────
+  server.post("/api/git/pull", async (_req, reply) => {
+    cache.invalidateAll();
+    const exec = makeCtx(false).exec;
+    const result = await exec.run("git", ["-C", repoDir, "pull", "--ff-only"]);
+    const ok = result.code === 0;
+    const output = `${result.stdout}\n${result.stderr}`.trim();
+    return reply.send({ ok, output });
+  });
+
   // ── GET /api/timeline ────────────────────────────────────────────────────────
   server.get("/api/timeline", async (_req, reply) => {
     try {

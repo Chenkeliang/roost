@@ -784,6 +784,202 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  // ── /api/git/* ────────────────────────────────────────────────────────────────
+
+  it("GET /api/git/status → parses ahead/behind from rev-list output", async () => {
+    function makeGitStatusExec(): Exec {
+      return {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          const joined = args.join(" ");
+          if (cmd === "git" && joined.includes("rev-parse --is-inside-work-tree")) {
+            return { code: 0, stdout: "true", stderr: "" };
+          }
+          if (cmd === "git" && joined.includes("remote get-url origin")) {
+            return { code: 0, stdout: "git@github.com:u/cfg.git\n", stderr: "" };
+          }
+          if (cmd === "git" && joined.includes("rev-parse --abbrev-ref HEAD")) {
+            return { code: 0, stdout: "main\n", stderr: "" };
+          }
+          if (cmd === "git" && joined.includes("rev-list --left-right --count")) {
+            return { code: 0, stdout: "1\t2\n", stderr: "" };
+          }
+          if (cmd === "git" && joined.includes("status --porcelain")) {
+            return { code: 0, stdout: "", stderr: "" };
+          }
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+    }
+
+    function makeGitStatusCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makeGitStatusExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeGitStatusCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/git/status" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      isRepo: boolean;
+      remote: string | null;
+      branch: string | null;
+      ahead: number;
+      behind: number;
+      clean: boolean;
+    };
+    expect(body.isRepo).toBe(true);
+    expect(body.remote).toBe("git@github.com:u/cfg.git");
+    expect(body.branch).toBe("main");
+    expect(body.behind).toBe(1);
+    expect(body.ahead).toBe(2);
+    expect(body.clean).toBe(true);
+    await server.close();
+  });
+
+  it("GET /api/git/status → isRepo:false when rev-parse fails", async () => {
+    function makeNotRepoExec(): Exec {
+      return {
+        async run(): Promise<ExecResult> {
+          return { code: 128, stdout: "", stderr: "not a git repository" };
+        },
+      };
+    }
+
+    function makeNotRepoCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makeNotRepoExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeNotRepoCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/git/status" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { isRepo: boolean; remote: null; branch: null; ahead: number; behind: number };
+    expect(body.isRepo).toBe(false);
+    expect(body.remote).toBeNull();
+    expect(body.branch).toBeNull();
+    expect(body.ahead).toBe(0);
+    expect(body.behind).toBe(0);
+    await server.close();
+  });
+
+  it("POST /api/git/push → ok:true on exit 0", async () => {
+    function makePushExec(): Exec {
+      return {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          if (cmd === "git" && args.includes("push")) {
+            return { code: 0, stdout: "Everything up-to-date", stderr: "" };
+          }
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+    }
+
+    function makePushCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makePushExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makePushCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/git/push" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { ok: boolean; output: string };
+    expect(body.ok).toBe(true);
+    expect(body.output).toContain("Everything up-to-date");
+    await server.close();
+  });
+
+  it("POST /api/git/push → ok:false on non-zero exit", async () => {
+    function makeFailPushExec(): Exec {
+      return {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          if (cmd === "git" && args.includes("push")) {
+            return { code: 1, stdout: "", stderr: "rejected: non-fast-forward" };
+          }
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+    }
+
+    function makeFailPushCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makeFailPushExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeFailPushCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/git/push" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { ok: boolean; output: string };
+    expect(body.ok).toBe(false);
+    expect(body.output).toContain("rejected");
+    await server.close();
+  });
+
+  it("POST /api/git/pull → ok:true on exit 0", async () => {
+    function makePullExec(): Exec {
+      return {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          if (cmd === "git" && args.includes("pull")) {
+            return { code: 0, stdout: "Already up to date.", stderr: "" };
+          }
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+    }
+
+    function makePullCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makePullExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makePullCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/git/pull" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { ok: boolean; output: string };
+    expect(body.ok).toBe(true);
+    expect(body.output).toContain("Already up to date");
+    await server.close();
+  });
+
   it("GET /api/discover?module=projects → only the projects key", async () => {
     const reg = defaultRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
