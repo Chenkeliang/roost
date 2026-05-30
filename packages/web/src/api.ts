@@ -19,6 +19,8 @@ export type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate };
 export interface HealthResponse {
   ok: boolean;
   name: string;
+  repoDir?: string;
+  ageKey?: boolean;
 }
 
 export interface ModulesResponse {

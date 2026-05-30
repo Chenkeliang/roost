@@ -4,6 +4,7 @@ import {
   Cube,
   ShieldCheck,
   ArrowSquareOut,
+  Key,
 } from "@phosphor-icons/react";
 import { Skeleton } from "../components/Skeleton";
 import { getHealth, getModules, type ModulesResponse } from "../api";
@@ -11,19 +12,18 @@ import { getHealth, getModules, type ModulesResponse } from "../api";
 export function Settings() {
   const [modules, setModules] = useState<ModulesResponse | null>(null);
   const [repoDir, setRepoDir] = useState<string | null>(null);
+  const [ageKey, setAgeKey] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     Promise.allSettled([getHealth(), getModules()])
-      .then(([_health, mods]) => {
+      .then(([health, mods]) => {
+        if (health.status === "fulfilled") {
+          setRepoDir(health.value.repoDir ?? null);
+          setAgeKey(health.value.ageKey ?? null);
+        }
         if (mods.status === "fulfilled") setModules(mods.value);
-        // Repo path is not exposed by API yet; derive a placeholder from window.location
-        setRepoDir(
-          typeof window !== "undefined" && window.location.hostname !== "localhost"
-            ? window.location.hostname
-            : "~/.local/share/roost/repo  (served via localhost)",
-        );
       })
       .finally(() => setLoading(false));
   }, []);
@@ -66,19 +66,37 @@ export function Settings() {
 
       {/* ── Repo ── */}
       <div style={sectionLabel}>Repository</div>
-      <div style={row}>
-        <FolderOpen size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
-        <span style={{ color: "var(--muted)", minWidth: 80 }}>Repo path</span>
-        {loading ? (
-          <Skeleton width={260} height={13} />
-        ) : (
-          <span
-            className="mono"
-            style={{ color: "var(--text)", fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-          >
-            {repoDir ?? "—"}
-          </span>
-        )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={row}>
+          <FolderOpen size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
+          <span style={{ color: "var(--muted)", minWidth: 80 }}>Repo path</span>
+          {loading ? (
+            <Skeleton width={260} height={13} />
+          ) : (
+            <span
+              className="mono"
+              style={{ color: "var(--text)", fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            >
+              {repoDir ?? "—"}
+            </span>
+          )}
+        </div>
+        <div style={row}>
+          <Key size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
+          <span style={{ color: "var(--muted)", minWidth: 80 }}>Age key</span>
+          {loading ? (
+            <Skeleton width={80} height={13} />
+          ) : (
+            <span
+              style={{
+                color: ageKey ? "var(--green)" : "var(--muted)",
+                fontSize: 12,
+              }}
+            >
+              {ageKey === null ? "—" : ageKey ? "present" : "not found"}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Modules ── */}

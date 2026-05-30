@@ -36,7 +36,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   // ── /api/health ─────────────────────────────────────────────────────────────
   server.get("/api/health", async (_req, reply) => {
-    return reply.send({ ok: true, name: "roost" });
+    const home = makeCtx(true).home;
+    const ageKeyPath = path.join(home, ".config", "sops", "age", "keys.txt");
+    const ageKey = fs.existsSync(ageKeyPath);
+    return reply.send({ ok: true, name: "roost", repoDir, ageKey });
   });
 
   // ── /api/modules ─────────────────────────────────────────────────────────────
