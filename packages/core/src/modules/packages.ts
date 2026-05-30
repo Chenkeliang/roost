@@ -22,6 +22,26 @@ function brewfilePath(repoDir: string): string {
 export const packagesModule: SyncModule = {
   name: "packages",
 
+  async index(ctx: ModuleContext): Promise<import("@roost/shared").ModuleIndex> {
+    const brew = await ctx.exec.run("brew", ["--version"]);
+    let managed = 0;
+    const file = brewfilePath(ctx.repoDir);
+    if (fs.existsSync(file)) {
+      managed = fs
+        .readFileSync(file, "utf8")
+        .split("\n")
+        .filter((line) => {
+          const t = line.trim();
+          return t.length > 0 && !t.startsWith("#");
+        }).length;
+    }
+    return {
+      available: brew.code === 0,
+      reason: brew.code === 0 ? undefined : "Homebrew not installed",
+      managed,
+    };
+  },
+
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const r = await ctx.exec.run("brew", ["--version"]);
     const note =

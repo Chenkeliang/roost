@@ -346,3 +346,50 @@ describe("packagesModule.doctor", () => {
     expect(mas!.detail).toContain("App Store");
   });
 });
+
+// ── index ─────────────────────────────────────────────────────────────────────
+
+describe("packagesModule.index", () => {
+  let repoDir: string;
+  beforeEach(() => {
+    repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-packages-idx-"));
+    fs.mkdirSync(path.join(repoDir, "roost"), { recursive: true });
+  });
+  afterEach(() => {
+    fs.rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  it("is cheap: probes brew --version + counts Brewfile lines, never runs brew bundle", async () => {
+    fs.writeFileSync(
+      path.join(repoDir, "roost", "Brewfile"),
+      "# comment\nbrew \"git\"\n\nbrew \"jq\"\ncask \"firefox\"\n",
+    );
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "Homebrew 4.x" }]);
+    const ctx = makeCtx({ exec, repoDir });
+    const idx = await packagesModule.index!(ctx);
+    expect(idx.available).toBe(true);
+    expect(idx.reason).toBeUndefined();
+    expect(idx.managed).toBe(3);
+    // never the heavy path
+    expect(calls.every((c) => !c.args.includes("bundle"))).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.args).toEqual(["--version"]);
+  });
+
+  it("reports unavailable with reason when brew is absent; managed still counted", async () => {
+    fs.writeFileSync(path.join(repoDir, "roost", "Brewfile"), "brew \"git\"\n");
+    const { exec } = makeFakeExec([{ code: 127, stderr: "command not found" }]);
+    const ctx = makeCtx({ exec, repoDir });
+    const idx = await packagesModule.index!(ctx);
+    expect(idx.available).toBe(false);
+    expect(idx.reason).toBe("Homebrew not installed");
+    expect(idx.managed).toBe(1);
+  });
+
+  it("managed is 0 when no Brewfile exists", async () => {
+    const { exec } = makeFakeExec([{ code: 0 }]);
+    const ctx = makeCtx({ exec, repoDir });
+    const idx = await packagesModule.index!(ctx);
+    expect(idx.managed).toBe(0);
+  });
+});
