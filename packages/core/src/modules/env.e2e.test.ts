@@ -22,6 +22,14 @@ import { createT } from "../i18n/index.js";
 /** The single-quote-containing alias value that must survive real shell sourcing. */
 const ALIAS_VALUE = "echo 'hi there'";
 const ENV_VALUE = "nvim";
+/**
+ * A value carrying BOTH a single and a double quote. Asserting its round-trip via
+ * `printf "%s" "$VAR"` is shell-agnostic — the generated file uses standard POSIX
+ * `'\''` escaping which both bash and dash parse identically. (We deliberately do
+ * NOT assert on `alias` *listing* format, which bash renders as `'\''` and dash as
+ * `'"'"'` — same value, different display — which would make the test shell-specific.)
+ */
+const QUOTED_VALUE = "a'b c\"d";
 
 function makeRealCtx(repoDir: string, home: string): ModuleContext {
   return {
@@ -46,6 +54,8 @@ function sampleEnvData(): EnvData {
     env: [
       // non-secret → no age key needed; printed back verbatim by the shell
       { kind: "env", name: "ROOST_E2E_EDITOR", value: ENV_VALUE, secret: false, enabled: true },
+      // carries single + double quotes → portable proof POSIX escaping round-trips
+      { kind: "env", name: "ROOST_E2E_QUOTED", value: QUOTED_VALUE, secret: false, enabled: true },
     ],
     path: [
       // $HOME must expand at source time (env.sh emits it double-quoted)
@@ -113,17 +123,20 @@ describe("env module — real-shell e2e round-trip", () => {
 
     // (a) The quote-containing alias: sourcing must succeed (exit 0 — proves no
     //     syntax break from the embedded single quote; execFileSync throws on a
-    //     non-zero exit) and the listing must show both the POSIX-escaped quote
-    //     sequence and the payload.
+    //     non-zero exit) and the payload must appear in the listing. We do NOT
+    //     assert the exact escape rendering — bash and dash display it differently
+    //     (`'\''` vs `'"'"'`) for the same value; that proof lives in (b) instead.
     const aliasOut = sourceAndRun(home, "alias say");
     expect(aliasOut.startsWith("say=")).toBe(true);
-    expect(aliasOut).toContain("'\\''"); // the escaped single quote survived
     expect(aliasOut).toContain("hi there"); // the value payload survived
     // The plain alias is intact too.
     expect(sourceAndRun(home, "alias ll")).toContain("ls -la");
 
-    // (b) The non-secret env var prints its exact value.
+    // (b) The non-secret env vars print their EXACT values — the portable proof
+    //     that POSIX single-quote escaping round-trips through real `sh` (identical
+    //     on bash and dash), including a value carrying single + double quotes.
     expect(sourceAndRun(home, 'printf "%s" "$ROOST_E2E_EDITOR"')).toBe(ENV_VALUE);
+    expect(sourceAndRun(home, 'printf "%s" "$ROOST_E2E_QUOTED"')).toBe(QUOTED_VALUE);
 
     // (c) $PATH contains the EXPANDED $HOME/... entry (not the literal "$HOME").
     const pathOut = sourceAndRun(home, 'printf "%s" "$PATH"');
