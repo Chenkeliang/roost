@@ -16,18 +16,28 @@ import { AppConfig } from "./views/AppConfig";
 
 type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "env" | "drift" | "timeline" | "settings";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "manage", label: "Manage" },
-  { id: "projects", label: "Projects" },
-  { id: "packages", label: "Packages" },
+type NavItem = { id: Tab; label: string };
+
+// Top-level item shown above the Modules group.
+const TOP_NAV: NavItem[] = [{ id: "overview", label: "Overview" }];
+
+// "Modules" group — the SyncModule-backed rich pages.
+const MODULE_NAV: NavItem[] = [
   { id: "dotfiles", label: "Dotfiles" },
+  { id: "packages", label: "Packages" },
+  { id: "projects", label: "Projects" },
   { id: "appconfig", label: "App Config" },
   { id: "env", label: "Aliases & Env" },
+];
+
+// Cross-module / system items below the divider.
+const TAIL_NAV: NavItem[] = [
   { id: "drift", label: "Drift" },
   { id: "timeline", label: "Timeline" },
   { id: "settings", label: "Settings" },
 ];
+
+const DOCS_URL = "https://github.com/Chenkeliang/roost/tree/main/website";
 
 // Inline coral logo mark (two devices + transfer arc)
 function RoostMark() {
@@ -47,6 +57,42 @@ function RoostMark() {
       <rect x="13" y="11.5" width="8.5" height="6" rx="1.3" />
       <path d="M11.5 9.2c4 0 .5 5 5.5 5" strokeDasharray="1 2" />
     </svg>
+  );
+}
+
+function NavButton({
+  item,
+  active,
+  onClick,
+}: {
+  item: NavItem;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        width: "100%",
+        appearance: "none",
+        border: 0,
+        borderLeft: `2px solid ${active ? "var(--accent)" : "transparent"}`,
+        background: active ? "var(--raise)" : "transparent",
+        color: active ? "var(--text)" : "var(--muted)",
+        fontFamily: "var(--font)",
+        fontSize: 13,
+        textAlign: "left",
+        padding: "7px 12px",
+        borderRadius: "var(--rr)",
+        cursor: "pointer",
+        transition: "background .12s, color .12s",
+      }}
+    >
+      {item.label}
+    </button>
   );
 }
 
@@ -84,114 +130,150 @@ export function App() {
         @keyframes roost-hud { from { opacity: 0; transform: translate(-50%, 8px) } to { opacity: 1; transform: translateX(-50%) } }
       `}</style>
 
-      {/* Top Bar */}
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          background: "var(--bg)",
-          zIndex: 20,
-          borderBottom: "1px solid var(--border-soft)",
-          marginBottom: 20,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 18,
-            maxWidth: 1080,
-            margin: "0 auto",
-            padding: "6px 24px 16px",
-          }}
-        >
-        {/* Brand */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            fontWeight: 600,
-            letterSpacing: "-.01em",
-            fontSize: 15,
-          }}
-        >
-          <RoostMark />
-          Roost
-        </div>
-
-        {/* Nav tabs */}
-        <nav
+      <div style={{ display: "flex" }}>
+        {/* Left grouped sidebar */}
+        <aside
           aria-label="Main navigation"
-          style={{ display: "flex", gap: 2, marginLeft: 6 }}
-        >
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              aria-current={activeTab === tab.id ? "page" : undefined}
-              style={{
-                appearance: "none",
-                border: 0,
-                background:
-                  activeTab === tab.id ? "var(--raise)" : "transparent",
-                color:
-                  activeTab === tab.id ? "var(--text)" : "var(--muted)",
-                fontFamily: "var(--font)",
-                fontSize: 13,
-                padding: "6px 11px",
-                borderRadius: "var(--rr)",
-                cursor: "pointer",
-                transition: "background .12s, color .12s",
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-
-        {/* Right side */}
-        <div
           style={{
-            marginLeft: "auto",
             display: "flex",
-            alignItems: "center",
-            gap: 12,
-            color: "var(--muted)",
-            fontSize: 12,
+            flexDirection: "column",
+            width: 220,
+            flexShrink: 0,
+            minHeight: "100vh",
+            position: "sticky",
+            top: 0,
+            background: "var(--surface)",
+            borderRight: "1px solid var(--border-soft)",
+            padding: "16px 12px",
+            gap: 4,
           }}
         >
-          <span
+          {/* Brand */}
+          <div
             style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              gap: 6,
-              padding: "3px 9px",
-              border: "1px solid var(--border)",
-              borderRadius: 999,
+              gap: 9,
+              fontWeight: 600,
+              letterSpacing: "-.01em",
+              fontSize: 15,
+              padding: "4px 10px 14px",
+            }}
+          >
+            <RoostMark />
+            Roost
+          </div>
+
+          {/* Top-level */}
+          {TOP_NAV.map((item) => (
+            <NavButton
+              key={item.id}
+              item={item}
+              active={activeTab === item.id}
+              onClick={() => setActiveTab(item.id)}
+            />
+          ))}
+
+          {/* Modules group */}
+          <div
+            style={{
+              textTransform: "uppercase",
+              letterSpacing: ".06em",
+              fontSize: 10.5,
+              fontWeight: 600,
+              color: "var(--muted)",
+              padding: "14px 12px 6px",
+            }}
+          >
+            Modules
+          </div>
+          {MODULE_NAV.map((item) => (
+            <NavButton
+              key={item.id}
+              item={item}
+              active={activeTab === item.id}
+              onClick={() => setActiveTab(item.id)}
+            />
+          ))}
+
+          {/* Divider */}
+          <div
+            style={{
+              height: 1,
+              background: "var(--border-soft)",
+              margin: "12px 8px",
+            }}
+          />
+          {TAIL_NAV.map((item) => (
+            <NavButton
+              key={item.id}
+              item={item}
+              active={activeTab === item.id}
+              onClick={() => setActiveTab(item.id)}
+            />
+          ))}
+
+          {/* Bottom */}
+          <div
+            style={{
+              marginTop: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "12px 10px 2px",
+              color: "var(--muted)",
               fontSize: 12,
             }}
           >
-            <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
-            local
-          </span>
-        </div>
-        </div>
-      </header>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "3px 9px",
+                border: "1px solid var(--border)",
+                borderRadius: 999,
+                fontSize: 12,
+              }}
+            >
+              <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
+              local
+            </span>
+            <a
+              href={DOCS_URL}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "var(--muted)", textDecoration: "none" }}
+            >
+              Docs
+            </a>
+            <span
+              style={{
+                marginLeft: "auto",
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                color: "var(--muted)",
+              }}
+            >
+              ⌘K
+            </span>
+          </div>
+        </aside>
 
-      {/* Main content */}
-      <main style={{ paddingBottom: 60 }}>
-        {activeTab === "overview" && <Overview showHud={showHud} />}
-        {activeTab === "manage" && <Manage showHud={showHud} />}
-        {activeTab === "projects" && <Projects showHud={showHud} />}
-        {activeTab === "packages" && <Packages showHud={showHud} />}
-        {activeTab === "dotfiles" && <Dotfiles showHud={showHud} />}
-        {activeTab === "appconfig" && <AppConfig showHud={showHud} />}
-        {activeTab === "env" && <AliasesEnv showHud={showHud} />}
-        {activeTab === "drift" && <Drift />}
-        {activeTab === "timeline" && <Timeline />}
-        {activeTab === "settings" && <Settings />}
-      </main>
+        {/* Main content */}
+        <main style={{ flex: 1, minWidth: 0, paddingBottom: 60 }}>
+          {activeTab === "overview" && <Overview showHud={showHud} />}
+          {activeTab === "manage" && <Manage showHud={showHud} />}
+          {activeTab === "projects" && <Projects showHud={showHud} />}
+          {activeTab === "packages" && <Packages showHud={showHud} />}
+          {activeTab === "dotfiles" && <Dotfiles showHud={showHud} />}
+          {activeTab === "appconfig" && <AppConfig showHud={showHud} />}
+          {activeTab === "env" && <AliasesEnv showHud={showHud} />}
+          {activeTab === "drift" && <Drift />}
+          {activeTab === "timeline" && <Timeline />}
+          {activeTab === "settings" && <Settings />}
+        </main>
+      </div>
 
       {/* Command Palette */}
       <CommandPalette

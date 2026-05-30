@@ -9,6 +9,8 @@ vi.mock("./api", () => ({
   getMachines: vi.fn().mockResolvedValue({ hosts: [], states: {} }),
   getStatus: vi.fn().mockResolvedValue({ reports: [] }),
   getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
+  getModules: vi.fn().mockResolvedValue({ modules: [] }),
+  getIndex: vi.fn().mockResolvedValue({ index: {} }),
   postCapture: vi.fn().mockResolvedValue({ changes: [] }),
   postLoad: vi.fn().mockResolvedValue({ results: [] }),
 }));
@@ -18,16 +20,45 @@ describe("App", () => {
     vi.clearAllMocks();
   });
 
-  it("renders all nav tabs", async () => {
+  it("renders all nav items in the sidebar", async () => {
     await act(async () => {
       render(<App />);
     });
-    // Multiple "Overview" buttons exist (nav tab + action bar) — use getAllByRole
+    // Multiple "Overview" buttons exist (nav item + action bar) — use getAllByRole
     expect(screen.getAllByRole("button", { name: "Overview" }).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole("button", { name: "Manage" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Drift" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Timeline" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+  });
+
+  it("renders the Modules group label in the sidebar", async () => {
+    await act(async () => {
+      render(<App />);
+    });
+    expect(screen.getByText("Modules")).toBeTruthy();
+  });
+
+  it("switches views when a sidebar nav item is clicked", async () => {
+    await act(async () => {
+      render(<App />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+    });
+    expect(screen.getByRole("button", { name: "Projects" }).getAttribute("aria-current")).toBe("page");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    });
+    expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("shows a Docs link to the website", async () => {
+    await act(async () => {
+      render(<App />);
+    });
+    const docs = screen.getByRole("link", { name: "Docs" });
+    expect(docs.getAttribute("href")).toBe("https://github.com/Chenkeliang/roost/tree/main/website");
   });
 
   it("shows the Roost brand name", async () => {
