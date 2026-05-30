@@ -6,9 +6,14 @@ import type { EnvData } from "@roost/shared";
 
 const BASE_ENV: EnvData = {
   schemaVersion: 1,
-  aliases: [{ kind: "alias", name: "ll", value: "ls -lah", enabled: true }],
+  aliases: [
+    { kind: "alias", name: "ll", value: "ls -lah", enabled: true },
+    { kind: "alias", name: "ga", value: "git add", enabled: true },
+  ],
   env: [
     { kind: "env", name: "EDITOR", value: "nvim", secret: false, enabled: true },
+    // matches the "git" search alongside the `ga` alias above.
+    { kind: "env", name: "GIT_EDITOR", value: "code --wait", secret: false, enabled: true },
     // Returned from server: secret with blank value → "encrypted" badge.
     { kind: "env", name: "OPENAI_API_KEY", value: "", secret: true, enabled: true },
   ],
@@ -50,38 +55,70 @@ describe("AliasesEnv", () => {
     mockEnv();
   });
 
-  it("renders the four tabs", async () => {
+  it("renders the unified list with filter chips and their counts", async () => {
     await renderView();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Aliases/i })).toBeTruthy();
-    });
-    expect(screen.getByRole("button", { name: /^Env$/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /PATH/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Functions/i })).toBeTruthy();
+    // chips (aria-label includes the live count)
+    expect(screen.getByRole("tab", { name: /^All 8$/ })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /^Aliases 2$/ })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /^Env 3$/ })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /^PATH 2$/ })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /^Functions 1$/ })).toBeTruthy();
+    // every kind shares one list — rows from each kind are visible at once
+    expect(screen.getByRole("row", { name: /alias ll/i })).toBeTruthy();
+    expect(screen.getByRole("row", { name: /env EDITOR/i })).toBeTruthy();
+    expect(screen.getByRole("row", { name: /path \$HOME\/bin/i })).toBeTruthy();
+    expect(screen.getByRole("row", { name: /function mkcd/i })).toBeTruthy();
+    // "N of M items" count
+    expect(screen.getByText(/8 of 8 items/i)).toBeTruthy();
   });
 
   it("shows the dotfiles de-confusion explainer", async () => {
     await renderView();
-    await waitFor(() => {
-      expect(screen.getByText(/your existing dotfiles stay untouched/i)).toBeTruthy();
+    expect(screen.getByText(/your existing dotfiles stay untouched/i)).toBeTruthy();
+  });
+
+  it("global search filters across kinds at once", async () => {
+    await renderView();
+    fireEvent.change(screen.getByLabelText(/^Search aliases/i), {
+      target: { value: "git" },
     });
+    await waitFor(() => {
+      // matches both the `ga` alias (value "git add") and the GIT_EDITOR env var
+      expect(screen.getByRole("row", { name: /alias ga/i })).toBeTruthy();
+    });
+    expect(screen.getByRole("row", { name: /env GIT_EDITOR/i })).toBeTruthy();
+    // non-matching rows are gone
+    expect(screen.queryByRole("row", { name: /alias ll/i })).toBeNull();
+    expect(screen.queryByRole("row", { name: /function mkcd/i })).toBeNull();
+  });
+
+  it("a kind chip narrows the list to that kind", async () => {
+    await renderView();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /^PATH 2$/ }));
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("row", { name: /path \$HOME\/bin/i })).toBeTruthy();
+    });
+    expect(screen.queryByRole("row", { name: /alias ll/i })).toBeNull();
+    expect(screen.queryByRole("row", { name: /env EDITOR/i })).toBeNull();
+    expect(screen.getByText(/2 of 8 items · PATH/i)).toBeTruthy();
   });
 
   it("adding an alias and saving calls putEnv with the new item", async () => {
     await renderView();
-    await waitFor(() => screen.getByLabelText("new alias name"));
-
-    fireEvent.change(screen.getByLabelText("new alias name"), {
-      target: { value: "gs" },
-    });
-    fireEvent.change(screen.getByLabelText("new alias value"), {
-      target: { value: "git status" },
-    });
+    // Add affordance creates a new alias and opens its editor
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Add alias/i }));
     });
+    // new empty alias editor is open (name is empty → aria-label "alias name")
+    await waitFor(() => screen.getByLabelText(/^alias name\s*$/i));
 
-    // Save becomes enabled once dirty
+    fireEvent.change(screen.getByLabelText(/^alias name\s*$/i), { target: { value: "gs" } });
+    fireEvent.change(screen.getByLabelText("alias value gs"), {
+      target: { value: "git status" },
+    });
+
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
     });
@@ -96,31 +133,31 @@ describe("AliasesEnv", () => {
     });
   });
 
-  it("a secret env item shows the 'encrypted' badge and never renders its value", async () => {
+  it("a secret env item shows the lock badge and never renders its value", async () => {
     await renderView();
-    // switch to Env tab
+    // row-level lock badge
+    expect(screen.getByTestId("lock-OPENAI_API_KEY")).toBeTruthy();
+    // value preview is blank for a secret — open the editor to inspect the field
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Env$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /edit env OPENAI_API_KEY/i }));
     });
-    await waitFor(() => {
-      expect(screen.getByTestId("encrypted-OPENAI_API_KEY")).toBeTruthy();
-    });
-    // The value field for the stored secret must be a password input (masked),
-    // and must not expose any plaintext value.
+    await waitFor(() => screen.getByTestId("encrypted-OPENAI_API_KEY"));
     const valueInput = screen.getByLabelText("env value OPENAI_API_KEY") as HTMLInputElement;
     expect(valueInput.type).toBe("password");
     expect(valueInput.value).toBe("");
   });
 
-  it("toggling secret on a plain env var masks the input", async () => {
+  it("toggling secret reveals the source selector and masks the value", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Env$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /edit env EDITOR/i }));
     });
     await waitFor(() => screen.getByLabelText("env value EDITOR"));
 
     const before = screen.getByLabelText("env value EDITOR") as HTMLInputElement;
     expect(before.type).toBe("text");
+    // no source selector until secret is on
+    expect(screen.queryByLabelText("env source EDITOR")).toBeNull();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("switch", { name: /mark env EDITOR secret/i }));
@@ -128,12 +165,14 @@ describe("AliasesEnv", () => {
 
     const after = screen.getByLabelText("env value EDITOR") as HTMLInputElement;
     expect(after.type).toBe("password");
+    // source selector now appears
+    expect(screen.getByLabelText("env source EDITOR")).toBeTruthy();
   });
 
   it("entering a new secret value sends it via putEnv to be encrypted", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Env$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /edit env OPENAI_API_KEY/i }));
     });
     await waitFor(() => screen.getByLabelText("env value OPENAI_API_KEY"));
 
@@ -153,21 +192,17 @@ describe("AliasesEnv", () => {
   it("choosing a 1Password reference shows the ref input and hides the value field (ADR-0004)", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Env$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /edit env EDITOR/i }));
     });
     await waitFor(() => screen.getByLabelText("env value EDITOR"));
 
-    // Mark EDITOR secret so the source selector appears.
     await act(async () => {
       fireEvent.click(screen.getByRole("switch", { name: /mark env EDITOR secret/i }));
     });
-    // Switch its source to a 1Password reference.
-    const sourceSel = screen.getByLabelText("env source EDITOR") as HTMLSelectElement;
     await act(async () => {
-      fireEvent.change(sourceSel, { target: { value: "ref:op" } });
+      fireEvent.change(screen.getByLabelText("env source EDITOR"), { target: { value: "ref:op" } });
     });
 
-    // The ref input appears; the plaintext value field is gone.
     expect(screen.getByLabelText("env ref EDITOR")).toBeTruthy();
     expect(screen.queryByLabelText("env value EDITOR")).toBeNull();
   });
@@ -175,7 +210,7 @@ describe("AliasesEnv", () => {
   it("PUT carries the ref source for a secret env item (ADR-0004)", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Env$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /edit env EDITOR/i }));
     });
     await waitFor(() => screen.getByLabelText("env value EDITOR"));
 
@@ -185,9 +220,7 @@ describe("AliasesEnv", () => {
     await act(async () => {
       fireEvent.change(screen.getByLabelText("env source EDITOR"), { target: { value: "ref:rbw" } });
     });
-    fireEvent.change(screen.getByLabelText("env ref EDITOR"), {
-      target: { value: "my-entry" },
-    });
+    fireEvent.change(screen.getByLabelText("env ref EDITOR"), { target: { value: "my-entry" } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
     });
@@ -198,40 +231,28 @@ describe("AliasesEnv", () => {
     expect(item.source).toEqual({ kind: "ref", backend: "rbw", ref: "my-entry" });
   });
 
-  it("PATH add and reorder updates state", async () => {
+  it("PATH reorder changes the saved order", async () => {
     await renderView();
+    // open the second PATH entry's editor and move it up
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /PATH/i }));
+      fireEvent.click(screen.getByRole("button", { name: /edit path \/usr\/local\/sbin/i }));
     });
-    await waitFor(() => screen.getByLabelText("new path value"));
-
-    // add a third entry
-    fireEvent.change(screen.getByLabelText("new path value"), {
-      target: { value: "/opt/homebrew/bin" },
-    });
+    await waitFor(() => screen.getByRole("button", { name: /move up \/usr\/local\/sbin/i }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Add entry/i }));
-    });
-    expect(screen.getByLabelText("path value /opt/homebrew/bin")).toBeTruthy();
-
-    // reorder: move the new (last) entry up, then save and assert order in payload
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /move up \/opt\/homebrew\/bin/i }));
+      fireEvent.click(screen.getByRole("button", { name: /move up \/usr\/local\/sbin/i }));
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
     });
 
     const sent = vi.mocked(putEnv).mock.calls[0]![0];
-    const values = sent.path.map((p) => p.value);
-    // moved from index 2 to index 1
-    expect(values).toEqual(["$HOME/bin", "/opt/homebrew/bin", "/usr/local/sbin"]);
+    expect(sent.path.map((p) => p.value)).toEqual(["/usr/local/sbin", "$HOME/bin"]);
   });
 
   it("functions editor edits the body", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Functions/i }));
+      fireEvent.click(screen.getByRole("button", { name: /edit function mkcd/i }));
     });
     await waitFor(() => screen.getByLabelText("function body mkcd"));
 
@@ -246,7 +267,7 @@ describe("AliasesEnv", () => {
     expect(sent.functions.find((f) => f.name === "mkcd")!.body).toBe("echo edited");
   });
 
-  it("import picker merges chosen candidates into state", async () => {
+  it("import picker filters to import: candidates and merges chosen ones", async () => {
     vi.mocked(getDiscover).mockResolvedValue({
       candidates: {
         env: [
@@ -290,9 +311,9 @@ describe("AliasesEnv", () => {
       fireEvent.click(screen.getByRole("button", { name: /^Import 1$/i }));
     });
 
-    // merged alias should now appear in the Aliases tab
+    // merged alias now appears in the unified list
     await waitFor(() => {
-      expect(screen.getByLabelText(/alias name gco/i)).toBeTruthy();
+      expect(screen.getByRole("row", { name: /alias gco/i })).toBeTruthy();
     });
 
     // and it survives a save
@@ -305,14 +326,16 @@ describe("AliasesEnv", () => {
 
   it("Save is disabled until there are local edits", async () => {
     await renderView();
-    await waitFor(() => screen.getByRole("button", { name: /^Save$/i }));
     const saveBtn = screen.getByRole("button", { name: /^Save$/i }) as HTMLButtonElement;
     expect(saveBtn.disabled).toBe(true);
 
-    // make an edit → enabled
-    fireEvent.change(screen.getByLabelText("alias value ll"), {
-      target: { value: "ls -la" },
+    // open the ll alias and edit it → dirty
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /edit alias ll/i }));
     });
+    await waitFor(() => screen.getByLabelText("alias value ll"));
+    fireEvent.change(screen.getByLabelText("alias value ll"), { target: { value: "ls -la" } });
+
     expect((screen.getByRole("button", { name: /^Save$/i }) as HTMLButtonElement).disabled).toBe(
       false,
     );
