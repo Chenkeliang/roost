@@ -23,10 +23,36 @@ export { scanForSecrets, hasSecret, assertNoPlaintextSecrets } from "./secrets/s
 export type { SecretFinding } from "./secrets/scanner.js";
 export { scanDir, isNoise } from "./discovery/scan.js";
 export type { ScanCandidate } from "./discovery/scan.js";
-export { dotfilesModule, classifyDotfile, isSensitivePath } from "./modules/dotfiles.js";
+export { dotfilesModule, classifyDotfile, isSensitivePath, isRoostManaged } from "./modules/dotfiles.js";
 export { packagesModule } from "./modules/packages.js";
 export { appconfigModule, classifyDomain, SENSITIVE_DOMAIN_HINTS } from "./modules/appconfig.js";
 export { projectsModule, findGitRepos, repoInfo } from "./modules/projects.js";
+export {
+  envModule,
+  generateEnvSh,
+  renderRcSourceLine,
+  ensureRcSourced,
+  removeRcMarker,
+  rcHasMarker,
+  extractImportCandidates,
+  envShPath,
+  roostConfigDir,
+} from "./modules/env.js";
+export {
+  emptyEnvData,
+  loadEnvData,
+  saveEnvData,
+  validateEnvData,
+  ENV_SCHEMA_VERSION,
+} from "./env-data.js";
+export {
+  defaultAgeKeyPath,
+  envSecretsDir,
+  envSecretPath,
+  recipientFromKey,
+  encryptEnvSecret,
+  decryptEnvSecret,
+} from "./env-crypto.js";
 export {
   emptyProjects,
   loadProjects,
