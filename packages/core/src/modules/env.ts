@@ -445,6 +445,15 @@ function writeFile0600Atomic(dest: string, content: string): void {
 export const envModule: SyncModule = {
   name: "env",
 
+  async index(ctx: ModuleContext): Promise<import("@roost/shared").ModuleIndex> {
+    // env is structural data injected via a generated file — no external tool to
+    // probe, so it is always available. Count the managed structured surface.
+    const data = loadEnvData(ctx.repoDir);
+    const managed =
+      data.aliases.length + data.env.length + data.path.length + data.functions.length;
+    return { available: true, managed };
+  },
+
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const candidates: Candidate[] = [];
 

@@ -867,3 +867,41 @@ describe("dotfiles excludes ~/.config/roost", () => {
     expect(candidates.some((c) => c.path.endsWith("nvim"))).toBe(true);
   });
 });
+
+// ── index ─────────────────────────────────────────────────────────────────────
+
+describe("envModule.index", () => {
+  // env is structural data only → always available; index must not shell out
+  // (no age/op/rbw probe, no env.sh generation).
+  const throwingExec: Exec = {
+    async run(): Promise<ExecResult> {
+      throw new Error("index must not run any external command");
+    },
+  };
+
+  it("is cheap: available=true, managed = aliases+env+path+functions, runs no commands", async () => {
+    saveEnvData(tmpRepo, sampleData()); // 1 alias + 1 env + 1 path + 1 function
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec: throwingExec });
+    const idx = await envModule.index!(ctx);
+    expect(idx.available).toBe(true);
+    expect(idx.reason).toBeUndefined();
+    expect(idx.managed).toBe(4);
+  });
+
+  it("managed counts the full structured surface", async () => {
+    saveEnvData(
+      tmpRepo,
+      sampleData({
+        aliases: [
+          { kind: "alias", name: "ll", value: "ls -la", enabled: true },
+          { kind: "alias", name: "gs", value: "git status", enabled: false },
+        ],
+        path: [],
+      }),
+    );
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec: throwingExec });
+    const idx = await envModule.index!(ctx);
+    // 2 aliases + 1 env + 0 path + 1 function (enabled state is irrelevant to managed count)
+    expect(idx.managed).toBe(4);
+  });
+});
