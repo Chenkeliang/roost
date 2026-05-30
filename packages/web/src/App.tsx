@@ -79,10 +79,6 @@ export function App() {
       {/* Top Bar */}
       <header
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 18,
-          padding: "6px 24px 16px",
           position: "sticky",
           top: 0,
           background: "var(--bg)",
@@ -91,6 +87,16 @@ export function App() {
           marginBottom: 20,
         }}
       >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 18,
+            maxWidth: 1080,
+            margin: "0 auto",
+            padding: "6px 24px 16px",
+          }}
+        >
         {/* Brand */}
         <div
           style={{
@@ -161,6 +167,7 @@ export function App() {
             <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
             local
           </span>
+        </div>
         </div>
       </header>
 
