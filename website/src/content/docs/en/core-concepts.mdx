@@ -1,0 +1,66 @@
+---
+title: Core Concepts
+description: The mental model behind Roost — primary to follower, selection.yaml, and the two complementary layers.
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, Card } from '@astrojs/starlight/components';
+
+A few ideas explain almost everything Roost does.
+
+## Primary → follower, one way
+
+Roost has a clear direction of flow:
+
+- You **capture** on your **primary** machine — the Mac whose setup you consider
+  the source of truth.
+- You **load** onto a **follower** machine — another Mac that should match.
+
+Loading is **one-directional**: it brings the config repo's state onto the
+current machine. There is no two-way merge; the repo is authoritative.
+
+## `selection.yaml` is the single source of truth
+
+What Roost manages is not implicit — it's written down. `selection.yaml` records
+exactly which items each module tracks. Commands like `select`, `capture`,
+`load`, `status`, and `list` all read from it. If it isn't in `selection.yaml`,
+Roost doesn't touch it.
+
+## Two complementary layers for shell config
+
+Roost can manage your shell setup two different ways, and they're meant to be
+used together:
+
+<CardGrid>
+  <Card title="Dotfiles — back up as-is">
+    The **Dotfiles** module captures existing files (like `~/.zshrc`,
+    `~/.gitconfig`) verbatim and restores them as files. Use this when you want
+    a file copied exactly as it is.
+  </Card>
+  <Card title="Aliases & Env — portable, managed">
+    The **Aliases & Env** module manages individual aliases, environment
+    variables, PATH entries, and functions as structured data. Roost regenerates
+    a single `~/.config/roost/env.sh` from that data on each machine — without
+    rewriting your `.zshrc`.
+  </Card>
+</CardGrid>
+
+The difference: Dotfiles preserves a file you already maintain; Aliases & Env
+lets Roost **own** a portable slice of shell config that it composes and writes
+itself. See [Aliases & Env](/aliases-and-env/) for the details.
+
+## Reversible by default
+
+Two guarantees make `load` safe to run:
+
+- **Dry-run first.** `roost load` only previews changes. You must pass `--apply`
+  to write anything.
+- **Backups before overwrite.** When applying, Roost backs up any existing file
+  before replacing it (for example under `~/.roost-backups/`).
+
+<Aside type="caution">
+Removing an item from management (`unmanage`) takes it out of the working tree,
+but does **not** rewrite git history. If a removed file ever held a secret,
+rotate it and purge history separately.
+</Aside>

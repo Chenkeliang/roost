@@ -27,6 +27,13 @@ pnpm test
 node packages/cli/dist/index.js doctor   # later: `roost doctor`
 ```
 
+## Documentation
+User-facing docs live in [`website/`](./website) — a Starlight (Astro) site, standalone from the pnpm workspace. Run it locally:
+```bash
+pnpm --dir website install
+pnpm --dir website dev     # or: pnpm --dir website build
+```
+
 ## Built on
 [chezmoi](https://www.chezmoi.io/) (dotfiles + age encryption), Homebrew, [mise](https://mise.jdx.dev/), TypeScript. macOS only (v1).
 

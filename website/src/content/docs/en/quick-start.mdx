@@ -1,0 +1,106 @@
+---
+title: Quick Start
+description: From a fresh checkout to loading your config on a second Mac.
+sidebar:
+  order: 3
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This walks through a first capture on your **main** Mac and a first load on a
+**second** Mac. Examples use `roost <command>`; while running from source,
+substitute `node packages/cli/dist/index.js <command>`.
+
+## On your main Mac
+
+<Steps>
+
+1. **Check your environment.** `doctor` reports which external tools are
+   available and the health of each module:
+
+   ```sh
+   roost doctor
+   ```
+
+2. **Create your config repo.** Scaffold the `roost/` layout and chezmoi stubs:
+
+   ```sh
+   roost init
+   ```
+
+   To create a **private GitHub repo**, wire up `origin`, and push in one step,
+   add `--github`:
+
+   ```sh
+   roost init --github
+   ```
+
+   Roost prompts for a Personal Access Token (used once, never stored) and a
+   repo name. Use `--dry-run` with `--github` to print the intent without making
+   any API calls or pushes.
+
+   <Aside type="tip">
+   You can also set `GITHUB_TOKEN` in the environment to run `--github`
+   non-interactively.
+   </Aside>
+
+3. **Select what to manage.** Discover candidates and choose what to track:
+
+   ```sh
+   roost select
+   roost select --all                       # select all non-excluded candidates
+   roost select --preset developer-essentials
+   ```
+
+   Your choices are recorded in `selection.yaml` — the single source of truth
+   for what Roost manages.
+
+4. **Capture into the repo.** Write the selected items into your config repo
+   (secret values are encrypted, and a scanner blocks plaintext secrets):
+
+   ```sh
+   roost capture
+   ```
+
+5. **Review and commit.** Inspect what's tracked, then commit and push your
+   config repo as you would any git repo:
+
+   ```sh
+   roost list
+   roost status
+   ```
+
+</Steps>
+
+## On your second Mac
+
+<Steps>
+
+1. Clone your config repo onto the new machine (and set `ROOST_REPO` if it isn't
+   at the default chezmoi source path).
+
+2. **Preview the changes first.** `load` is **dry-run by default** — it shows
+   what would change without touching anything:
+
+   ```sh
+   roost load
+   ```
+
+3. **Apply when you're happy.** Roost backs up existing files before overwriting:
+
+   ```sh
+   roost load --apply
+   ```
+
+</Steps>
+
+<Aside type="note">
+Loading flows **one way**: from your config repo (your primary's captured state)
+onto a follower machine. See [Core Concepts](/core-concepts/).
+</Aside>
+
+## Where to go next
+
+- [Core Concepts](/core-concepts/) — the model behind capture/load and `selection.yaml`.
+- [Aliases & Env](/aliases-and-env/) — portable shell config that Roost manages directly.
+- [Secrets](/secrets/) — optional age encryption and key backends.

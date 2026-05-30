@@ -1,0 +1,50 @@
+---
+title: Dashboard
+description: The optional local web UI launched with roost serve.
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Roost ships a **local** web dashboard for managing your setup visually. Start it
+with:
+
+```sh
+roost serve
+```
+
+This launches a local JSON API server (default port `4317`) that serves the web
+UI. You can point it at a specific config repo or web build:
+
+```sh
+roost serve --port 4317 --repo /path/to/config-repo --web packages/web/dist
+```
+
+<Aside type="note" title="Local only">
+The dashboard runs entirely on your machine. Like the rest of Roost, it has no
+server, no account, and no telemetry — nothing is sent anywhere.
+</Aside>
+
+## Views
+
+The dashboard is organized into a few views:
+
+- **Overview** — primary and follower status cards, a drift summary, quick
+  Capture / Load actions, and per-module health dots.
+- **Manage** — what's currently managed plus candidates you can add (from a
+  scan), with presets. This is the visual equivalent of `select`.
+- **Drift** — a side-by-side diff of primary vs. follower state.
+- **Timeline** — snapshot history, with preview and rollback.
+- **Settings** — repo, profiles, age backend, and modules/plugins; Doctor and
+  scan status are surfaced here too.
+
+There's also a dedicated **Aliases & Env** panel for managing aliases,
+environment variables, PATH entries, and functions — including choosing a secret
+env source (age, 1Password, or rbw). Resolved secret **values** are never
+displayed; only the reference locator is shown.
+
+<Aside type="caution" title="Status">
+The dashboard is under active development. Available views and panels track the
+locked design but may not all be wired up yet in the current build.
+</Aside>

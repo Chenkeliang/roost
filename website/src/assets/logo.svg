@@ -1,0 +1,7 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Roost">
+  <!-- Two devices (primary -> follower) with a transfer arc, per the brand mark. -->
+  <rect x="3" y="7" width="11" height="8" rx="1.5" stroke="#FF6363" stroke-width="1.6"/>
+  <rect x="18" y="17" width="11" height="8" rx="1.5" stroke="#8A8A8E" stroke-width="1.6"/>
+  <path d="M11 12 C 20 12, 22 14, 23 17" stroke="#FF6363" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <path d="M21 16.2 L23.2 17.4 L21.6 19.3" stroke="#FF6363" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

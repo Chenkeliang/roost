@@ -1,0 +1,62 @@
+---
+title: Introduction
+description: What Roost is, and why your data stays yours.
+sidebar:
+  order: 1
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+Roost is an open-source macOS configuration backup and migration tool.
+
+On your main Mac you **select** what to manage — dotfiles, packages, app config,
+projects, aliases & env, and (optionally) secrets. Roost stores it in **your own
+private git repository**. On another Mac you **load** it back with one command,
+with a visual manager for everything you've backed up.
+
+<Aside type="note" title="Early development">
+Roost is in early development (P1 MVP). This documentation describes what exists
+in the codebase today, not future plans.
+</Aside>
+
+## Why it's safe
+
+<CardGrid>
+  <Card title="Your data stays yours">
+    Config lives in **your** private git repository. No server, no account,
+    **no telemetry**, nothing phoned home.
+  </Card>
+  <Card title="Secrets are optional">
+    Most setups — dotfiles, packages, app config, projects — need no key at all.
+    If you do back up secret values, they're encrypted with your own
+    [age](https://github.com/FiloSottile/age) key, never shown in the UI or
+    logs, and a pre-commit scanner blocks plaintext secrets from entering the repo.
+  </Card>
+  <Card title="No required password manager">
+    Getting your age key onto a second Mac is your choice — copy it once,
+    or pull it from 1Password or rbw. Skip all that and each machine just
+    generates its own key. None is required.
+  </Card>
+  <Card title="Reversible by default">
+    `load` previews changes (dry-run) and backs up existing files before
+    overwriting.
+  </Card>
+</CardGrid>
+
+## Two repos — don't mix them
+
+Roost is to your config repo what git is to your code repo. There are two
+separate things:
+
+- **Roost (this tool)** — the engine + CLI (and a desktop app later). It ships
+  with **zero personal data**.
+- **Your config repo** — your private git repo. It is the **single source of
+  truth** (Roost's chezmoi source).
+
+You own the data; Roost is just the tool that captures it and loads it back.
+
+## What's next
+
+- [Installation](/installation/) — set up the dev toolchain and prerequisites.
+- [Quick Start](/quick-start/) — first capture and your first load on a second Mac.
+- [Core Concepts](/core-concepts/) — the mental model behind Roost.
