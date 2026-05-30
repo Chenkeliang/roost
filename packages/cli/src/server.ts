@@ -3,7 +3,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
-import type { ModuleContext } from "@roost/shared";
+import type { ModuleContext, EnvData } from "@roost/shared";
 import type { ModuleRegistry } from "@roost/core";
 import {
   loadSelection,
@@ -20,6 +20,12 @@ import {
   createExec,
   createLogger,
   createT,
+  loadEnvData,
+  saveEnvData,
+  validateEnvData,
+  defaultAgeKeyPath,
+  recipientFromKey,
+  encryptEnvSecret,
 } from "@roost/core";
 
 export interface ServerDeps {
@@ -202,6 +208,74 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         diffs.push({ module: mod.name, text });
       }
       return reply.send({ diffs });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── GET /api/env ──────────────────────────────────────────────────────────────
+  // Returns EnvData with secret env values redacted to '' (never echo plaintext).
+  server.get("/api/env", async (_req, reply) => {
+    try {
+      const data = loadEnvData(repoDir);
+      const redacted: EnvData = {
+        ...data,
+        env: data.env.map((e) => (e.secret ? { ...e, value: "" } : e)),
+      };
+      return reply.send(redacted);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── PUT /api/env ──────────────────────────────────────────────────────────────
+  // Accepts a full EnvData. For each secret env item carrying a non-empty value,
+  // treats it as NEW plaintext to encrypt (never echoed back); persists env.yaml
+  // with secret values blanked.
+  server.put<{ Body: unknown }>("/api/env", async (req, reply) => {
+    try {
+      let incoming: EnvData;
+      try {
+        incoming = validateEnvData(req.body);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return reply.status(400).send({ error: msg });
+      }
+
+      const ctx = makeCtx(false);
+      const recipient = await recipientFromKey(ctx.exec, defaultAgeKeyPath(ctx.home));
+
+      const persisted: EnvData = {
+        schemaVersion: incoming.schemaVersion,
+        aliases: incoming.aliases,
+        path: incoming.path,
+        functions: incoming.functions,
+        env: [],
+      };
+
+      for (const e of incoming.env) {
+        if (e.secret && e.value.length > 0) {
+          if (recipient === null) {
+            return reply
+              .status(400)
+              .send({ error: `cannot encrypt secret "${e.name}": no age key available` });
+          }
+          await encryptEnvSecret(ctx.exec, {
+            repoDir,
+            name: e.name,
+            plaintext: e.value,
+            recipient,
+          });
+        }
+        persisted.env.push(e.secret ? { ...e, value: "" } : e);
+      }
+
+      saveEnvData(repoDir, persisted);
+
+      // Echo back with secrets redacted (never return plaintext).
+      return reply.send(persisted);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });

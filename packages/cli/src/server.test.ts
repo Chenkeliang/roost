@@ -487,4 +487,125 @@ describe("buildServer", () => {
 
     await server.close();
   });
+
+  // ── /api/env structured editing ───────────────────────────────────────────────
+
+  it("GET /api/env → redacts secret env values to ''", async () => {
+    const { saveEnvData } = await import("@roost/core");
+    saveEnvData(tmpDir, {
+      schemaVersion: 1,
+      aliases: [{ kind: "alias", name: "ll", value: "ls -la", enabled: true }],
+      env: [
+        { kind: "env", name: "EDITOR", value: "nvim", secret: false, enabled: true },
+        { kind: "env", name: "TOKEN", value: "stored-secret", secret: true, enabled: true },
+      ],
+      path: [],
+      functions: [],
+    });
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/env" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      env: { name: string; value: string; secret: boolean }[];
+    };
+    const tokenEntry = body.env.find((e) => e.name === "TOKEN")!;
+    expect(tokenEntry.value).toBe(""); // redacted
+    const editorEntry = body.env.find((e) => e.name === "EDITOR")!;
+    expect(editorEntry.value).toBe("nvim"); // non-secret preserved
+    // raw plaintext must not leak anywhere in the response
+    expect(res.body).not.toContain("stored-secret");
+
+    await server.close();
+  });
+
+  it("PUT /api/env → encrypts a new secret value, never returns it, blanks it on disk", async () => {
+    // age-simulating exec + a fake key file under a sandboxed home so
+    // recipientFromKey/encrypt succeed without touching the real $HOME.
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "roost-env-server-home-"));
+    const keyPath = path.join(fakeHome, ".config", "sops", "age", "keys.txt");
+    fs.mkdirSync(path.dirname(keyPath), { recursive: true });
+    fs.writeFileSync(keyPath, "AGE-SECRET-KEY-FAKE", { mode: 0o600 });
+
+    function makeAgeExec(): Exec {
+      return {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          if (cmd === "age-keygen" && args[0] === "-y") {
+            return { code: 0, stdout: "age1faketestrecipient\n", stderr: "" };
+          }
+          if (cmd === "age" && args.includes("-r")) {
+            const oIdx = args.indexOf("-o");
+            const dest = args[oIdx + 1]!;
+            const src = args[args.length - 1]!;
+            const plain = fs.readFileSync(src, "utf8");
+            fs.mkdirSync(path.dirname(dest), { recursive: true });
+            fs.writeFileSync(dest, `CIPHER:${plain}`, "utf8");
+            return { code: 0, stdout: "", stderr: "" };
+          }
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+    }
+    function makeAgeCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: fakeHome,
+        profile: "base",
+        dryRun,
+        exec: makeAgeExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    try {
+      const reg = new ModuleRegistry();
+      const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeAgeCtx(tmpDir, d) });
+
+      const payload = {
+        schemaVersion: 1,
+        aliases: [],
+        env: [{ kind: "env", name: "TOKEN", value: "fresh-plaintext", secret: true, enabled: true }],
+        path: [],
+        functions: [],
+      };
+      const res = await server.inject({
+        method: "PUT",
+        url: "/api/env",
+        payload,
+        headers: { "content-type": "application/json" },
+      });
+      expect(res.statusCode).toBe(200);
+
+      // response never echoes the plaintext
+      expect(res.body).not.toContain("fresh-plaintext");
+      const body = res.json() as { env: { name: string; value: string }[] };
+      expect(body.env.find((e) => e.name === "TOKEN")?.value).toBe("");
+
+      // ciphertext written, yaml blanked
+      expect(fs.existsSync(path.join(tmpDir, "roost", "env-secrets", "TOKEN.age"))).toBe(true);
+      const yamlRaw = fs.readFileSync(path.join(tmpDir, "roost", "env.yaml"), "utf8");
+      expect(yamlRaw).not.toContain("fresh-plaintext");
+
+      await server.close();
+    } finally {
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
+  it("PUT /api/env → 400 on malformed body", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({
+      method: "PUT",
+      url: "/api/env",
+      payload: { schemaVersion: "not-a-number" },
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = res.json() as { error: string };
+    expect(typeof body.error).toBe("string");
+    await server.close();
+  });
 });
