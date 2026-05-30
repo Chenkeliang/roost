@@ -102,6 +102,11 @@ export const packagesModule: SyncModule = {
     const filePath = brewfilePath(ctx.repoDir);
     if (fs.existsSync(filePath)) {
       fs.rmSync(filePath);
+      ctx.log.warn(
+        "unmanage: items removed from the working tree but git history is NOT purged. " +
+        "If any removed file ever contained secrets, rotate them now and purge git history " +
+        "with `git filter-repo` or BFG Repo Cleaner.",
+      );
       return { module: "packages", applied: [BREWFILE_ID], backedUp: [], skipped: [] };
     }
     return { module: "packages", applied: [], backedUp: [], skipped: [BREWFILE_ID] };

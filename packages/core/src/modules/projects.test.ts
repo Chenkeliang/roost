@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -596,6 +596,49 @@ describe("projectsModule.unmanage", () => {
 
     expect(result.applied).toHaveLength(0);
     expect(result.skipped).toHaveLength(0);
+  });
+
+  it("logs a git history warning when projects are removed", async () => {
+    const repoDir = path.join(tmpDir, "roost-repo3");
+    fs.mkdirSync(repoDir, { recursive: true });
+    const { saveProjects } = await import("../projects.js");
+    saveProjects(repoDir, {
+      schemaVersion: 1,
+      projects: [{ path: "/home/user/alpha", repo: "https://github.com/u/alpha.git", envTool: "none" }],
+    });
+
+    const { exec } = makeFakeExec([]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      home: tmpDir,
+      repoDir,
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: { projects: ["/home/user/alpha"] } };
+    await projectsModule.unmanage(ctx, sel);
+
+    expect(warnSpy).toHaveBeenCalled();
+    const msg: string = warnSpy.mock.calls[0]?.[0] ?? "";
+    expect(msg).toMatch(/git.*history|history.*git/i);
+    expect(msg).toMatch(/filter-repo|BFG/i);
+  });
+
+  it("does NOT log git history warning when nothing is removed", async () => {
+    const repoDir = path.join(tmpDir, "roost-repo4");
+    fs.mkdirSync(repoDir, { recursive: true });
+
+    const { exec } = makeFakeExec([]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      home: tmpDir,
+      repoDir,
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: {} };
+    await projectsModule.unmanage(ctx, sel);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 

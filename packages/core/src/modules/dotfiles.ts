@@ -187,6 +187,14 @@ export const dotfilesModule: SyncModule = {
       applied.push(id);
     }
 
+    if (applied.length > 0) {
+      ctx.log.warn(
+        "unmanage: items removed from the working tree but git history is NOT purged. " +
+        "If any removed file ever contained secrets, rotate them now and purge git history " +
+        "with `git filter-repo` or BFG Repo Cleaner.",
+      );
+    }
+
     return { module: "dotfiles", applied, backedUp: [], skipped: [] };
   },
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -303,6 +303,37 @@ describe("dotfilesModule.unmanage", () => {
     const result = await dotfilesModule.unmanage(ctx, sel);
     expect(calls).toHaveLength(0);
     expect(result.applied).toHaveLength(0);
+  });
+
+  it("logs a git history warning when items are removed", async () => {
+    const ids = ["/home/user/.zshrc"];
+    const { exec } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      home: os.homedir(),
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: { dotfiles: ids } };
+    await dotfilesModule.unmanage(ctx, sel);
+
+    expect(warnSpy).toHaveBeenCalled();
+    const msg: string = warnSpy.mock.calls[0]?.[0] ?? "";
+    expect(msg).toMatch(/git.*history|history.*git/i);
+    expect(msg).toMatch(/filter-repo|BFG/i);
+  });
+
+  it("does NOT log git history warning on empty selection", async () => {
+    const { exec } = makeFakeExec([]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      home: os.homedir(),
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: {} };
+    await dotfilesModule.unmanage(ctx, sel);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 
