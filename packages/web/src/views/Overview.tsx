@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { FloppyDisk, DownloadSimple, FileCode, Package, SlidersHorizontal, GitBranch, Scan, Lock } from "@phosphor-icons/react";
+import { FloppyDisk, DownloadSimple, FileCode, Package, SlidersHorizontal, GitBranch, Scan, Lock, Desktop } from "@phosphor-icons/react";
 import { MachineCard } from "../components/MachineCard";
 import { StatusDot } from "../components/StatusDot";
 import { Tile } from "../components/Tile";
@@ -192,31 +192,45 @@ export function Overview({ showHud }: OverviewProps) {
       >
         <MachineCard
           type="primary"
-          name={primaryHost ?? health?.name ?? "this machine"}
-          hostname={primaryHost}
+          name={health?.name ?? primaryHost ?? "this machine"}
+          hostname={primaryHost ?? health?.name}
           tracked={trackedCount}
           drift={driftedCount}
           lastActionLabel="capture"
           lastAction={primaryHost ? "now" : undefined}
-          status={
-            hasConflict
-              ? "conflict"
-              : hasDrift
-              ? "drift"
-              : "synced"
-          }
+          status={hasConflict ? "conflict" : hasDrift ? "drift" : "synced"}
           loading={loadingData}
         />
-        <MachineCard
-          type="follower"
-          name={followerHost ?? "Mac mini"}
-          hostname={followerHost}
-          tracked={trackedCount}
-          drift={driftedCount}
-          lastActionLabel="load"
-          status={followerHost ? "drift" : "unmanaged"}
-          loading={loadingData}
-        />
+        {followerHost ? (
+          <MachineCard
+            type="follower"
+            name={followerHost}
+            hostname={followerHost}
+            tracked={trackedCount}
+            drift={driftedCount}
+            lastActionLabel="load"
+            status="drift"
+            loading={loadingData}
+          />
+        ) : (
+          <article
+            style={{
+              background: "var(--surface)",
+              border: "1px dashed var(--border)",
+              borderRadius: "var(--rc)",
+              padding: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 11,
+              color: "var(--muted)",
+            }}
+          >
+            <Desktop size={18} style={{ flexShrink: 0 }} />
+            <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+              No other machine yet — run <span className="mono">roost load</span> on a second Mac to see it here.
+            </div>
+          </article>
+        )}
       </section>
 
       {/* Primary Actions */}

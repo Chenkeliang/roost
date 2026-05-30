@@ -72,6 +72,18 @@ describe("Overview", () => {
     });
   });
 
+  it("shows one real machine card and an honest empty state when there is no second machine", async () => {
+    await act(async () => {
+      render(<Overview showHud={noop} />);
+    });
+    // Real hostname from /api/health, not a hardcoded follower.
+    await waitFor(() => expect(screen.getAllByText(/macbook\.local|roost/).length).toBeGreaterThanOrEqual(1));
+    // No fake follower.
+    expect(screen.queryByText("Mac mini")).not.toBeInTheDocument();
+    // Honest empty state for the absent second machine.
+    expect(screen.getByText(/No other machine yet/i)).toBeInTheDocument();
+  });
+
   it("does not render with old shape: result.changes (must use result.results)", async () => {
     // The mock returns { results: [...] } not { changes: [...] } — if Overview
     // accidentally reads .changes it would get undefined and show "0 results"
