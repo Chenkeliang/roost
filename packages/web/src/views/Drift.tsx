@@ -100,7 +100,6 @@ function DiffPane({ moduleName, diffs, loading }: DiffPaneProps) {
         }}
       >
         {lines.map((line, i) => (
-          // eslint-disable-next-line react/no-array-index-key
           <DiffLine key={i} line={line} />
         ))}
       </pre>

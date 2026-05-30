@@ -1,7 +1,7 @@
 import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
 export default tseslint.config(
-  // packages/web uses JSX/TSX and its own tsconfig — lint is handled by tsc --noEmit in that package
-  { ignores: ["**/dist/**", "**/node_modules/**", "packages/web/**"] },
+  { ignores: ["**/dist/**", "**/node_modules/**", "packages/web/src-tauri/**"] },
   ...tseslint.configs.recommended,
   {
     rules: {
@@ -10,6 +10,14 @@ export default tseslint.config(
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+    },
+  },
+  {
+    files: ["packages/web/src/**/*.{ts,tsx}"],
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   }
 );
