@@ -1,5 +1,5 @@
 // Typed fetch wrapper for Roost API endpoints
-import type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate, EnvData } from "@roost/shared";
+import type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate, EnvData, ModuleIndex } from "@roost/shared";
 
 // When running inside Tauri there is no Vite dev-proxy, so we must target the
 // engine's absolute URL.  In normal browser / Vite dev / jsdom test contexts
@@ -14,7 +14,7 @@ const API_BASE: string =
     : "");
 
 // Re-export shared types for component use
-export type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate, EnvData };
+export type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate, EnvData, ModuleIndex };
 
 export interface HealthResponse {
   ok: boolean;
@@ -168,5 +168,24 @@ export function putEnv(data: EnvData): Promise<EnvData> {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
+  });
+}
+
+// Server GET /api/index returns { index: Record<string, ModuleIndex> }
+export interface IndexResponse { index: Record<string, ModuleIndex>; }
+
+export function getIndex(): Promise<IndexResponse> {
+  return apiFetch<IndexResponse>("/api/index");
+}
+
+export function getDiscoverModule(module: string): Promise<DiscoverResponse> {
+  return apiFetch<DiscoverResponse>(`/api/discover?module=${encodeURIComponent(module)}`);
+}
+
+export function testProjectRemote(remote: string): Promise<{ reachable: boolean; message: string }> {
+  return apiFetch("/api/projects/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ remote }),
   });
 }
