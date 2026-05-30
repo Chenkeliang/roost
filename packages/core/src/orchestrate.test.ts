@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection } from "@roost/shared";
-import { defaultRegistry, discoverAll, captureAll, gateSecrets, statusAll, loadAll } from "./orchestrate.js";
+import { defaultRegistry, discoverAll, captureAll, gateSecrets, statusAll, loadAll, indexAll } from "./orchestrate.js";
 
 // ── fake exec ─────────────────────────────────────────────────────────────────
 
@@ -76,6 +76,23 @@ describe("discoverAll", () => {
     const result = await discoverAll(reg, ctx);
     expect(result).toHaveProperty("dotfiles");
     expect(result).toHaveProperty("packages");
+  });
+});
+
+// ── indexAll ──────────────────────────────────────────────────────────────────
+
+describe("indexAll", () => {
+  it("returns a ModuleIndex per module that implements index()", async () => {
+    const { exec } = makeFakeExec([
+      { code: 0, stdout: "git version 2.x", stderr: "" }, // projects index → git --version
+    ]);
+    const reg = defaultRegistry();
+    const ctx = makeCtx({ exec, home: tmpDir, repoDir: tmpDir });
+    const result = await indexAll(reg, ctx);
+    // projects implements index() → present and shaped
+    expect(result["projects"]).toBeDefined();
+    expect(typeof result["projects"]!.managed).toBe("number");
+    expect(typeof result["projects"]!.available).toBe("boolean");
   });
 });
 

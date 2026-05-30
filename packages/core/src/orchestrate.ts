@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import type { ModuleContext, Candidate, ChangeSet, DriftReport, ApplyResult, Selection } from "@roost/shared";
+import type { ModuleContext, Candidate, ChangeSet, DriftReport, ApplyResult, Selection, ModuleIndex } from "@roost/shared";
 import { ModuleRegistry } from "./registry.js";
 import { dotfilesModule } from "./modules/dotfiles.js";
 import { packagesModule } from "./modules/packages.js";
@@ -29,6 +29,19 @@ export async function discoverAll(
     result[mod.name] = await mod.discover(ctx);
   }
   return result;
+}
+
+export async function indexAll(
+  reg: ModuleRegistry,
+  ctx: ModuleContext,
+): Promise<Record<string, ModuleIndex>> {
+  const out: Record<string, ModuleIndex> = {};
+  for (const m of reg.list()) {
+    if (typeof m.index === "function") {
+      out[m.name] = await m.index(ctx);
+    }
+  }
+  return out;
 }
 
 export async function captureAll(

@@ -83,6 +83,7 @@ export {
   gateSecrets,
   statusAll,
   loadAll,
+  indexAll,
 } from "./orchestrate.js";
 export {
   createDotfilesRepoImporter,
