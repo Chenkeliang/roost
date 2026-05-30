@@ -15,6 +15,7 @@ import {
   captureAll,
   loadAll,
   statusAll,
+  discoverAll,
   defaultRegistry,
   createExec,
   createLogger,
@@ -135,6 +136,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       doc = removeItem(doc, mod, id);
       saveSelection(repoDir, doc);
       return reply.send({ schemaVersion: doc.schemaVersion, modules: doc.modules });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── GET /api/discover ────────────────────────────────────────────────────────
+  server.get("/api/discover", async (_req, reply) => {
+    try {
+      const candidates = await discoverAll(registry, makeCtx(true));
+      return reply.send({ candidates });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });

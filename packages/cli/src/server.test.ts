@@ -373,6 +373,32 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/discover → returns per-module candidate arrays", async () => {
+    const reg = new ModuleRegistry();
+    const candidateA: Candidate = {
+      id: "~/.zshrc",
+      path: "/home/user/.zshrc",
+      category: "shell",
+      recommendation: "track",
+    };
+    const modWithCandidates: SyncModule = {
+      ...makeFakeModule({ name: "dotfiles" }),
+      async discover(): Promise<Candidate[]> { return [candidateA]; },
+    };
+    reg.register(modWithCandidates);
+    reg.register(makeFakeModule({ name: "packages" }));
+
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/discover" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { candidates: Record<string, Candidate[]> };
+    expect(body.candidates["dotfiles"]).toHaveLength(1);
+    expect(body.candidates["dotfiles"]?.[0]?.id).toBe("~/.zshrc");
+    expect(body.candidates["packages"]).toHaveLength(0);
+
+    await server.close();
+  });
+
   it("GET /api/diff → returns per-module diff text from registered modules", async () => {
     const reg = new ModuleRegistry();
     reg.register(
