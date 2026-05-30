@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
-import { findGitRepos, repoInfo, projectsModule } from "./projects.js";
+import { findGitRepos, repoInfo, projectsModule, parseRemoteHost, parseRemoteProtocol } from "./projects.js";
 import { loadProjects } from "../projects.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -48,6 +48,27 @@ beforeEach(() => {
 
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+// ── remote parsing ──────────────────────────────────────────────────────────
+
+describe("parseRemoteHost / parseRemoteProtocol", () => {
+  it("parses ssh git@host:path", () => {
+    expect(parseRemoteHost("git@github.com:u/r.git")).toBe("github.com");
+    expect(parseRemoteProtocol("git@github.com:u/r.git")).toBe("ssh");
+  });
+  it("parses https", () => {
+    expect(parseRemoteHost("https://gitlab.luojilab.com/g/r.git")).toBe("gitlab.luojilab.com");
+    expect(parseRemoteProtocol("https://gitlab.luojilab.com/g/r.git")).toBe("https");
+  });
+  it("parses ssh:// url", () => {
+    expect(parseRemoteHost("ssh://git@code.qschou.com:22/g/r.git")).toBe("code.qschou.com");
+    expect(parseRemoteProtocol("ssh://git@code.qschou.com/g/r.git")).toBe("ssh");
+  });
+  it("handles null / unknown", () => {
+    expect(parseRemoteHost(null)).toBeNull();
+    expect(parseRemoteProtocol(null)).toBe("other");
+  });
 });
 
 // ── findGitRepos ──────────────────────────────────────────────────────────────

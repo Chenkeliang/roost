@@ -14,6 +14,24 @@ import type {
 } from "@roost/shared";
 import { loadProjects, saveProjects } from "../projects.js";
 
+// ── remote parsing ──────────────────────────────────────────────────────────
+
+export function parseRemoteHost(url: string | null): string | null {
+  if (!url) return null;
+  let m = url.match(/^[a-z]+:\/\/(?:[^@/]+@)?([^/:]+)/i); // scheme://[user@]host
+  if (m) return m[1]!;
+  m = url.match(/^[^@\s]+@([^:]+):/); // git@host:path
+  if (m) return m[1]!;
+  return "other";
+}
+
+export function parseRemoteProtocol(url: string | null): "ssh" | "https" | "other" {
+  if (!url) return "other";
+  if (/^https?:\/\//i.test(url)) return "https";
+  if (/^ssh:\/\//i.test(url) || /^[^@\s]+@[^:]+:/.test(url)) return "ssh";
+  return "other";
+}
+
 // ── findGitRepos ──────────────────────────────────────────────────────────────
 
 // Directory names that never hold user projects but are enormous to walk. Without
