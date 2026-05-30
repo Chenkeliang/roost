@@ -6,6 +6,7 @@
     "roost": "./dist/index.js"
   },
   "dependencies": {
+    "@clack/prompts": "^1.5.0",
     "@fastify/static": "^9.1.3",
     "@roost/core": "workspace:*",
     "@roost/shared": "workspace:*",

@@ -6,6 +6,7 @@ import {
   saveSelection,
   emptySelection,
 } from "@roost/core";
+import { promptSelection, buildSelection } from "../wizard.js";
 
 export interface SelectDeps {
   repoDir: string;
@@ -17,12 +18,17 @@ export interface SelectDeps {
 export async function runSelect(deps: SelectDeps): Promise<Selection> {
   const { repoDir, ctx, all, preset } = deps;
 
-  if (!all && !preset) {
-    throw new Error("specify --all or --preset <name>");
-  }
-
   const reg = defaultRegistry();
   const discovered = await discoverAll(reg, ctx);
+
+  // Interactive path: no flags → prompt user
+  if (!all && !preset) {
+    const chosenIds = await promptSelection(discovered);
+    const { modules } = buildSelection(discovered, chosenIds);
+    const doc = { schemaVersion: emptySelection().schemaVersion, modules };
+    saveSelection(repoDir, doc);
+    return doc;
+  }
 
   // Flatten all candidates
   const allCandidates = Object.values(discovered).flat();

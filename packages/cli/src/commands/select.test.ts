@@ -85,15 +85,7 @@ describe("runSelect", () => {
     expect(dotfileIds.some((id) => id.endsWith(".vimrc"))).toBe(false);
   });
 
-  it("throws when neither --all nor --preset is specified", async () => {
-    const repoDir = path.join(tmpDir, "repo");
-    const home = path.join(tmpDir, "home");
-    fs.mkdirSync(repoDir, { recursive: true });
-    fs.mkdirSync(home, { recursive: true });
-
-    const exec = makeFakeExec([]);
-    const ctx = makeCtx({ exec, home, repoDir });
-
-    await expect(runSelect({ repoDir, ctx })).rejects.toThrow(/--all or --preset/i);
-  });
+  // NOTE: the no-flags path now invokes the interactive promptSelection wizard
+  // and is not unit-tested here (it requires TTY / @clack/prompts); --all and
+  // --preset are the testable paths.
 });
