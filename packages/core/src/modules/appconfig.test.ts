@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
-import { classifyDomain, appconfigModule } from "./appconfig.js";
+import { classifyDomain, appconfigModule, SENSITIVE_DOMAIN_HINTS } from "./appconfig.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -199,18 +199,251 @@ describe("appconfigModule.capture", () => {
     expect(result.written).toHaveLength(0);
     expect(result.encrypted).toHaveLength(0);
   });
+
+  it("blocks a domain whose plist contains an AWS key (AKIA…) and logs a warning", async () => {
+    const domain = "com.example.awsapp";
+    const dangerousPlist =
+      '<?xml version="1.0"?><plist><string>AKIAIOSFODNN7EXAMPLE</string></plist>';
+    const { exec } = makeFakeExec([{ code: 0, stdout: dangerousPlist, stderr: "" }]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      repoDir: tmpDir,
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: { appconfig: [`domain:${domain}`] } };
+
+    const result = await appconfigModule.capture(ctx, sel);
+
+    // File must NOT be written
+    const dest = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
+    expect(fs.existsSync(dest)).toBe(false);
+    expect(result.written).toHaveLength(0);
+
+    // Warning must have been logged (with domain, without the raw secret value)
+    expect(warnSpy).toHaveBeenCalled();
+    const warningArg: string = warnSpy.mock.calls[0]?.[0] ?? "";
+    expect(warningArg).toContain(domain);
+    expect(warningArg).not.toContain("AKIAIOSFODNN7EXAMPLE");
+
+    // blocked list must record the domain
+    expect((result as { blocked?: string[] }).blocked).toContain(domain);
+  });
+
+  it("blocks a domain containing a GitHub token (ghp_…) and logs a warning", async () => {
+    const domain = "com.example.githubapp";
+    const dangerousPlist =
+      '<?xml version="1.0"?><plist><string>ghp_1234567890abcdefghij</string></plist>';
+    const { exec } = makeFakeExec([{ code: 0, stdout: dangerousPlist, stderr: "" }]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      repoDir: tmpDir,
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: { appconfig: [`domain:${domain}`] } };
+
+    const result = await appconfigModule.capture(ctx, sel);
+
+    const dest = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
+    expect(fs.existsSync(dest)).toBe(false);
+    expect(result.written).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    expect((result as { blocked?: string[] }).blocked).toContain(domain);
+  });
+
+  it("blocks a domain containing an OpenAI key (sk-…) and logs a warning", async () => {
+    const domain = "com.example.openaiapp";
+    const dangerousPlist =
+      '<?xml version="1.0"?><plist><string>sk-abcdefghijklmnopqrstuvwxyz123456</string></plist>';
+    const { exec } = makeFakeExec([{ code: 0, stdout: dangerousPlist, stderr: "" }]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      repoDir: tmpDir,
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: { appconfig: [`domain:${domain}`] } };
+
+    const result = await appconfigModule.capture(ctx, sel);
+
+    const dest = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
+    expect(fs.existsSync(dest)).toBe(false);
+    expect(result.written).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    expect((result as { blocked?: string[] }).blocked).toContain(domain);
+  });
+
+  it("writes a clean plist that has no secrets", async () => {
+    const domain = "com.apple.dock";
+    const cleanPlist =
+      '<?xml version="1.0"?><plist><dict><key>tilesize</key><integer>48</integer></dict></plist>';
+    const { exec } = makeFakeExec([{ code: 0, stdout: cleanPlist, stderr: "" }]);
+    const ctx = makeCtx({ exec, repoDir: tmpDir });
+    const sel: Selection = { modules: { appconfig: [`domain:${domain}`] } };
+
+    const result = await appconfigModule.capture(ctx, sel);
+
+    const dest = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
+    expect(fs.existsSync(dest)).toBe(true);
+    expect(result.written).toContain(dest);
+    expect((result as { blocked?: string[] }).blocked ?? []).toHaveLength(0);
+  });
+
+  it("writes clean domain and blocks secret domain in the same capture call", async () => {
+    const cleanDomain = "com.apple.dock";
+    const secretDomain = "com.example.awsapp";
+    const cleanPlist = '<?xml version="1.0"?><plist><dict></dict></plist>';
+    const secretPlist = '<?xml version="1.0"?><plist><string>AKIAIOSFODNN7EXAMPLE</string></plist>';
+
+    const { exec } = makeFakeExec([
+      { code: 0, stdout: cleanPlist, stderr: "" },
+      { code: 0, stdout: secretPlist, stderr: "" },
+    ]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      repoDir: tmpDir,
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = {
+      modules: { appconfig: [`domain:${cleanDomain}`, `domain:${secretDomain}`] },
+    };
+
+    const result = await appconfigModule.capture(ctx, sel);
+
+    const cleanDest = path.join(tmpDir, "roost/appconfig", `${cleanDomain}.plist`);
+    const secretDest = path.join(tmpDir, "roost/appconfig", `${secretDomain}.plist`);
+    expect(fs.existsSync(cleanDest)).toBe(true);
+    expect(fs.existsSync(secretDest)).toBe(false);
+    expect(result.written).toContain(cleanDest);
+    expect(result.written).not.toContain(secretDest);
+    expect((result as { blocked?: string[] }).blocked).toContain(secretDomain);
+    expect(warnSpy).toHaveBeenCalledOnce();
+  });
+});
+
+// ── SENSITIVE_DOMAIN_HINTS ────────────────────────────────────────────────────
+
+describe("SENSITIVE_DOMAIN_HINTS", () => {
+  it("is exported and is an array of RegExp", () => {
+    expect(Array.isArray(SENSITIVE_DOMAIN_HINTS)).toBe(true);
+    expect(SENSITIVE_DOMAIN_HINTS.length).toBeGreaterThan(0);
+    for (const r of SENSITIVE_DOMAIN_HINTS) {
+      expect(r).toBeInstanceOf(RegExp);
+    }
+  });
+
+  it("matches obvious credential-holding domain names", () => {
+    const sensitiveNames = [
+      "com.openai.chatgpt",
+      "com.anthropic.claude",
+      "com.github.desktop",
+      "com.gitlab.runner",
+      "com.slack.Slack",
+      "com.amazon.aws.cli",
+      "com.google.gcloud",
+      "com.example.authservice",
+      "com.example.tokenmanager",
+      "com.1password.extension",
+      "com.bitwarden.vault",
+      "com.example.credential-store",
+    ];
+    for (const name of sensitiveNames) {
+      const matched = SENSITIVE_DOMAIN_HINTS.some((r) => r.test(name));
+      expect(matched, `Expected ${name} to be matched by SENSITIVE_DOMAIN_HINTS`).toBe(true);
+    }
+  });
+
+  it("does not match benign domains", () => {
+    const benignNames = [
+      "com.apple.dock",
+      "com.apple.Finder",
+      "com.googlecode.iterm2",
+      "com.microsoft.VSCode",
+    ];
+    for (const name of benignNames) {
+      const matched = SENSITIVE_DOMAIN_HINTS.some((r) => r.test(name));
+      expect(matched, `Expected ${name} NOT to be matched by SENSITIVE_DOMAIN_HINTS`).toBe(false);
+    }
+  });
 });
 
 // ── apply ─────────────────────────────────────────────────────────────────────
 
 describe("appconfigModule.apply", () => {
+  it("quits the app via osascript BEFORE defaults import at runtime", async () => {
+    const domain = "com.apple.dock";
+    const plistFile = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
+    fs.mkdirSync(path.dirname(plistFile), { recursive: true });
+    fs.writeFileSync(plistFile, "<plist></plist>");
+
+    // Two responses: osascript (quit) then defaults import
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" }, // osascript quit (may fail — tolerated)
+      { code: 0, stdout: "", stderr: "" }, // defaults import
+    ]);
+    const ctx = makeCtx({ exec, repoDir: tmpDir, dryRun: false });
+    const plan: ApplyPlan = {
+      module: "appconfig",
+      actions: [{ id: `domain:${domain}`, kind: "update", target: plistFile }],
+    };
+
+    await appconfigModule.apply(ctx, plan);
+
+    // osascript must appear before defaults import in call order
+    const osascriptIdx = calls.findIndex((c) => c.cmd === "osascript");
+    const importIdx = calls.findIndex(
+      (c) => c.cmd === "defaults" && c.args.includes("import"),
+    );
+    expect(osascriptIdx).toBeGreaterThanOrEqual(0);
+    expect(importIdx).toBeGreaterThan(osascriptIdx);
+
+    // osascript must carry a quit command for the domain
+    const quitCall = calls[osascriptIdx]!;
+    expect(quitCall.args).toContain("-e");
+    const scriptArg = quitCall.args[quitCall.args.indexOf("-e") + 1] ?? "";
+    expect(scriptArg).toContain("quit");
+    expect(scriptArg).toContain(domain);
+  });
+
+  it("tolerates osascript quit failure and still imports", async () => {
+    const domain = "com.apple.dock";
+    const plistFile = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
+    fs.mkdirSync(path.dirname(plistFile), { recursive: true });
+    fs.writeFileSync(plistFile, "<plist></plist>");
+
+    // osascript fails (app not running), defaults import succeeds
+    const { exec, calls } = makeFakeExec([
+      { code: 1, stdout: "", stderr: "Application isn't running" }, // osascript fails
+      { code: 0, stdout: "", stderr: "" }, // defaults import still runs
+    ]);
+    const ctx = makeCtx({ exec, repoDir: tmpDir, dryRun: false });
+    const plan: ApplyPlan = {
+      module: "appconfig",
+      actions: [{ id: `domain:${domain}`, kind: "update", target: plistFile }],
+    };
+
+    const result = await appconfigModule.apply(ctx, plan);
+
+    expect(result.applied).toContain(`domain:${domain}`);
+    const importCall = calls.find(
+      (c) => c.cmd === "defaults" && c.args.includes("import"),
+    );
+    expect(importCall).toBeDefined();
+  });
+
   it("calls defaults import with domain and file path in real mode", async () => {
     const domain = "com.apple.dock";
     const plistFile = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
     fs.mkdirSync(path.dirname(plistFile), { recursive: true });
     fs.writeFileSync(plistFile, "<plist></plist>");
 
-    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    // Two responses: osascript (quit) then defaults import
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" }, // osascript quit
+      { code: 0, stdout: "", stderr: "" }, // defaults import
+    ]);
     const ctx = makeCtx({ exec, repoDir: tmpDir, dryRun: false });
     const plan: ApplyPlan = {
       module: "appconfig",
@@ -233,7 +466,7 @@ describe("appconfigModule.apply", () => {
     expect(result.skipped).toHaveLength(0);
   });
 
-  it("skips defaults import in dryRun mode", async () => {
+  it("skips defaults import in dryRun mode (no osascript either)", async () => {
     const domain = "com.apple.dock";
     const { exec, calls } = makeFakeExec([]);
     const ctx = makeCtx({ exec, repoDir: tmpDir, dryRun: true });
@@ -248,6 +481,8 @@ describe("appconfigModule.apply", () => {
       (c) => c.cmd === "defaults" && c.args.includes("import"),
     );
     expect(importCall).toBeUndefined();
+    const osascriptCall = calls.find((c) => c.cmd === "osascript");
+    expect(osascriptCall).toBeUndefined();
 
     expect(result.applied).toHaveLength(0);
     expect(result.skipped).toContain(`domain:${domain}`);
@@ -259,7 +494,11 @@ describe("appconfigModule.apply", () => {
     fs.mkdirSync(path.dirname(plistFile), { recursive: true });
     fs.writeFileSync(plistFile, "<plist></plist>");
 
-    const { exec } = makeFakeExec([{ code: 1, stdout: "", stderr: "error" }]);
+    // osascript ok, defaults import fails
+    const { exec } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" }, // osascript
+      { code: 1, stdout: "", stderr: "error" }, // defaults import
+    ]);
     const ctx = makeCtx({ exec, repoDir: tmpDir, dryRun: false });
     const plan: ApplyPlan = {
       module: "appconfig",
@@ -358,6 +597,41 @@ describe("appconfigModule.unmanage", () => {
 
     expect(result.applied).toHaveLength(0);
     expect(result.skipped).toContain(`domain:${domain}`);
+  });
+
+  it("logs a git history warning when domains are removed", async () => {
+    const domain = "com.apple.dock";
+    const plistFile = path.join(tmpDir, "roost/appconfig", `${domain}.plist`);
+    fs.mkdirSync(path.dirname(plistFile), { recursive: true });
+    fs.writeFileSync(plistFile, "<plist></plist>");
+
+    const { exec } = makeFakeExec([]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      repoDir: tmpDir,
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: { appconfig: [`domain:${domain}`] } };
+    await appconfigModule.unmanage(ctx, sel);
+
+    expect(warnSpy).toHaveBeenCalled();
+    const msg: string = warnSpy.mock.calls[0]?.[0] ?? "";
+    expect(msg).toMatch(/git.*history|history.*git/i);
+    expect(msg).toMatch(/filter-repo|BFG/i);
+  });
+
+  it("does NOT log git history warning when nothing is removed", async () => {
+    const { exec } = makeFakeExec([]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      repoDir: tmpDir,
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: { appconfig: [] } };
+    await appconfigModule.unmanage(ctx, sel);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 

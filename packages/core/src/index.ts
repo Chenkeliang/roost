@@ -25,7 +25,7 @@ export { scanDir, isNoise } from "./discovery/scan.js";
 export type { ScanCandidate } from "./discovery/scan.js";
 export { dotfilesModule, classifyDotfile, isSensitivePath } from "./modules/dotfiles.js";
 export { packagesModule } from "./modules/packages.js";
-export { appconfigModule, classifyDomain } from "./modules/appconfig.js";
+export { appconfigModule, classifyDomain, SENSITIVE_DOMAIN_HINTS } from "./modules/appconfig.js";
 export { projectsModule, findGitRepos, repoInfo } from "./modules/projects.js";
 export {
   emptyProjects,
@@ -75,4 +75,5 @@ export type {
   PluginManifest,
   RoostPlugin,
   LoadResult,
+  LoadPluginOpts,
 } from "./plugins/loader.js";

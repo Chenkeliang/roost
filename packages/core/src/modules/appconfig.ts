@@ -11,6 +11,7 @@ import type {
   ApplyResult,
   Health,
 } from "@roost/shared";
+import { scanForSecrets } from "../secrets/scanner.js";
 
 // ── classifyDomain ────────────────────────────────────────────────────────────
 
@@ -24,8 +25,30 @@ const SKIP_PATTERNS: RegExp[] = [
   /account/i,
 ];
 
+/**
+ * Domains known to hold OAuth tokens, API keys, or other credentials.
+ * These are skipped by default in discover() so they are never offered for tracking.
+ */
+export const SENSITIVE_DOMAIN_HINTS: RegExp[] = [
+  /openai/i,
+  /anthropic/i,
+  /github/i,
+  /gitlab/i,
+  /slack/i,
+  /aws/i,
+  /gcloud/i,
+  /auth/i,
+  /token/i,
+  /credential/i,
+  /1password/i,
+  /bitwarden/i,
+];
+
 export function classifyDomain(domain: string): "track" | "skip" {
   for (const re of SKIP_PATTERNS) {
+    if (re.test(domain)) return "skip";
+  }
+  for (const re of SENSITIVE_DOMAIN_HINTS) {
     if (re.test(domain)) return "skip";
   }
   return "track";
@@ -66,6 +89,7 @@ export const appconfigModule: SyncModule = {
   async capture(ctx: ModuleContext, sel: Selection): Promise<ChangeSet> {
     const ids = sel.modules["appconfig"] ?? [];
     const written: string[] = [];
+    const blocked: string[] = [];
 
     for (const id of ids) {
       const domain = stripPrefix(id);
@@ -73,13 +97,22 @@ export const appconfigModule: SyncModule = {
       if (r.code !== 0) {
         throw new Error(`defaults export ${domain} failed (code ${r.code}): ${r.stderr}`);
       }
+      const findings = scanForSecrets(r.stdout);
+      if (findings.length > 0) {
+        const ruleNames = findings.map((f) => f.rule).join(", ");
+        ctx.log.warn(
+          `appconfig capture: domain "${domain}" contains potential secrets (${ruleNames}) — skipped. Rotate any exposed credentials.`,
+        );
+        blocked.push(domain);
+        continue;
+      }
       const dest = plistPath(ctx.repoDir, domain);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.writeFileSync(dest, r.stdout, "utf8");
       written.push(dest);
     }
 
-    return { module: "appconfig", written, encrypted: [] };
+    return { module: "appconfig", written, encrypted: [], blocked };
   },
 
   async apply(ctx: ModuleContext, plan: ApplyPlan): Promise<ApplyResult> {
@@ -94,6 +127,13 @@ export const appconfigModule: SyncModule = {
         skipped.push(action.id);
         continue;
       }
+
+      // Attempt to quit the owning app so cfprefsd flushes its cache before we
+      // import. Failure is tolerated — the app may not be running or the domain
+      // may not map to an app bundle id. Sandboxed apps (prefs under
+      // ~/Library/Containers/<id>/…) may also ignore this quit and still require
+      // Full Disk Access; that is a known macOS limitation.
+      await ctx.exec.run("osascript", ["-e", `quit app id "${domain}"`]);
 
       const r = await ctx.exec.run("defaults", ["import", domain, file]);
       if (r.code !== 0) {
@@ -149,6 +189,14 @@ export const appconfigModule: SyncModule = {
       } else {
         skipped.push(id);
       }
+    }
+
+    if (applied.length > 0) {
+      ctx.log.warn(
+        "unmanage: items removed from the working tree but git history is NOT purged. " +
+        "If any removed file ever contained secrets, rotate them now and purge git history " +
+        "with `git filter-repo` or BFG Repo Cleaner.",
+      );
     }
 
     return { module: "appconfig", applied, backedUp: [], skipped };
