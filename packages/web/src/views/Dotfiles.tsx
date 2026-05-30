@@ -4,6 +4,7 @@ import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
+import { useT } from "../i18n";
 import { getIndex, getDotfiles, getDiscoverModule, addSelection } from "../api";
 
 interface DotfilesProps { showHud?: (m: HudMessage) => void; }
@@ -28,6 +29,7 @@ function CategoryIcon({ category }: { category: Category }) {
 }
 
 export function Dotfiles({ showHud }: DotfilesProps) {
+  const { t } = useT();
   const [available, setAvailable] = useState(true);
   const [managed, setManaged] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,8 +87,8 @@ export function Dotfiles({ showHud }: DotfilesProps) {
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
         <EmptyState
           icon={<File size={24} />}
-          title="chezmoi not installed"
-          subtitle="Install chezmoi to manage dotfiles — Roost won't run chezmoi until it's available."
+          title={t("dotfiles.noChezmoiTitle")}
+          subtitle={t("dotfiles.noChezmoiSubtitle")}
         />
       </div>
     );
@@ -95,7 +97,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
-        Config files Roost backs up &amp; restores on a new Mac. Managed: {managed?.length ?? 0} · scanning for more is on-demand.
+        {t("dotfiles.explainer")} Managed: {managed?.length ?? 0} · scanning for more is on-demand.
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -110,12 +112,12 @@ export function Dotfiles({ showHud }: DotfilesProps) {
         </div>
         <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
-          {scanning ? "Scanning…" : "Scan for dotfiles"}
+          {scanning ? t("dotfiles.scanning") : t("dotfiles.scan")}
         </button>
       </div>
 
       {shown.length === 0 ? (
-        <EmptyState icon={<File size={24} />} title={managed && managed.length > 0 ? "Nothing here" : "No dotfiles tracked yet"} subtitle={managed && managed.length > 0 ? "No dotfiles match this filter." : 'Click "Scan for dotfiles" to find config files on this Mac.'} />
+        <EmptyState icon={<File size={24} />} title={managed && managed.length > 0 ? t("dotfiles.emptyMatchTitle") : t("dotfiles.emptyTitle")} subtitle={managed && managed.length > 0 ? t("dotfiles.emptyMatchSubtitle") : t("dotfiles.emptySubtitle")} />
       ) : (
         <div style={card}>
           {shown.map((p) => {

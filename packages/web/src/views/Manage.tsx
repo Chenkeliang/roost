@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import type { DriftItem, Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
+import { useT } from "../i18n";
 import { StatusDot } from "../components/StatusDot";
 import { Skeleton } from "../components/Skeleton";
 import { EmptyState } from "../components/EmptyState";
@@ -321,6 +322,7 @@ function ModuleSectionWithActions({
 // ── Manage ────────────────────────────────────────────────────────────────────
 
 export function Manage({ showHud }: ManageProps) {
+  const { t } = useT();
   const [selection, setSelection] = useState<SelectionResponse | null>(null);
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
   const [discover, setDiscover] = useState<DiscoverResponse | null>(null);
@@ -474,8 +476,8 @@ export function Manage({ showHud }: ManageProps) {
       {modules.length === 0 ? (
         <EmptyState
           icon={<FileCode size={24} />}
-          title="No modules tracked"
-          subtitle="Run roost init to set up module tracking"
+          title={t("manage.noModulesTitle")}
+          subtitle={t("manage.noModulesSubtitle")}
         />
       ) : (
         <section

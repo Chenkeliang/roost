@@ -4,6 +4,7 @@ import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
+import { useT } from "../i18n";
 import { getIndex, getAppConfig, getDiscoverModule, addSelection } from "../api";
 
 interface AppConfigProps { showHud?: (m: HudMessage) => void; }
@@ -17,6 +18,7 @@ function candidateDomain(id: string): string {
 }
 
 export function AppConfig({ showHud }: AppConfigProps) {
+  const { t } = useT();
   const [available, setAvailable] = useState(true);
   const [managed, setManaged] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,8 +76,8 @@ export function AppConfig({ showHud }: AppConfigProps) {
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
         <EmptyState
           icon={<Sliders size={24} />}
-          title="defaults unavailable"
-          subtitle="App preferences are read with macOS `defaults` — unavailable on this machine."
+          title={t("appconfig.unavailableTitle")}
+          subtitle={t("appconfig.unavailableSubtitle")}
         />
       </div>
     );
@@ -84,7 +86,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
-        App preference domains Roost backs up &amp; restores on a new Mac. Managed: {managed?.length ?? 0} · scanning for more is on-demand.
+        {t("appconfig.explainer")} Managed: {managed?.length ?? 0} · scanning for more is on-demand.
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -99,15 +101,15 @@ export function AppConfig({ showHud }: AppConfigProps) {
         </div>
         <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
-          {scanning ? "Scanning…" : "Scan app preferences"}
+          {scanning ? t("appconfig.scanning") : t("appconfig.scan")}
         </button>
       </div>
 
       {shown.length === 0 ? (
         <EmptyState
           icon={<Sliders size={24} />}
-          title={managed && managed.length > 0 ? "Nothing here" : "No app config managed yet"}
-          subtitle={managed && managed.length > 0 ? "No domains match this filter." : "Scan to find app preference domains on this Mac."}
+          title={managed && managed.length > 0 ? t("appconfig.emptyMatchTitle") : t("appconfig.emptyTitle")}
+          subtitle={managed && managed.length > 0 ? t("appconfig.emptyMatchSubtitle") : t("appconfig.emptySubtitle")}
         />
       ) : (
         <div style={card}>

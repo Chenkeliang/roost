@@ -4,6 +4,7 @@ import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
+import { useT } from "../i18n";
 import { getIndex, getDiscoverModule, testProjectRemote, addSelection } from "../api";
 
 interface ProjectsProps { showHud?: (m: HudMessage) => void; }
@@ -13,6 +14,7 @@ const card: React.CSSProperties = { background: "var(--surface)", border: "1px s
 const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
 
 export function Projects({ showHud }: ProjectsProps) {
+  const { t } = useT();
   const [managed, setManaged] = useState<number | null>(null);
   const [available, setAvailable] = useState(true);
   const [reason, setReason] = useState<string | undefined>();
@@ -76,7 +78,7 @@ export function Projects({ showHud }: ProjectsProps) {
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
-        Git projects Roost can re-clone on a new Mac. Managed: {loading ? "…" : managed} · scanning your disk is on-demand.
+        {t("projects.explainer")} Managed: {loading ? "…" : managed} · scanning your disk is on-demand.
       </p>
 
       {!available && (
@@ -88,7 +90,7 @@ export function Projects({ showHud }: ProjectsProps) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <button onClick={() => void scan()} disabled={scanning || !available} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
-          {scanning ? "Scanning…" : "Scan for git projects"}
+          {scanning ? t("projects.scanning") : t("projects.scan")}
         </button>
       </div>
 
@@ -106,9 +108,9 @@ export function Projects({ showHud }: ProjectsProps) {
       {scanning ? (
         <div style={card}>{[1, 2, 3].map((i) => <div key={i} style={{ padding: "12px 14px", borderBottom: "1px solid var(--border-soft)" }}><Skeleton width={300} height={14} /></div>)}</div>
       ) : cands === null ? (
-        <EmptyState icon={<GitBranch size={24} />} title="No scan yet" subtitle='Click "Scan for git projects" to find repositories on this Mac.' />
+        <EmptyState icon={<GitBranch size={24} />} title={t("projects.noScanTitle")} subtitle={t("projects.noScanSubtitle")} />
       ) : shown.length === 0 ? (
-        <EmptyState icon={<GitBranch size={24} />} title="Nothing here" subtitle="No repositories match this host filter." />
+        <EmptyState icon={<GitBranch size={24} />} title={t("projects.emptyTitle")} subtitle={t("projects.emptySubtitle")} />
       ) : (
         <div style={card}>
           {shown.map((c) => (

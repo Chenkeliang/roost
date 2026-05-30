@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ShieldCheck } from "@phosphor-icons/react";
+import { useT } from "./i18n";
+import type { Locale } from "./i18n/strings";
 import { CommandPalette } from "./components/CommandPalette";
 import { ActionBar } from "./components/ActionBar";
 import { Hud, type HudMessage } from "./components/Hud";
@@ -16,25 +18,25 @@ import { AppConfig } from "./views/AppConfig";
 
 type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "env" | "drift" | "timeline" | "settings";
 
-type NavItem = { id: Tab; label: string };
+type NavItem = { id: Tab; labelKey: string };
 
 // Top-level item shown above the Modules group.
-const TOP_NAV: NavItem[] = [{ id: "overview", label: "Overview" }];
+const TOP_NAV: NavItem[] = [{ id: "overview", labelKey: "nav.overview" }];
 
 // "Modules" group — the SyncModule-backed rich pages.
 const MODULE_NAV: NavItem[] = [
-  { id: "dotfiles", label: "Dotfiles" },
-  { id: "packages", label: "Packages" },
-  { id: "projects", label: "Projects" },
-  { id: "appconfig", label: "App Config" },
-  { id: "env", label: "Aliases & Env" },
+  { id: "dotfiles", labelKey: "nav.dotfiles" },
+  { id: "packages", labelKey: "nav.packages" },
+  { id: "projects", labelKey: "nav.projects" },
+  { id: "appconfig", labelKey: "nav.appconfig" },
+  { id: "env", labelKey: "nav.env" },
 ];
 
 // Cross-module / system items below the divider.
 const TAIL_NAV: NavItem[] = [
-  { id: "drift", label: "Drift" },
-  { id: "timeline", label: "Timeline" },
-  { id: "settings", label: "Settings" },
+  { id: "drift", labelKey: "nav.drift" },
+  { id: "timeline", labelKey: "nav.timeline" },
+  { id: "settings", labelKey: "nav.settings" },
 ];
 
 const DOCS_URL = "https://github.com/Chenkeliang/roost/tree/main/website";
@@ -61,13 +63,13 @@ function RoostMark() {
 }
 
 function NavButton({
-  item,
   active,
   onClick,
+  label,
 }: {
-  item: NavItem;
   active: boolean;
   onClick: () => void;
+  label: string;
 }) {
   return (
     <button
@@ -91,12 +93,61 @@ function NavButton({
         transition: "background .12s, color .12s",
       }}
     >
-      {item.label}
+      {label}
     </button>
   );
 }
 
+// Segmented EN | 中 control for the sidebar bottom area.
+function LanguageSwitcher({
+  locale,
+  setLocale,
+}: {
+  locale: Locale;
+  setLocale: (l: Locale) => void;
+}) {
+  const opts: { id: Locale; label: string }[] = [
+    { id: "en", label: "EN" },
+    { id: "zh", label: "中" },
+  ];
+  return (
+    <div
+      aria-label="Language"
+      style={{
+        display: "inline-flex",
+        border: "1px solid var(--border)",
+        borderRadius: 999,
+        overflow: "hidden",
+      }}
+    >
+      {opts.map((o) => {
+        const active = locale === o.id;
+        return (
+          <button
+            key={o.id}
+            onClick={() => setLocale(o.id)}
+            aria-pressed={active}
+            style={{
+              appearance: "none",
+              border: 0,
+              background: active ? "var(--raise)" : "transparent",
+              color: active ? "var(--text)" : "var(--muted)",
+              fontFamily: "var(--font)",
+              fontSize: 11,
+              padding: "3px 9px",
+              cursor: "pointer",
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function App() {
+  const { t, locale, setLocale } = useT();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [hud, setHud] = useState<HudMessage | null>(null);
@@ -168,7 +219,7 @@ export function App() {
           {TOP_NAV.map((item) => (
             <NavButton
               key={item.id}
-              item={item}
+              label={t(item.labelKey)}
               active={activeTab === item.id}
               onClick={() => setActiveTab(item.id)}
             />
@@ -185,12 +236,12 @@ export function App() {
               padding: "14px 12px 6px",
             }}
           >
-            Modules
+            {t("nav.modulesGroup")}
           </div>
           {MODULE_NAV.map((item) => (
             <NavButton
               key={item.id}
-              item={item}
+              label={t(item.labelKey)}
               active={activeTab === item.id}
               onClick={() => setActiveTab(item.id)}
             />
@@ -207,7 +258,7 @@ export function App() {
           {TAIL_NAV.map((item) => (
             <NavButton
               key={item.id}
-              item={item}
+              label={t(item.labelKey)}
               active={activeTab === item.id}
               onClick={() => setActiveTab(item.id)}
             />
@@ -245,11 +296,13 @@ export function App() {
               rel="noreferrer"
               style={{ color: "var(--muted)", textDecoration: "none" }}
             >
-              Docs
+              {t("app.docs")}
             </a>
+            <span style={{ marginLeft: "auto" }}>
+              <LanguageSwitcher locale={locale} setLocale={setLocale} />
+            </span>
             <span
               style={{
-                marginLeft: "auto",
                 fontFamily: "var(--mono)",
                 fontSize: 11,
                 color: "var(--muted)",

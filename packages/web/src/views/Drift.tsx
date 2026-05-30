@@ -4,6 +4,7 @@ import type { DriftReport } from "@roost/shared";
 import { EmptyState } from "../components/EmptyState";
 import { StatusDot } from "../components/StatusDot";
 import { Skeleton } from "../components/Skeleton";
+import { useT } from "../i18n";
 import { getStatus, getDiff, type DiffEntry } from "../api";
 
 // Derive a display status from a report's items
@@ -188,6 +189,7 @@ function DriftedModuleRow({
 // ── Drift ─────────────────────────────────────────────────────────────────────
 
 export function Drift() {
+  const { t } = useT();
   const [reports, setReports] = useState<DriftReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -232,7 +234,7 @@ export function Drift() {
           marginBottom: 14,
         }}
       >
-        Drift Overview
+        {t("drift.heading")}
       </div>
 
       {loading ? (
@@ -277,8 +279,8 @@ export function Drift() {
       ) : drifted.length === 0 ? (
         <EmptyState
           icon={<GitDiff size={24} weight="duotone" />}
-          title="No drift detected"
-          subtitle="All modules are in sync between machines"
+          title={t("drift.noDriftTitle")}
+          subtitle={t("drift.noDriftSubtitle")}
         />
       ) : (
         <section

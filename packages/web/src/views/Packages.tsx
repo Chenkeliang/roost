@@ -3,6 +3,7 @@ import { Package, Cube, AppStoreLogo, Storefront, DownloadSimple } from "@phosph
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
+import { useT } from "../i18n";
 import { getIndex, getBrewfile, addSelection, postCapture, type BrewfileResponse } from "../api";
 
 interface PackagesProps { showHud?: (m: HudMessage) => void; }
@@ -31,6 +32,7 @@ function Section({ icon, title, items }: { icon: React.ReactNode; title: string;
 }
 
 export function Packages({ showHud }: PackagesProps) {
+  const { t } = useT();
   const [managed, setManaged] = useState<number | null>(null);
   const [brewfile, setBrewfile] = useState<BrewfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +67,7 @@ export function Packages({ showHud }: PackagesProps) {
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
-        Homebrew formulae, casks &amp; Mac App Store apps Roost can reinstall on a new Mac. Managed: {loading ? "…" : managed}.
+        {t("packages.explainer")} Managed: {loading ? "…" : managed}.
       </p>
 
       {loading ? (
@@ -73,18 +75,18 @@ export function Packages({ showHud }: PackagesProps) {
       ) : !brewfile?.available ? (
         <EmptyState
           icon={<Package size={24} />}
-          title="Homebrew not installed"
-          subtitle="Install Homebrew to manage packages — Roost won't run brew until it's available."
+          title={t("packages.noBrewTitle")}
+          subtitle={t("packages.noBrewSubtitle")}
         />
       ) : !brewfile.exists ? (
         <EmptyState
           icon={<Package size={24} />}
-          title="No packages tracked yet"
-          subtitle="Import your installed Homebrew packages into the repo to manage them."
+          title={t("packages.emptyTitle")}
+          subtitle={t("packages.emptySubtitle")}
           action={
             <button onClick={() => void importFromMac()} disabled={importing} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
               <DownloadSimple size={14} />
-              {importing ? "Importing…" : "Import from this Mac"}
+              {importing ? t("packages.importing") : t("packages.import")}
             </button>
           }
         />

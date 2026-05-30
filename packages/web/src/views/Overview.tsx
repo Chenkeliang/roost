@@ -6,6 +6,7 @@ import { Tile } from "../components/Tile";
 import { Skeleton } from "../components/Skeleton";
 import type { HudMessage } from "../components/Hud";
 import type { DriftReport } from "@roost/shared";
+import { useT } from "../i18n";
 import {
   getHealth,
   getMachines,
@@ -80,6 +81,7 @@ function ModuleHealthChip({ report }: ModuleHealthProps) {
 }
 
 export function Overview({ showHud }: OverviewProps) {
+  const { t } = useT();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [machines, setMachines] = useState<MachinesResponse | null>(null);
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
@@ -227,7 +229,7 @@ export function Overview({ showHud }: OverviewProps) {
           >
             <Desktop size={18} style={{ flexShrink: 0 }} />
             <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-              No other machine yet — run <span className="mono">roost load</span> on a second Mac to see it here.
+              {t("overview.noOtherMachine")}
             </div>
           </article>
         )}
@@ -261,7 +263,7 @@ export function Overview({ showHud }: OverviewProps) {
           onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
         >
           <FloppyDisk size={16} weight={capturing ? "duotone" : "regular"} />
-          {capturing ? "Capturing…" : "Capture"}
+          {capturing ? t("overview.capturing") : t("overview.capture")}
         </button>
 
         <button
@@ -290,7 +292,7 @@ export function Overview({ showHud }: OverviewProps) {
           onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
         >
           <DownloadSimple size={16} weight={loading ? "duotone" : "regular"} />
-          {loading ? "Loading…" : "Load (dry-run)"}
+          {loading ? t("overview.loading") : t("overview.load")}
         </button>
 
         <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 12 }}>
@@ -318,7 +320,7 @@ export function Overview({ showHud }: OverviewProps) {
             marginBottom: 12,
           }}
         >
-          Module Health
+          {t("overview.moduleHealth")}
         </div>
         {loadingData ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -334,7 +336,7 @@ export function Overview({ showHud }: OverviewProps) {
           </div>
         ) : (
           <div style={{ color: "var(--muted)", fontSize: 13 }}>
-            No module status available. Is the Roost server running?
+            {t("overview.noStatus")}
           </div>
         )}
       </section>

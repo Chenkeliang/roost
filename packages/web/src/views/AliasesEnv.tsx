@@ -21,6 +21,7 @@ import type {
 } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { Skeleton } from "../components/Skeleton";
+import { useT } from "../i18n";
 import { getEnv, putEnv, getDiscover } from "../api";
 
 interface AliasesEnvProps {
@@ -606,6 +607,7 @@ function ImportPicker({
 // ── AliasesEnv (root) ─────────────────────────────────────────────────────────
 
 export function AliasesEnv({ showHud }: AliasesEnvProps) {
+  const { t } = useT();
   const [data, setData] = useState<EnvData | null>(null);
   const [serverData, setServerData] = useState<EnvData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -874,8 +876,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
           maxWidth: 720,
         }}
       >
-        Portable aliases &amp; environment Roost manages for you and carries across Macs — your
-        existing dotfiles stay untouched.
+        {t("env.explainer")}
       </p>
 
       {/* search input (filters across all kinds) */}
@@ -978,7 +979,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             }}
           >
             <DownloadSimple size={13} />
-            Import from your shell
+            {t("env.importFromShell")}
           </button>
           {dirty && (
             <span
@@ -1018,7 +1019,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             }}
           >
             <FloppyDisk size={13} weight="fill" />
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("env.saving") : t("env.save")}
           </button>
         </div>
       </div>
@@ -1045,8 +1046,8 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             style={{ padding: "34px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}
           >
             {counts.all === 0
-              ? "Nothing managed yet. Add an item or import from your shell."
-              : "No matches. Try a different search or chip."}
+              ? t("env.emptyManaged")
+              : t("env.noMatches")}
           </div>
         ) : (
           shown.map((ref) => {

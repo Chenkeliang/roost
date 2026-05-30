@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ClockCounterClockwise, GitCommit } from "@phosphor-icons/react";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
+import { useT } from "../i18n";
 import { getTimeline, type TimelineEntry } from "../api";
 
 function relativeDate(iso: string): string {
@@ -79,6 +80,7 @@ function SnapshotRow({ entry }: { entry: TimelineEntry }) {
 }
 
 export function Timeline() {
+  const { t } = useT();
   const [entries, setEntries] = useState<TimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export function Timeline() {
           marginBottom: 14,
         }}
       >
-        Timeline
+        {t("timeline.heading")}
       </div>
 
       {loading ? (
@@ -152,8 +154,8 @@ export function Timeline() {
       ) : entries.length === 0 ? (
         <EmptyState
           icon={<ClockCounterClockwise size={24} weight="duotone" />}
-          title="No snapshots yet"
-          subtitle="Run roost capture to create the first snapshot in your repo"
+          title={t("timeline.emptyTitle")}
+          subtitle={t("timeline.emptySubtitle")}
         />
       ) : (
         <section

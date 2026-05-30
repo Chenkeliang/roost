@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { App } from "./App";
+import { LocaleProvider } from "./i18n";
 
 // Mock the api module
 vi.mock("./api", () => ({
@@ -93,5 +94,22 @@ describe("App", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("clicking the 中 language switch flips a nav label to its zh string", async () => {
+    localStorage.clear();
+    await act(async () => {
+      render(
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>,
+      );
+    });
+    expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "中" }));
+    });
+    expect(screen.getByRole("button", { name: "设置" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
   });
 });

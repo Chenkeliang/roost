@@ -7,9 +7,11 @@ import {
   Key,
 } from "@phosphor-icons/react";
 import { Skeleton } from "../components/Skeleton";
+import { useT } from "../i18n";
 import { getHealth, getModules, type ModulesResponse } from "../api";
 
 export function Settings() {
+  const { t } = useT();
   const [modules, setModules] = useState<ModulesResponse | null>(null);
   const [repoDir, setRepoDir] = useState<string | null>(null);
   const [ageKey, setAgeKey] = useState<boolean | null>(null);
@@ -61,11 +63,11 @@ export function Settings() {
           marginBottom: 14,
         }}
       >
-        Settings
+        {t("settings.heading")}
       </div>
 
       {/* ── Repo ── */}
-      <div style={sectionLabel}>Repository</div>
+      <div style={sectionLabel}>{t("settings.repository")}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={row}>
           <FolderOpen size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
@@ -100,7 +102,7 @@ export function Settings() {
       </div>
 
       {/* ── Modules ── */}
-      <div style={sectionLabel}>Registered modules</div>
+      <div style={sectionLabel}>{t("settings.registeredModules")}</div>
       <div
         style={{
           background: "var(--surface)",
@@ -143,20 +145,19 @@ export function Settings() {
       </div>
 
       {/* ── Privacy ── */}
-      <div style={sectionLabel}>Privacy</div>
+      <div style={sectionLabel}>{t("settings.privacy")}</div>
       <div style={{ ...row, gap: 12 }}>
         <ShieldCheck size={16} weight="fill" style={{ color: "var(--green)", flexShrink: 0 }} />
         <div>
-          <div style={{ fontWeight: 540 }}>Local — no telemetry</div>
+          <div style={{ fontWeight: 540 }}>{t("settings.privacyTitle")}</div>
           <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
-            Roost runs entirely on your machine. No data is sent to any server.
-            Your config repo is private git — you own it.
+            {t("settings.privacyBody")}
           </div>
         </div>
       </div>
 
       {/* ── Docs ── */}
-      <div style={sectionLabel}>Documentation</div>
+      <div style={sectionLabel}>{t("settings.documentation")}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {[
           { label: "Documentation (使用文档)", href: "https://github.com/Chenkeliang/roost/tree/main/website" },
