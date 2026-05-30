@@ -1,0 +1,46 @@
+---
+title: 仪表盘
+description: 通过 roost serve 启动的可选本地 Web UI。
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Roost 自带一个**本地** Web 仪表盘,用于可视化管理你的配置。用以下命令启动:
+
+```sh
+roost serve
+```
+
+它会启动一个本地 JSON API 服务器(默认端口 `4317`)来提供 Web UI。你可以让它指向特定的
+配置仓库或 Web 构建:
+
+```sh
+roost serve --port 4317 --repo /path/to/config-repo --web packages/web/dist
+```
+
+<Aside type="note" title="仅在本地">
+仪表盘完全运行在你的机器上。和 Roost 的其余部分一样,它没有服务器、没有账号、也没有
+遥测——什么都不会发往任何地方。
+</Aside>
+
+## 视图
+
+仪表盘组织为几个视图:
+
+- **概览**——主力与从机的状态卡、漂移摘要、快捷的 Capture / Load 操作,以及各模块的
+  健康点。
+- **管理**——当前已纳管的内容,以及你可以加入的候选项(来自一次扫描),并带预设。
+  这是 `select` 的可视化等价物。
+- **漂移**——主力与从机状态的并排 diff。
+- **时间线**——快照历史,带预览与回滚。
+- **设置**——仓库、Profiles、age 后端,以及模块/插件;Doctor 与扫描状态也在此呈现。
+
+还有一个专门的**别名与环境变量**面板,用于管理别名、环境变量、PATH 条目和函数——包括
+选择密钥环境变量来源(age、1Password 或 rbw)。解析出的密钥**值**绝不显示;只展示引用
+定位符。
+
+<Aside type="caution" title="状态">
+仪表盘正在积极开发中。可用的视图与面板遵循已锁定的设计,但当前构建中可能尚未全部接通。
+</Aside>

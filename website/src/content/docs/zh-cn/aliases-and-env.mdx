@@ -1,0 +1,79 @@
+---
+title: 别名与环境变量
+description: 管理可移植的别名、环境变量、PATH 与函数——以及三种密钥环境变量来源。
+sidebar:
+  order: 6
+---
+
+import { Aside, Steps, Card, CardGrid } from '@astrojs/starlight/components';
+
+**别名与环境变量**模块把你 shell 配置中可移植的部分作为**结构化数据**来管理,而不是
+作为一份被拷贝的文件。你把单个别名、环境变量、PATH 条目和函数告诉 Roost,Roost 在每台
+机器上把它们组合成一个生成的文件。
+
+## 受管的 `env.sh`
+
+Roost 从你的数据重新生成单个文件:
+
+- **`~/.config/roost/env.sh`**——一个扁平的 POSIX-sh 文件,包含你已启用的别名、环境
+  变量、PATH 条目和函数。它在**每次 apply 时重新生成**,以 `0600` 权限原子写入,且
+  **不会**提交到你的仓库(已提交的源是结构化的 `roost/env.yaml`)。
+
+为了让你的 shell 用上它,Roost 会向每个已有的 rc 文件(`.zshrc`、`.zprofile`、
+`.bashrc`、`.bash_profile`)添加**一行 source**,并用标记包裹:
+
+```sh
+# >>> roost env >>>
+[ -f "$HOME/.config/roost/env.sh" ] && . "$HOME/.config/roost/env.sh"
+# <<< roost env <<<
+```
+
+<Aside type="tip" title="它从不重写你的 rc 文件">
+Roost 只追加那一段单一、幂等的标记块——它**不会**编辑或重排你 `.zshrc` 的其余部分。
+全部解除管理会把这段块再次移除。
+</Aside>
+
+## 从你的 shell 导入
+
+Roost 能读取你已有的 rc 文件并**建议**可导入的项——顶层别名、简单的
+`export NAME=value` 行,以及直白的 PATH 前置/追加条目。这些是保守的、只读的建议:
+任何位于控制块内的内容,或任何使用命令替换(`$(...)` 或反引号)的值,都会被跳过。
+未经你同意,什么都不会被导入。
+
+## 密钥环境变量值
+
+一个环境变量可以被标记为**密钥**。密钥值绝不会以明文写入你的仓库、绝不在 UI 中显形、
+也绝不被记入日志。在 apply 时解析密钥有**三种来源**
+(见 [ADR-0004](https://github.com/Chenkeliang/roost/blob/main/docs/adr/0004-secret-env-resolution.md)):
+
+<CardGrid>
+  <Card title="age(默认)">
+    明文用你的 age 密钥加密,作为 `roost/env-secrets/<NAME>.age` 存入仓库。apply 时
+    用你本地的 age 密钥解密,并内联进 `env.sh`。
+  </Card>
+  <Card title="1Password(op://…)">
+    仓库只存一个 `op://Vault/Item/field` **引用**——没有密文。apply 时 Roost 通过
+    `op` CLI 解析它。
+  </Card>
+  <Card title="rbw">
+    仓库只存一个 rbw 项引用——没有密文。apply 时 Roost 通过 `rbw` CLI(一个免费、
+    开源的 Bitwarden 客户端)解析它。
+  </Card>
+</CardGrid>
+
+使用**引用**来源(`op` / `rbw`)时,连密文都不会落到你的仓库——引用只是一个定位符。
+解析出的值仅存在于内存中,被内联进 `0600` 的 `env.sh`,随后丢弃。
+
+<Aside type="caution" title="非密钥值原样存储">
+**未**标记为密钥的别名、PATH 条目和环境变量会以明文提交到你的仓库(并随
+`roost init --github` 推送到你的 remote)。请把任何敏感内容标记为 `secret`。若在非密钥
+字段中检测到明文密钥,`capture` 会被**阻止**,直到你将其标记。
+</Aside>
+
+## 失败安全的解析
+
+若某个密钥无法解析(没有 age 密钥,或 `op` / `rbw` 不可用或失败),Roost 会**跳过那一个值**
+并给出警告——警告只指明变量名、绝不指明值——并写入一个占位符,而非半截的赋值。
+`roost doctor` 会预先报告你的 age 密钥以及 `op` / `rbw` CLI 是否可用。
+
+关于设置 age 密钥与各后端,见[密钥](/zh-cn/secrets/)。

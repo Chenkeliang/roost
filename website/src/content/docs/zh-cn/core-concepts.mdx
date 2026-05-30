@@ -1,0 +1,57 @@
+---
+title: 核心概念
+description: Roost 背后的心智模型——主力到从机、selection.yaml,以及两个互补层。
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, Card } from '@astrojs/starlight/components';
+
+几个观念几乎能解释 Roost 所做的一切。
+
+## 主力 → 从机,单向流动
+
+Roost 有清晰的流动方向:
+
+- 你在**主力**机器上**采集**——这台 Mac 的配置被你视为事实源。
+- 你**载入**到**从机**——另一台应当与之保持一致的 Mac。
+
+载入是**单向**的:它把配置仓库的状态带到当前机器上。不存在双向合并;仓库是权威。
+
+## `selection.yaml` 是唯一事实源
+
+Roost 管理什么并非隐式——它被写了下来。`selection.yaml` 准确记录了每个模块跟踪哪些项。
+`select`、`capture`、`load`、`status`、`list` 等命令都从中读取。如果它不在
+`selection.yaml` 里,Roost 就不会碰它。
+
+## shell 配置的两个互补层
+
+Roost 可以用两种不同方式管理你的 shell 配置,而它们本就该配合使用:
+
+<CardGrid>
+  <Card title="Dotfiles——原样备份">
+    **Dotfiles** 模块逐字采集已有文件(如 `~/.zshrc`、`~/.gitconfig`)并按文件还原。
+    当你想要一份完全照原样拷贝的文件时,用它。
+  </Card>
+  <Card title="别名与环境变量——可移植、受管">
+    **别名与环境变量**模块把单个别名、环境变量、PATH 条目和函数作为结构化数据来管理。
+    Roost 在每台机器上据此重新生成单个 `~/.config/roost/env.sh`——而不重写你的
+    `.zshrc`。
+  </Card>
+</CardGrid>
+
+区别在于:Dotfiles 保留一份你已在维护的文件;别名与环境变量则让 Roost **拥有**一片
+可移植的 shell 配置,由它自己组合并写出。详见[别名与环境变量](/zh-cn/aliases-and-env/)。
+
+## 默认可逆
+
+两条保证让 `load` 可以放心运行:
+
+- **先 dry-run。** `roost load` 只预览改动。你必须传 `--apply` 才会写入任何东西。
+- **覆盖前先备份。** 应用时,Roost 会在替换前备份任何已有文件(例如放到
+  `~/.roost-backups/` 下)。
+
+<Aside type="caution">
+把某项移出管理(`unmanage`)会将它从工作树中取出,但**不会**重写 git 历史。
+若某个被移除的文件曾经存放过密钥,请单独轮换它并清除历史。
+</Aside>
