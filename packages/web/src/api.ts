@@ -1,5 +1,5 @@
 // Typed fetch wrapper for Roost API endpoints
-import type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate } from "@roost/shared";
+import type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate, EnvData } from "@roost/shared";
 
 // When running inside Tauri there is no Vite dev-proxy, so we must target the
 // engine's absolute URL.  In normal browser / Vite dev / jsdom test contexts
@@ -14,7 +14,7 @@ const API_BASE: string =
     : "");
 
 // Re-export shared types for component use
-export type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate };
+export type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate, EnvData };
 
 export interface HealthResponse {
   ok: boolean;
@@ -154,4 +154,19 @@ export interface DiffResponse {
 
 export function getDiff(): Promise<DiffResponse> {
   return apiFetch<DiffResponse>("/api/diff");
+}
+
+// Server GET /api/env returns the full EnvData with secret env values redacted to ''.
+export function getEnv(): Promise<EnvData> {
+  return apiFetch<EnvData>("/api/env");
+}
+
+// Server PUT /api/env accepts a full EnvData; a secret env item carrying a non-empty
+// `value` is treated as NEW plaintext to encrypt server-side (never echoed back).
+export function putEnv(data: EnvData): Promise<EnvData> {
+  return apiFetch<EnvData>("/api/env", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
 }
