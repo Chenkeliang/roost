@@ -5,11 +5,12 @@ import type {
   EnvData,
   AliasItem,
   EnvVarItem,
+  EnvSecretSource,
   PathEntry,
   FunctionItem,
 } from "@roost/shared";
 
-export const ENV_SCHEMA_VERSION = 1;
+export const ENV_SCHEMA_VERSION = 2;
 
 export function emptyEnvData(): EnvData {
   return { schemaVersion: ENV_SCHEMA_VERSION, aliases: [], env: [], path: [], functions: [] };
@@ -94,18 +95,41 @@ function parseAlias(item: unknown): AliasItem {
   );
 }
 
+// A secret env value's source of truth (ADR-0004). The `ref` locator is stored
+// in yaml and surfaced in the UI, but it is NOT injected into env.sh — the
+// *resolved value* is, and that is single-quote escaped by generateEnvSh. So we
+// validate the locator as data (non-empty string + known backend), not shell.
+function optSource(obj: Record<string, unknown>): EnvSecretSource | undefined {
+  const v = obj["source"];
+  if (v === undefined) return undefined;
+  const src = asRecord(v, "env entry source");
+  const kind = src["kind"];
+  if (kind === "age") return { kind: "age" };
+  if (kind === "ref") {
+    const backend = src["backend"];
+    if (backend !== "op" && backend !== "rbw") {
+      throw new Error(`env.yaml: env entry source "backend" must be "op" or "rbw"`);
+    }
+    const ref = src["ref"];
+    if (typeof ref !== "string" || ref.length === 0) {
+      throw new Error(`env.yaml: env entry source "ref" must be a non-empty string`);
+    }
+    return { kind: "ref", backend, ref };
+  }
+  throw new Error(`env.yaml: env entry "source.kind" must be "age" or "ref"`);
+}
+
 function parseEnv(item: unknown): EnvVarItem {
   const obj = asRecord(item, "env entry");
-  return withComment<EnvVarItem>(
-    {
-      kind: "env",
-      name: reqShellName(obj, "env entry"),
-      value: reqString(obj, "value", "env entry"),
-      secret: reqBool(obj, "secret", "env entry"),
-      enabled: reqBool(obj, "enabled", "env entry"),
-    },
-    optComment(obj, "env entry"),
-  );
+  const source = optSource(obj);
+  const base: EnvVarItem = {
+    kind: "env",
+    name: reqShellName(obj, "env entry"),
+    value: reqString(obj, "value", "env entry"),
+    secret: reqBool(obj, "secret", "env entry"),
+    enabled: reqBool(obj, "enabled", "env entry"),
+  };
+  return withComment<EnvVarItem>(source === undefined ? base : { ...base, source }, optComment(obj, "env entry"));
 }
 
 function parsePath(item: unknown): PathEntry {

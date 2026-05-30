@@ -439,6 +439,209 @@ describe("envModule.capture", () => {
   });
 });
 
+// ── ADR-0004: ref-source secret env (op / rbw) ─────────────────────────────────
+
+/**
+ * Fake Exec for a secret backend: `op read <ref>` / `rbw get <ref>` resolve to a
+ * fixed value; backend availability is toggled. Records calls so tests can assert
+ * the value never appears anywhere it shouldn't.
+ */
+function makeRefExec(opts: {
+  op?: Map<string, string>;
+  rbw?: Map<string, string>;
+  opAvailable?: boolean;
+  rbwAvailable?: boolean;
+}): { exec: Exec; calls: Call[] } {
+  const calls: Call[] = [];
+  const opAvailable = opts.opAvailable ?? true;
+  const rbwAvailable = opts.rbwAvailable ?? true;
+  const exec: Exec = {
+    async run(cmd: string, args: string[]): Promise<ExecResult> {
+      calls.push({ cmd, args });
+      // age-keygen path used by recipientFromKey in doctor / unrelated flows
+      if (cmd === "age-keygen") return { code: 0, stdout: "age1faketestrecipient\n", stderr: "" };
+      if (cmd === "op") {
+        if (!opAvailable) return { code: 127, stdout: "", stderr: "op: command not found" };
+        if (args[0] === "read") {
+          const v = opts.op?.get(args[1]!);
+          if (v === undefined) return { code: 1, stdout: "", stderr: "item not found" };
+          return { code: 0, stdout: v + "\n", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      }
+      if (cmd === "rbw") {
+        if (!rbwAvailable) return { code: 127, stdout: "", stderr: "rbw: command not found" };
+        if (args[0] === "get") {
+          const v = opts.rbw?.get(args[1]!);
+          if (v === undefined) return { code: 1, stdout: "", stderr: "no entry" };
+          return { code: 0, stdout: v + "\n", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      }
+      return { code: 0, stdout: "", stderr: "" };
+    },
+  };
+  return { exec, calls };
+}
+
+describe("envModule capture — ref source (ADR-0004)", () => {
+  it("does not encrypt and writes no ciphertext, but persists the ref and blanks the value", async () => {
+    saveEnvData(tmpRepo, sampleData({
+      env: [{
+        kind: "env",
+        name: "TOKEN",
+        value: "should-be-ignored",
+        secret: true,
+        source: { kind: "ref", backend: "op", ref: "op://Vault/Item/field" },
+        enabled: true,
+      }],
+    }));
+    const { exec, calls } = makeRefExec({ op: new Map([["op://Vault/Item/field", "resolved"]]) });
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec });
+
+    const cs = await envModule.capture(ctx, { modules: {} });
+
+    // No ciphertext written for the ref item.
+    expect(cs.encrypted).not.toContain(envSecretPath(tmpRepo, "TOKEN"));
+    expect(fs.existsSync(envSecretPath(tmpRepo, "TOKEN"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpRepo, "roost", "env-secrets"))).toBe(false);
+    // No backend resolution happens at capture time.
+    expect(calls.some((c) => c.cmd === "op")).toBe(false);
+    // Ref persisted, value blanked.
+    const onDisk = loadEnvData(tmpRepo).env.find((e) => e.name === "TOKEN")!;
+    expect(onDisk.value).toBe("");
+    expect(onDisk.source).toEqual({ kind: "ref", backend: "op", ref: "op://Vault/Item/field" });
+    const yamlRaw = fs.readFileSync(path.join(tmpRepo, "roost", "env.yaml"), "utf8");
+    expect(yamlRaw).not.toContain("should-be-ignored");
+  });
+});
+
+describe("envModule apply — ref source (ADR-0004)", () => {
+  it("resolves an op ref and inlines the value into env.sh (chmod 600), value not in repo/logs", async () => {
+    saveEnvData(tmpRepo, sampleData({
+      env: [{
+        kind: "env",
+        name: "TOKEN",
+        value: "",
+        secret: true,
+        source: { kind: "ref", backend: "op", ref: "op://Vault/Item/field" },
+        enabled: true,
+      }],
+    }));
+    const { exec } = makeRefExec({ op: new Map([["op://Vault/Item/field", "op-secret-value"]]) });
+    const { log, warns, infos } = makeLog();
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec, log });
+
+    await envModule.apply(ctx, { module: "env", actions: [] });
+
+    const live = envShPath(tmpHome);
+    expect(fs.readFileSync(live, "utf8")).toContain("export TOKEN='op-secret-value'");
+    expect(fs.statSync(live).mode & 0o777).toBe(0o600);
+    // never in the repo
+    expect(fs.existsSync(path.join(tmpRepo, "roost", "env-secrets"))).toBe(false);
+    const yamlRaw = fs.readFileSync(path.join(tmpRepo, "roost", "env.yaml"), "utf8");
+    expect(yamlRaw).not.toContain("op-secret-value");
+    // never in logs
+    expect(warns.join("\n")).not.toContain("op-secret-value");
+    expect(infos.join("\n")).not.toContain("op-secret-value");
+  });
+
+  it("resolves an rbw ref and inlines it", async () => {
+    saveEnvData(tmpRepo, sampleData({
+      env: [{
+        kind: "env",
+        name: "TOKEN",
+        value: "",
+        secret: true,
+        source: { kind: "ref", backend: "rbw", ref: "my-entry" },
+        enabled: true,
+      }],
+    }));
+    const { exec } = makeRefExec({ rbw: new Map([["my-entry", "rbw-secret"]]) });
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec });
+    await envModule.apply(ctx, { module: "env", actions: [] });
+    expect(fs.readFileSync(envShPath(tmpHome), "utf8")).toContain("export TOKEN='rbw-secret'");
+  });
+
+  it("failure-safe: backend unavailable → warn (name+backend only), no half-write, no value leak", async () => {
+    saveEnvData(tmpRepo, sampleData({
+      env: [{
+        kind: "env",
+        name: "TOKEN",
+        value: "",
+        secret: true,
+        source: { kind: "ref", backend: "op", ref: "op://Vault/Item/secret" },
+        enabled: true,
+      }],
+    }));
+    // op present in the map but the backend is unavailable (command not found).
+    const { exec } = makeRefExec({ op: new Map([["op://Vault/Item/secret", "never-resolved"]]), opAvailable: false });
+    const { log, warns } = makeLog();
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec, log });
+
+    await envModule.apply(ctx, { module: "env", actions: [] });
+
+    const live = fs.readFileSync(envShPath(tmpHome), "utf8");
+    // No half/blank value: it falls back to the explicit placeholder, never an empty assignment.
+    expect(live).toContain("export TOKEN='<roost-secret:unset>'");
+    expect(live).not.toContain("never-resolved");
+    // Warned about the name + backend, but never leaked a value or raw stderr containing it.
+    expect(warns.join("\n")).toMatch(/TOKEN/);
+    expect(warns.join("\n")).toMatch(/op/);
+    expect(warns.join("\n")).not.toContain("never-resolved");
+  });
+
+  it("dry-run resolves nothing and writes nothing for a ref item", async () => {
+    saveEnvData(tmpRepo, sampleData({
+      env: [{
+        kind: "env",
+        name: "TOKEN",
+        value: "",
+        secret: true,
+        source: { kind: "ref", backend: "op", ref: "op://Vault/Item/field" },
+        enabled: true,
+      }],
+    }));
+    const { exec, calls } = makeRefExec({ op: new Map([["op://Vault/Item/field", "secret"]]) });
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec, dryRun: true });
+
+    await envModule.apply(ctx, { module: "env", actions: [] });
+    expect(fs.existsSync(envShPath(tmpHome))).toBe(false);
+    expect(calls.some((c) => c.cmd === "op")).toBe(false);
+  });
+
+  it("idempotent re-apply of a ref item yields identical env.sh", async () => {
+    saveEnvData(tmpRepo, sampleData({
+      env: [{
+        kind: "env",
+        name: "TOKEN",
+        value: "",
+        secret: true,
+        source: { kind: "ref", backend: "op", ref: "op://Vault/Item/field" },
+        enabled: true,
+      }],
+    }));
+    const { exec } = makeRefExec({ op: new Map([["op://Vault/Item/field", "v1"]]) });
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec });
+    await envModule.apply(ctx, { module: "env", actions: [] });
+    const first = fs.readFileSync(envShPath(tmpHome), "utf8");
+    await envModule.apply(ctx, { module: "env", actions: [] });
+    const second = fs.readFileSync(envShPath(tmpHome), "utf8");
+    expect(second).toBe(first);
+  });
+});
+
+describe("envModule doctor — op/rbw availability (ADR-0004)", () => {
+  it("reports op and rbw availability", async () => {
+    const { exec } = makeRefExec({ opAvailable: true, rbwAvailable: false });
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec });
+    const health = await envModule.doctor(ctx);
+    const byName = Object.fromEntries(health.map((h) => [h.name, h]));
+    expect(byName["op"]?.ok).toBe(true);
+    expect(byName["rbw"]?.ok).toBe(false);
+  });
+});
+
 // ── apply ─────────────────────────────────────────────────────────────────────
 
 describe("envModule.apply", () => {

@@ -17,6 +17,7 @@ import type {
   PathEntry,
 } from "@roost/shared";
 import { scanForSecrets } from "../secrets/scanner.js";
+import { createOpBackend, createRbwBackend } from "../secrets/backend.js";
 import { backupFiles } from "../apply.js";
 import {
   loadEnvData,
@@ -360,20 +361,43 @@ function readFileSafe(p: string): string | null {
 }
 
 /**
- * Decrypt every enabled secret env value into a name→plaintext map for inlining
+ * Resolve every enabled secret env value into a name→plaintext map for inlining
  * into env.sh. Used by both apply and unmanage so a regenerated artifact keeps
  * real secret values rather than the `<roost-secret:unset>` placeholder. (L2)
+ *
+ * Per ADR-0004 a secret's `source` selects how the value is resolved:
+ *  - `age` (or absent): decrypt `roost/env-secrets/<NAME>.age` with the local age key.
+ *  - `ref`: resolve via the op/rbw backend (`exec`-only, I1/I3).
+ *
+ * Resolution is failure-safe (I10): if a source cannot produce a value the item
+ * is SKIPPED (no entry in the map → generateEnvSh emits the placeholder, never a
+ * half/blank assignment), with a warning carrying only the name (+ backend for
+ * refs) — never the value, never a raw error that might contain it. (I6)
  */
-async function decryptEnabledSecrets(ctx: ModuleContext, data: EnvData): Promise<Map<string, string>> {
+async function resolveEnabledSecrets(ctx: ModuleContext, data: EnvData): Promise<Map<string, string>> {
   const secrets = new Map<string, string>();
   const keyPath = defaultAgeKeyPath(ctx.home);
   for (const e of data.env) {
     if (!e.secret || !e.enabled) continue;
-    const plain = await decryptEnvSecret(ctx.exec, { repoDir: ctx.repoDir, name: e.name, keyPath });
-    if (plain !== null) {
-      secrets.set(e.name, plain);
+    const src = e.source ?? { kind: "age" as const };
+    if (src.kind === "ref") {
+      const backend = src.backend === "op" ? createOpBackend(ctx.exec) : createRbwBackend(ctx.exec);
+      try {
+        const val = await backend.get(src.ref);
+        secrets.set(e.name, val);
+      } catch {
+        // Never surface the caught error: its message may echo the secret/stderr.
+        ctx.log.warn(
+          `env: could not resolve secret "${e.name}" from ${src.backend} — using placeholder.`,
+        );
+      }
     } else {
-      ctx.log.warn(`env: could not decrypt secret "${e.name}" — using placeholder.`);
+      const plain = await decryptEnvSecret(ctx.exec, { repoDir: ctx.repoDir, name: e.name, keyPath });
+      if (plain !== null) {
+        secrets.set(e.name, plain);
+      } else {
+        ctx.log.warn(`env: could not decrypt secret "${e.name}" — using placeholder.`);
+      }
     }
   }
   return secrets;
@@ -511,9 +535,12 @@ export const envModule: SyncModule = {
     }
 
     if (ctx.dryRun) {
-      // Report what would be written/encrypted without touching disk.
+      // Report what would be written/encrypted without touching disk. A `ref`
+      // secret (ADR-0004) is never encrypted, so it produces no ciphertext path.
       for (const e of data.env) {
-        if (e.secret) encrypted.push(envSecretPath(ctx.repoDir, e.name));
+        if (e.secret && (e.source?.kind ?? "age") === "age") {
+          encrypted.push(envSecretPath(ctx.repoDir, e.name));
+        }
       }
       return { module: "env", written: ["roost/env.yaml"], encrypted, blocked };
     }
@@ -531,6 +558,13 @@ export const envModule: SyncModule = {
     for (const e of data.env) {
       if (!e.secret) {
         persisted.env.push(e);
+        continue;
+      }
+      // A `ref` secret (ADR-0004) keeps its locator in yaml and stores NO
+      // ciphertext: the value is resolved on apply from op/rbw. Just blank the
+      // (never-used) value and persist the item with its source.
+      if (e.source?.kind === "ref") {
+        persisted.env.push({ ...e, value: "" });
         continue;
       }
       if (e.value.length > 0) {
@@ -582,7 +616,7 @@ export const envModule: SyncModule = {
     }
 
     // Decrypt secret env values into a Map for inlining.
-    const secrets = await decryptEnabledSecrets(ctx, data);
+    const secrets = await resolveEnabledSecrets(ctx, data);
 
     const applied: string[] = [];
     const backedUp: string[] = [];
@@ -692,7 +726,7 @@ export const envModule: SyncModule = {
     if (fs.existsSync(livePath) || !isEmpty) {
       // Re-inline the REMAINING secrets (decrypt like apply) so unmanaging one
       // item doesn't blank the others to the placeholder until the next apply. (L2)
-      const secrets = await decryptEnabledSecrets(ctx, next);
+      const secrets = await resolveEnabledSecrets(ctx, next);
       backedUp.push(...backupFiles([livePath], backupDir));
       chmodSecretBackups(backupDir, livePath);
       writeFile0600Atomic(livePath, generateEnvSh(next, secrets));
@@ -748,6 +782,18 @@ export const envModule: SyncModule = {
       ok: recipient !== null,
       detail: recipient !== null ? undefined : "no age key — secret env vars cannot be encrypted",
     });
+
+    // op / rbw availability — needed only for secret env items with a `ref`
+    // source (ADR-0004). Probed via the single exec adapter. (I1/I3)
+    for (const [name, cli] of [["op", "op"], ["rbw", "rbw"]] as const) {
+      const probe = await ctx.exec.run(cli, ["--version"]);
+      const ok = probe.code === 0;
+      health.push({
+        name,
+        ok,
+        detail: ok ? undefined : `${cli} not available — secret env vars referencing ${cli} cannot be resolved`,
+      });
+    }
 
     const livePath = envShPath(ctx.home);
     if (!fs.existsSync(livePath)) {

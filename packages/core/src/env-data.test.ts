@@ -186,6 +186,116 @@ describe("validateEnvData — C2 reject newline in comments", () => {
   });
 });
 
+// ── ADR-0004: secret env source ────────────────────────────────────────────────
+
+describe("env source — back-compat & ref validation", () => {
+  const base = { schemaVersion: ENV_SCHEMA_VERSION, aliases: [], env: [], path: [], functions: [] };
+
+  it("loads an old env.yaml without `source` and treats it as age (no source field)", () => {
+    const old = {
+      // no schemaVersion bump, no source — exactly what older Roost wrote
+      schemaVersion: 1,
+      aliases: [],
+      env: [{ kind: "env", name: "TOKEN", value: "", secret: true, enabled: true }],
+      path: [],
+      functions: [],
+    };
+    const dir = path.join(tmpDir, "roost");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "env.yaml"), yaml.dump(old), "utf8");
+    const loaded = loadEnvData(tmpDir);
+    const token = loaded.env.find((e) => e.name === "TOKEN")!;
+    expect(token.secret).toBe(true);
+    // Absent source is preserved as absent (interpreted as age downstream).
+    expect(token.source).toBeUndefined();
+  });
+
+  it("accepts an op ref source on a secret item", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        env: [
+          {
+            kind: "env",
+            name: "TOKEN",
+            value: "",
+            secret: true,
+            source: { kind: "ref", backend: "op", ref: "op://Vault/Item/field" },
+            enabled: true,
+          },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts an rbw ref source and an explicit age source", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        env: [
+          { kind: "env", name: "A", value: "", secret: true, source: { kind: "rbw", ...{} }, enabled: true },
+        ],
+      }),
+    ).toThrow(); // rbw is not a kind — kind must be "ref" or "age"
+    expect(() =>
+      validateEnvData({
+        ...base,
+        env: [
+          { kind: "env", name: "A", value: "", secret: true, source: { kind: "ref", backend: "rbw", ref: "my-entry" }, enabled: true },
+          { kind: "env", name: "B", value: "", secret: true, source: { kind: "age" }, enabled: true },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects a ref source with an unknown backend", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        env: [
+          {
+            kind: "env",
+            name: "TOKEN",
+            value: "",
+            secret: true,
+            source: { kind: "ref", backend: "vault", ref: "x" },
+            enabled: true,
+          },
+        ],
+      }),
+    ).toThrow(/backend/i);
+  });
+
+  it("rejects a ref source with an empty ref", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        env: [
+          {
+            kind: "env",
+            name: "TOKEN",
+            value: "",
+            secret: true,
+            source: { kind: "ref", backend: "op", ref: "" },
+            enabled: true,
+          },
+        ],
+      }),
+    ).toThrow(/ref/i);
+  });
+
+  it("rejects a source with an unknown kind", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        env: [
+          { kind: "env", name: "TOKEN", value: "", secret: true, source: { kind: "vault" }, enabled: true },
+        ],
+      }),
+    ).toThrow(/source/i);
+  });
+});
+
 describe("validateEnvData — C3 reject PATH value injection", () => {
   const base = { schemaVersion: 1, aliases: [], env: [], path: [], functions: [] };
 
