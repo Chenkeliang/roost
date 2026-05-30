@@ -1,0 +1,77 @@
+---
+title: Profiles
+description: How Roost resolves a machine profile, profiles.yaml, and the proposed profile-scoped selection.
+sidebar:
+  order: 11
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A **profile** is a label for the current machine — `base` by default, or
+something like `primary` / `follower` / `work` if you differentiate machines.
+Roost resolves a profile on every command and surfaces it; it's the seam through
+which cross-machine differentiation will eventually flow.
+
+## Seeing the active profile
+
+```sh
+roost profile        # show the active profile and how it resolved
+roost profile list   # list every defined profile, marking the active one
+```
+
+`profile` prints the active profile and its resolution source. `profile list`
+additionally prints each profile defined in `profiles.yaml` along with its
+hostnames, marking the one matched by the current host.
+
+## `profiles.yaml`
+
+Profiles are defined in an **optional**, additive data file at
+`roost/profiles.yaml` in your config repo. It's separate from `selection.yaml`;
+if it's absent, every machine resolves to `base`.
+
+```yaml
+# roost/profiles.yaml
+- name: primary
+  hostnames: [studio.local, studio]
+- name: follower
+  hostnames: [air.local]
+```
+
+Each entry is `{ name, hostnames? }`. `hostnames` is optional; it lets Roost
+auto-match a profile by the machine's hostname.
+
+<Aside type="note" title="It's purely additive">
+`profiles.yaml` never changes how `selection.yaml` is parsed. A malformed
+`profiles.yaml` falls back to `base` rather than breaking unrelated commands.
+</Aside>
+
+## Resolution precedence
+
+Roost picks the active profile in this order, first match wins:
+
+1. `--profile <name>` — the global flag, on any command.
+2. `ROOST_PROFILE` — an environment variable.
+3. **hostname match** — a profile in `profiles.yaml` whose `hostnames` includes
+   the current host.
+4. `base` — the default when nothing else matches.
+
+```sh
+roost status --profile follower      # force a profile for one command
+ROOST_PROFILE=work roost status      # via the environment
+```
+
+## Status: resolve and label only
+
+<Aside type="caution" title="Profile-scoped selection is proposed, not implemented">
+Today, profiles are **resolved and labeled** — `roost profile` shows the active
+profile, and it's threaded through as context — but every machine still shares
+**one** managed list. There is no per-profile differentiation yet:
+`selection.yaml` is a flat `modules: Record<string, string[]>`, and `primary`
+and `follower` cannot yet manage different items.
+
+Making selection profile-scoped touches the `selection.yaml` schema, so it goes
+through change control as
+[ADR-0005](https://github.com/Chenkeliang/roost/blob/main/docs/adr/0005-profile-scoped-selection.md),
+which is **PROPOSED**, not shipped. Until it's accepted and implemented, profiles
+resolve and label only.
+</Aside>

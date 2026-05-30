@@ -1,0 +1,281 @@
+---
+title: CLI Reference
+description: Every roost command — purpose, usage, flags, an example, and what it prints.
+sidebar:
+  order: 10
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Every Roost command, grouped by what you reach for it. Examples use
+`roost <command>`; while running from source, substitute
+`node packages/cli/dist/index.js <command>`.
+
+<Aside type="note" title="Global flag">
+`--profile <name>` is available on every command. It overrides the active
+machine profile for that invocation (precedence: `--profile` > `ROOST_PROFILE`
+env > hostname match > `base`). See [Profiles](/profiles/).
+</Aside>
+
+## Setup
+
+### `init`
+
+Scaffold the config repo with the `roost/` layout and chezmoi stubs.
+
+```sh
+roost init
+roost init --github            # also create a PRIVATE GitHub repo, wire origin, push
+roost init --github --dry-run  # print intent, no API calls or pushes
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--repo <dir>` | Path to the config repo directory (defaults to the chezmoi source path or `ROOST_REPO`). |
+| `--github` | Create a private GitHub repo via the API, set `origin`, and push. Prompts for a Personal Access Token (used once, never stored) and a repo name — or reads `GITHUB_TOKEN` from the environment. |
+| `--dry-run` | With `--github`, print the intended actions and make no API calls or pushes. |
+
+**Outputs:** the files it created (or `already initialized, nothing to do`). If
+an age key already exists, it reminds you to back it up offline.
+
+### `select`
+
+Discover candidates on the machine and choose what to track. Choices are written
+to `selection.yaml`, the single source of truth for what Roost manages.
+
+```sh
+roost select
+roost select --all                        # all non-excluded candidates
+roost select --preset developer-essentials
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--all` | Select every non-excluded candidate. |
+| `--preset <name>` | Select candidates matching a named preset (e.g. `developer-essentials`). |
+
+**Outputs:** `selected <n> items`.
+
+### `capture`
+
+Write the items in `selection.yaml` into the config repo. Secret values are
+encrypted; a plaintext-secret scanner blocks the capture if it finds one.
+
+```sh
+roost capture
+```
+
+**Outputs:** per module, a line of the form `[<module>] written: <n>, encrypted: <n>`.
+
+## Manage
+
+### `load`
+
+Apply the config repo's state to the current machine. **Dry-run by default** —
+nothing is written until you pass `--apply`. When applying, Roost backs up any
+existing file before overwriting.
+
+```sh
+roost load            # preview only (dry-run)
+roost load --apply    # actually apply
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--apply` | Apply changes (default is dry-run). |
+
+**Outputs:** the planned or applied changes per module.
+
+### `unmanage`
+
+Stop managing a single item: forget it from the repo and drop it from
+`selection.yaml`. This affects the working tree only — it does **not** rewrite
+git history.
+
+```sh
+roost unmanage dotfiles ~/.zshrc
+roost unmanage --module dotfiles --id ~/.zshrc
+roost unmanage dotfiles ~/.zshrc --dry-run
+```
+
+| Argument / Flag | Meaning |
+| --- | --- |
+| `<module>` / `--module <m>` | Module that owns the item (e.g. `dotfiles`). |
+| `<id>` / `--id <id>` | Item id to unmanage. |
+| `--dry-run` | Print intent and write nothing. |
+
+**Outputs:** what was forgotten and dropped (or the intent, under `--dry-run`).
+
+## Inspect
+
+### `doctor`
+
+Check external dependencies and per-module health. Run this first when something
+isn't working.
+
+```sh
+roost doctor
+```
+
+**Outputs:** one line per check, `ok` or `FAIL`, with an optional detail — e.g.
+missing `chezmoi`/`age`/`op`/`rbw`, whether your rc file sources the managed
+`env.sh`, and whether an age key is present.
+
+### `list`
+
+List selected items and their drift state.
+
+```sh
+roost list
+```
+
+**Outputs:** the managed items per module, each with its current sync state.
+
+### `status`
+
+Show drift status for all selected modules.
+
+```sh
+roost status
+```
+
+**Outputs:** a per-module drift summary (synced / drift / conflict).
+
+### `diff`
+
+Show the diff between the repo's state and the current machine.
+
+```sh
+roost diff
+```
+
+**Outputs:** a unified diff per module that has drifted.
+
+### `audit`
+
+Audit the config repo for plaintext secrets. Exits non-zero if it finds any.
+
+```sh
+roost audit
+roost audit --repo /path/to/config-repo
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--repo <dir>` | Path to the config repo directory. |
+
+**Outputs:** counts of encrypted and scanned files, any plaintext findings (path
++ rule), and a pass/fail line.
+
+### `import`
+
+Import candidates from an existing dotfiles repo or a Mackup setup. This only
+proposes candidates; it does not capture them.
+
+```sh
+roost import                                   # auto-detect
+roost import --source dotfiles --path ~/dotfiles
+roost import --source mackup
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--source <source>` | `auto` (default), `dotfiles`, or `mackup`. |
+| `--path <dir>` | Path to the dotfiles repo (required with `--source dotfiles`). |
+
+**Outputs:** per detected source, the candidate count and, per candidate, a
+recommendation and path, plus any notes.
+
+### `plugins`
+
+List the currently registered module names.
+
+```sh
+roost plugins
+```
+
+**Outputs:** one module name per line.
+
+### `profile`
+
+Show the resolved machine profile and how it was resolved; `profile list` shows
+all defined profiles and marks the active one. See [Profiles](/profiles/).
+
+```sh
+roost profile        # show the active profile + how it resolved
+roost profile list   # list defined profiles, mark the active one
+```
+
+**Outputs:** the active profile and the resolution source (flag / env / hostname
+/ default); `list` adds each defined profile with its hostnames.
+
+## App config
+
+### `app learn`
+
+Record which app preference domains change while you edit a setting in a GUI app.
+Roost snapshots domains, waits for you to make the change, then diffs.
+
+```sh
+roost app learn
+```
+
+**Outputs:** the captured changed domain(s), or `No domains changed.`
+
+## Secrets
+
+See [Secrets](/secrets/) for the full picture; these manage the age key.
+
+### `key rotate`
+
+Re-encrypt every `.age` file in the repo to a new age recipient.
+
+```sh
+roost key rotate --new-recipient age1...
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--new-recipient <age1...>` | New age recipient public key. **Required.** |
+| `--old-key <path>` | Path to the existing age private key (default `~/.config/age/key.txt`). |
+| `--repo <dir>` | Path to the config repo directory. |
+
+**Outputs:** progress as each `.age` file is re-encrypted.
+
+### `key backup`
+
+Show where the age key lives and how to back it up offline — the age private key
+is the recovery material for every encrypted item.
+
+```sh
+roost key backup
+roost key backup --show          # also print the key contents (handle with care)
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--key <path>` | Path to the age private key (default `~/.config/sops/age/keys.txt`). |
+| `--show` | Also print the key contents — for copying into a safe place. |
+
+**Outputs:** the key's location and offline-backup guidance. With `--show`, the
+key material is printed below a warning.
+
+## Serve
+
+### `serve`
+
+Start the local JSON API server that backs the web [Dashboard](/dashboard/).
+
+```sh
+roost serve
+roost serve --port 4317 --repo /path/to/config-repo --web packages/web/dist
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--port <n>` | Port to listen on (default `4317`). |
+| `--repo <dir>` | Path to the config repo directory. |
+| `--web <dir>` | Path to the web build directory (`packages/web/dist`). |
+
+**Outputs:** the listening URL. The dashboard runs entirely on your machine — no
+server, account, or telemetry.

@@ -1,0 +1,89 @@
+---
+title: 故障排查
+description: 常见问题与解法——缺少工具、age 密钥、密钥后端、应用偏好、GitHub 与 serve。
+sidebar:
+  order: 13
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+多数问题首先会在一个地方暴露:运行 `roost doctor`。它会报告每个外部依赖与各模块的健康检查,
+所以从它开始。
+
+```sh
+roost doctor
+```
+
+## 缺少 `chezmoi`、`age`、`brew` 或 `mise`
+
+Roost 是薄编排器——它驱动这些工具,而不是重新实现它们。若 `doctor` 报告某个工具缺失,
+装上它再重跑:
+
+```sh
+brew install chezmoi age mise
+```
+
+`brew` 本身来自 [brew.sh](https://brew.sh)。在某模块所需的工具到位之前,该模块的检查会一直
+为红,其命令也无法运行。
+
+## 没有 age 密钥
+
+密钥功能(加密密钥类环境变量、在新 Mac 上解密它们)需要一把 age 私钥,期望位于:
+
+```
+~/.config/sops/age/keys.txt
+```
+
+若 `doctor` 报告 `age-key … no age key`,请在采集密钥前生成或恢复一把。age 私钥是你的恢复
+材料——查看它在哪以及如何备份:
+
+```sh
+roost key backup
+```
+
+<Aside type="danger" title="没有密钥就没有恢复">
+若你丢失 age 密钥及其每一份离线副本,被加密的数据将**无法恢复**。在依赖它之前,先离线备份。
+参见[密钥](/zh-cn/secrets/)。
+</Aside>
+
+## secret-env 引用找不到 `op` 或 `rbw`
+
+一个密钥类环境变量可以从 1Password(`op`)或 Bitwarden(`rbw`)取值,而不用 age
+(见[密钥](/zh-cn/secrets/))。若被引用的后端未安装,`doctor` 会标出它
+(`op not available …` / `rbw not available …`),且 `load --apply` 是**失败安全**的:
+它跳过那一个值、仅按变量名告警(绝不显示值),不写半成品赋值。
+
+```sh
+brew install 1password-cli   # 提供 `op`
+brew install rbw             # Bitwarden CLI
+```
+
+## 应用偏好需要"完全磁盘访问"
+
+appconfig 模块用 `defaults import` 导入 macOS 偏好(它绝不 symlink plist)。对于偏好位于
+`~/Library/Containers/<id>/…` 下的**沙盒**应用,即便应用已退出,macOS 仍可能要求
+**完全磁盘访问(Full Disk Access)**导入才生效。这是一个已知的 macOS 限制。
+
+**解法:**在 *系统设置 → 隐私与安全性 → 完全磁盘访问* 中授予你的终端完全磁盘访问,然后重跑
+`roost load --apply`。
+
+## `init --github` 失败
+
+`roost init --github` 经 GitHub API 创建私有仓库。它需要一个带 **`repo`** scope 的
+Personal Access Token(只输入一次、绝不存储,或从 `GITHUB_TOKEN` 读取)。若创建或推送失败,
+检查该 token 是否有 `repo` scope 且未过期。要在不碰 GitHub 的情况下演练:
+
+```sh
+roost init --github --dry-run
+```
+
+## `serve` 端口已被占用
+
+`roost serve` 默认监听 `4317`。若该端口被占用,换一个:
+
+```sh
+roost serve --port 4318
+```
+
+你也能用 `--repo` 与 `--web` 让 `serve` 指向特定仓库或 Web 构建。参见
+[CLI 参考](/zh-cn/cli-reference/)。

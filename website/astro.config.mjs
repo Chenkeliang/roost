@@ -62,7 +62,17 @@ export default defineConfig({
           translations: { "zh-CN": "使用 Roost" },
           items: [
             { label: "Dashboard", slug: "dashboard" },
+            { label: "Drift & Snapshots", slug: "drift-and-snapshots" },
             { label: "Safety & FAQ", slug: "safety-and-faq" },
+          ],
+        },
+        {
+          label: "Reference",
+          translations: { "zh-CN": "参考" },
+          items: [
+            { label: "CLI Reference", slug: "cli-reference" },
+            { label: "Profiles", slug: "profiles" },
+            { label: "Troubleshooting", slug: "troubleshooting" },
           ],
         },
       ],

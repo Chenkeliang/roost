@@ -1,0 +1,69 @@
+---
+title: 画像
+description: Roost 如何解析机器画像、profiles.yaml,以及提议中的按画像分片纳管。
+sidebar:
+  order: 11
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**画像(profile)**是当前机器的标签——默认是 `base`,若你要区分机器,则可能是
+`primary` / `follower` / `work` 之类。Roost 在每个命令上都会解析画像并把它显现出来;
+它是跨机差异化最终要流经的接缝。
+
+## 查看活动画像
+
+```sh
+roost profile        # 显示活动画像及它如何被解析
+roost profile list   # 列出每个已定义画像,标出活动项
+```
+
+`profile` 打印活动画像及其解析来源。`profile list` 还会打印 `profiles.yaml` 中定义的
+每个画像及其 hostnames,并标出被当前主机匹配到的那个。
+
+## `profiles.yaml`
+
+画像定义在配置仓库中一个**可选**、增量的数据文件 `roost/profiles.yaml` 里。它与
+`selection.yaml` 相互独立;若不存在,每台机器都解析为 `base`。
+
+```yaml
+# roost/profiles.yaml
+- name: primary
+  hostnames: [studio.local, studio]
+- name: follower
+  hostnames: [air.local]
+```
+
+每个条目是 `{ name, hostnames? }`。`hostnames` 可选;它让 Roost 能按机器 hostname
+自动匹配画像。
+
+<Aside type="note" title="它是纯增量的">
+`profiles.yaml` 绝不改变 `selection.yaml` 的解析方式。一份格式错误的 `profiles.yaml`
+会回退到 `base`,而不会拖垮无关命令。
+</Aside>
+
+## 解析优先级
+
+Roost 按以下顺序挑选活动画像,首个命中者胜出:
+
+1. `--profile <name>`——任意命令上的全局旗标。
+2. `ROOST_PROFILE`——环境变量。
+3. **hostname 匹配**——`profiles.yaml` 中某画像的 `hostnames` 包含当前主机。
+4. `base`——其余皆不匹配时的默认值。
+
+```sh
+roost status --profile follower      # 为某个命令强制指定画像
+ROOST_PROFILE=work roost status      # 经环境变量
+```
+
+## 现状:仅解析与标注
+
+<Aside type="caution" title="按画像分片纳管为提议,尚未实现">
+目前,画像只是被**解析并标注**——`roost profile` 显示活动画像,并把它作为上下文向下传递
+——但每台机器仍共享**同一份**纳管清单。还**没有**按画像差异化:`selection.yaml` 是扁平的
+`modules: Record<string, string[]>`,`primary` 与 `follower` 还无法各自纳管不同的项。
+
+让纳管按画像分片会触及 `selection.yaml` 的 schema,因此须走变更控制,即
+[ADR-0005](https://github.com/Chenkeliang/roost/blob/main/docs/adr/0005-profile-scoped-selection.md)
+——它处于**提议(PROPOSED)**状态,尚未发布。在它被接受并实现之前,画像只做解析与标注。
+</Aside>

@@ -1,0 +1,62 @@
+---
+title: 漂移与快照
+description: 仪表盘的 Drift 与 Timeline 视图,以及它们在 CLI 端对应的 status 与 diff。
+sidebar:
+  order: 12
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+一旦你开始管理不止一台 Mac,要问的问题就变成"哪里不同步?"和"改了什么、何时改的?"。
+Roost 同时回答这两点——在[仪表盘](/zh-cn/dashboard/)里可视化呈现,在命令行也能查。
+
+## 漂移——哪里不同步
+
+漂移是配置仓库状态与当前机器之间的差异。一个模块要么 **synced**(已同步),要么
+**drifted**(漂移),要么处于 **conflict**(冲突)。
+
+### 在仪表盘里
+
+**Drift** 视图只列出发生漂移(或冲突)的模块,每个带一个状态点。用 **View diff**
+展开某一行,即可看到该模块按需拉取的、`+`/`-` 着色的统一 diff。当一切同步时,该视图显示
+"No drift detected" 空态。
+
+### 在 CLI 端
+
+```sh
+roost status   # 各模块漂移摘要:synced / drift / conflict
+roost diff     # 每个漂移模块一份统一 diff
+roost list     # 被管条目及其漂移状态
+```
+
+`status` 是摘要;`diff` 是细节。仪表盘的 Drift 视图正是这同样两份数据源的可视化组合。
+
+## 时间线——改了什么、何时改的
+
+每次 `capture` 都会在你的配置仓库里记录一次提交,所以仓库的 git 历史*就是*你的快照历史。
+
+### 在仪表盘里
+
+**Timeline** 视图按时间倒序列出快照——短 SHA、提交标题,以及相对时间("2h ago")。
+它读取你配置仓库的提交日志;若你还没采集过,它会显示 "No snapshots yet" 空态,引导你去跑
+`roost capture`。
+
+<Aside type="note" title="目前为只读">
+Timeline 目前*展示*快照历史。预览与回滚属于该视图已锁定的设计,但在当前构建里可能尚未接通
+——要回滚,请在你的配置仓库里检出更早的提交,再跑 `roost load`。
+</Aside>
+
+### 在 CLI 端
+
+快照就是普通 git 提交,因此你直接用 git 查看和切换它们:
+
+```sh
+git -C <config-repo> log --oneline    # 快照历史
+git -C <config-repo> checkout <sha>   # 切到更早的快照
+roost load                            # 预览应用它(dry-run)
+```
+
+<Aside type="tip">
+Drift 比较的是*此刻的仓库 vs 机器*;Timeline 是*仓库随时间的历史*。两者合起来回答"这台 Mac
+同步了吗?"与"仓库是怎么变成现在这样的?"。
+</Aside>
