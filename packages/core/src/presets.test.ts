@@ -19,12 +19,16 @@ const candidates: Candidate[] = [
   makeCandidate("/home/user/.gitignore_global"),
   makeCandidate("/home/user/.npmrc", "encrypt"),
   makeCandidate("/home/user/.DS_Store", "exclude"),
+  makeCandidate("domain:com.googlecode.iterm2"),
+  makeCandidate("domain:com.apple.dock"),
 ];
 
 describe("PRESETS", () => {
-  it("has at least developer-essentials and everything", () => {
+  it("has developer-essentials, terminal, shell-only, and everything", () => {
     const names = PRESETS.map((p) => p.name);
     expect(names).toContain("developer-essentials");
+    expect(names).toContain("terminal");
+    expect(names).toContain("shell-only");
     expect(names).toContain("everything");
   });
 });
@@ -89,6 +93,61 @@ describe("applyPreset developer-essentials", () => {
   it("does NOT select .vimrc (not a shell/git essential by basename)", () => {
     const ids = applyPreset("developer-essentials", candidates);
     expect(ids.some((id) => id.endsWith(".vimrc"))).toBe(false);
+  });
+});
+
+describe("applyPreset terminal", () => {
+  it("selects shell RC files (.zshrc, .zprofile, .zshenv, .bash_profile, .p10k.zsh)", () => {
+    const ids = applyPreset("terminal", candidates);
+    expect(ids.some((id) => id.endsWith(".zshrc"))).toBe(true);
+    expect(ids.some((id) => id.endsWith(".zprofile"))).toBe(true);
+    expect(ids.some((id) => id.endsWith(".zshenv"))).toBe(true);
+    expect(ids.some((id) => id.endsWith(".bash_profile"))).toBe(true);
+    expect(ids.some((id) => id.endsWith(".p10k.zsh"))).toBe(true);
+  });
+
+  it("selects terminal app config domains (iterm2)", () => {
+    const ids = applyPreset("terminal", candidates);
+    expect(ids).toContain("domain:com.googlecode.iterm2");
+  });
+
+  it("does NOT select non-terminal appconfig domains (com.apple.dock)", () => {
+    const ids = applyPreset("terminal", candidates);
+    expect(ids).not.toContain("domain:com.apple.dock");
+  });
+
+  it("does NOT select .gitconfig (not a shell file)", () => {
+    const ids = applyPreset("terminal", candidates);
+    expect(ids.some((id) => id.endsWith(".gitconfig"))).toBe(false);
+  });
+
+  it("does NOT select Brewfile", () => {
+    const ids = applyPreset("terminal", candidates);
+    expect(ids).not.toContain("Brewfile");
+  });
+});
+
+describe("applyPreset shell-only", () => {
+  it("selects shell RC files only", () => {
+    const ids = applyPreset("shell-only", candidates);
+    expect(ids.some((id) => id.endsWith(".zshrc"))).toBe(true);
+    expect(ids.some((id) => id.endsWith(".bash_profile"))).toBe(true);
+    expect(ids.some((id) => id.endsWith(".p10k.zsh"))).toBe(true);
+  });
+
+  it("does NOT select .gitconfig", () => {
+    const ids = applyPreset("shell-only", candidates);
+    expect(ids.some((id) => id.endsWith(".gitconfig"))).toBe(false);
+  });
+
+  it("does NOT select Brewfile", () => {
+    const ids = applyPreset("shell-only", candidates);
+    expect(ids).not.toContain("Brewfile");
+  });
+
+  it("does NOT select appconfig domains", () => {
+    const ids = applyPreset("shell-only", candidates);
+    expect(ids.some((id) => id.startsWith("domain:"))).toBe(false);
   });
 });
 

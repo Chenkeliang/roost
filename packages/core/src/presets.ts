@@ -18,6 +18,27 @@ const DEVELOPER_ESSENTIAL_BASENAMES = new Set([
   ".p10k.zsh",
 ]);
 
+// Shell RC files only (for shell-only and terminal presets)
+const SHELL_RC_BASENAMES = new Set([
+  ".zshrc",
+  ".zprofile",
+  ".zshenv",
+  ".bashrc",
+  ".bash_profile",
+  ".p10k.zsh",
+]);
+
+// Terminal-relevant app config domains (terminal emulators + editors)
+const TERMINAL_APP_DOMAINS = new Set([
+  "com.googlecode.iterm2",
+  "com.apple.Terminal",
+  "net.kovidgoyal.kitty",
+  "com.github.wez.wezterm",
+  "dev.warp.Warp-Stable",
+  "com.microsoft.VSCode",
+  "com.neovide.neovide",
+]);
+
 export const PRESETS: Preset[] = [
   {
     name: "developer-essentials",
@@ -27,6 +48,27 @@ export const PRESETS: Preset[] = [
       if (DEVELOPER_ESSENTIAL_BASENAMES.has(base)) return true;
       if (c.id === "Brewfile") return true;
       return false;
+    },
+  },
+  {
+    name: "terminal",
+    description: "Shell RC files plus terminal emulator and editor app config domains",
+    match(c: Candidate): boolean {
+      const base = path.basename(c.id);
+      if (SHELL_RC_BASENAMES.has(base)) return true;
+      // appconfig candidates have ids like "domain:<bundle-id>"
+      if (c.id.startsWith("domain:")) {
+        const domain = c.id.slice("domain:".length);
+        if (TERMINAL_APP_DOMAINS.has(domain)) return true;
+      }
+      return false;
+    },
+  },
+  {
+    name: "shell-only",
+    description: "Shell RC files only (.zshrc, .zprofile, .zshenv, .bashrc, .bash_profile, .p10k.zsh)",
+    match(c: Candidate): boolean {
+      return SHELL_RC_BASENAMES.has(path.basename(c.id));
     },
   },
   {
