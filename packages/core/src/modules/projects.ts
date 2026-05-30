@@ -16,11 +16,38 @@ import { loadProjects, saveProjects } from "../projects.js";
 
 // ── findGitRepos ──────────────────────────────────────────────────────────────
 
+// Directory names that never hold user projects but are enormous to walk. Without
+// this, scanning $HOME (which is a root) wanders into ~/Library and node_modules
+// trees and takes tens of seconds — see the discover size guard (M4).
+const IGNORE_DIRS = new Set([
+  "node_modules",
+  "Library",
+  ".Trash",
+  "Applications",
+  "Pictures",
+  "Movies",
+  "Music",
+  "vendor",
+  "target",
+  "dist",
+  "build",
+  "__pycache__",
+  "venv",
+  ".venv",
+  "go", // ~/go/pkg is huge; ~/go/src is added as an explicit root in candidateRoots
+]);
+
+// Hard ceiling on directories visited so discovery is bounded on ANY machine
+// (M4 size guard): a deep/large $HOME must never make discover hang.
+const MAX_VISITS = 6000;
+
 export function findGitRepos(roots: string[], maxDepth = 4): string[] {
   const found = new Set<string>();
+  let visits = 0;
 
   function walk(dir: string, depth: number): void {
-    if (depth < 0) return;
+    if (depth < 0 || visits >= MAX_VISITS) return;
+    visits++;
 
     let entries: fs.Dirent[];
     try {
@@ -29,22 +56,18 @@ export function findGitRepos(roots: string[], maxDepth = 4): string[] {
       return; // unreadable — tolerate silently
     }
 
-    let hasGit = false;
     for (const entry of entries) {
       if (entry.name === ".git") {
-        hasGit = true;
-        break;
+        found.add(dir);
+        return; // don't recurse inside a git repo root
       }
-    }
-
-    if (hasGit) {
-      found.add(dir);
-      return; // don't recurse inside a git repo root
     }
 
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      if (entry.name === ".git") continue; // never descend into .git dirs
+      if (entry.name.startsWith(".")) continue; // skip hidden dirs (incl .git)
+      if (IGNORE_DIRS.has(entry.name)) continue; // skip huge/irrelevant trees
+      if (visits >= MAX_VISITS) break;
       walk(path.join(dir, entry.name), depth - 1);
     }
   }
@@ -76,6 +99,25 @@ export async function repoInfo(
   return { remote, branch, dirty, hasMise };
 }
 
+// Run `fn` over items with bounded concurrency, preserving order. Keeps discover
+// fast (parallel git probes) without spawning hundreds of processes at once.
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, idx: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await fn(items[idx]!, idx);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
 // ── candidate roots ───────────────────────────────────────────────────────────
 
 const EXTRA_SUBDIRS = [
@@ -104,29 +146,24 @@ export const projectsModule: SyncModule = {
 
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const roots = candidateRoots(ctx.home);
-    const repoPaths = findGitRepos(roots);
-    const capped = repoPaths.slice(0, 100);
+    const capped = findGitRepos(roots).slice(0, 100);
 
-    const candidates: Candidate[] = [];
-    for (const repoPath of capped) {
-      const info = await repoInfo(ctx.exec, repoPath);
-      const hasRemote = info.remote !== null;
-      const note: string | undefined = !hasRemote
-        ? "no remote — cannot restore from manifest"
-        : info.dirty
-          ? "uncommitted changes"
-          : undefined;
+    // Discovery only needs to know whether a repo has an origin remote (to decide
+    // track vs exclude). That's ONE cheap git call per repo, run in parallel — NOT
+    // the full repoInfo (branch + `git status --porcelain` are slow and only needed
+    // at capture/status time for the small set of selected repos).
+    const hasRemote = await mapLimit(capped, 16, async (repoPath) => {
+      const r = await ctx.exec.run("git", ["-C", repoPath, "remote", "get-url", "origin"]);
+      return r.code === 0 && r.stdout.trim().length > 0;
+    });
 
-      candidates.push({
-        id: repoPath,
-        path: repoPath,
-        category: "projects",
-        recommendation: hasRemote ? "track" : "exclude",
-        note,
-      });
-    }
-
-    return candidates;
+    return capped.map((repoPath, i) => ({
+      id: repoPath,
+      path: repoPath,
+      category: "projects",
+      recommendation: (hasRemote[i] ? "track" : "exclude") as "track" | "exclude",
+      note: hasRemote[i] ? undefined : "no remote — cannot restore from manifest",
+    }));
   },
 
   async capture(ctx: ModuleContext, sel: Selection): Promise<ChangeSet> {

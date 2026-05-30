@@ -115,6 +115,20 @@ describe("findGitRepos", () => {
     const results = findGitRepos([path.join(tmpDir, "doesnotexist")], 2);
     expect(Array.isArray(results)).toBe(true);
   });
+
+  it("skips heavy/hidden dirs (Library, node_modules, dotdirs) — the size guard", () => {
+    // A real project that should be found.
+    const proj = path.join(tmpDir, "work", "app");
+    fs.mkdirSync(path.join(proj, ".git"), { recursive: true });
+    // Repos buried in dirs that must NOT be walked.
+    for (const heavy of ["Library", "node_modules", ".hidden", "go"]) {
+      fs.mkdirSync(path.join(tmpDir, heavy, "x", ".git"), { recursive: true });
+    }
+
+    const results = findGitRepos([tmpDir], 4);
+    expect(results).toContain(proj);
+    expect(results.some((r) => /\/(Library|node_modules|\.hidden|go)\//.test(r))).toBe(false);
+  });
 });
 
 // ── repoInfo ──────────────────────────────────────────────────────────────────
@@ -207,6 +221,19 @@ describe("projectsModule.discover", () => {
     const c = candidates.find((x) => x.id === repoPath);
     expect(c).toBeDefined();
     expect(c!.note).toMatch(/no remote/i);
+  });
+
+  it("does NOT run `git status` during discover (perf guard) — only a remote probe", async () => {
+    const home = tmpDir;
+    fs.mkdirSync(path.join(home, "myproject", ".git"), { recursive: true });
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "https://github.com/u/p.git\n", stderr: "" },
+    ]);
+    const ctx = makeCtx({ exec, home, repoDir: tmpDir });
+    await projectsModule.discover(ctx);
+    expect(calls.some((c) => c.args.includes("remote"))).toBe(true);
+    expect(calls.some((c) => c.args.includes("status"))).toBe(false);
+    expect(calls.some((c) => c.args.includes("branch"))).toBe(false);
   });
 });
 
