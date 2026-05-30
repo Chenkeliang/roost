@@ -655,3 +655,35 @@ describe("appconfigModule.doctor", () => {
     expect(health[0]?.detail).toBeTruthy();
   });
 });
+
+// ── index ─────────────────────────────────────────────────────────────────────
+
+describe("appconfigModule.index", () => {
+  // defaults is a macOS system tool → always available; index must not shell out
+  // (no `defaults domains`, no `osascript`, no per-domain export).
+  const throwingExec: Exec = {
+    async run(): Promise<ExecResult> {
+      throw new Error("index must not run any external command");
+    },
+  };
+
+  it("is cheap: available=true, counts captured plist files, runs no commands", async () => {
+    const dir = path.join(tmpDir, "roost", "appconfig");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "com.apple.dock.plist"), "<plist/>");
+    fs.writeFileSync(path.join(dir, "com.apple.finder.plist"), "<plist/>");
+    fs.writeFileSync(path.join(dir, "notes.txt"), "ignore me");
+    const ctx = makeCtx({ exec: throwingExec, repoDir: tmpDir });
+    const idx = await appconfigModule.index!(ctx);
+    expect(idx.available).toBe(true);
+    expect(idx.reason).toBeUndefined();
+    expect(idx.managed).toBe(2);
+  });
+
+  it("managed is 0 when no appconfig data dir exists", async () => {
+    const ctx = makeCtx({ exec: throwingExec, repoDir: tmpDir });
+    const idx = await appconfigModule.index!(ctx);
+    expect(idx.available).toBe(true);
+    expect(idx.managed).toBe(0);
+  });
+});

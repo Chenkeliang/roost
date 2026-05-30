@@ -56,8 +56,12 @@ export function classifyDomain(domain: string): "track" | "skip" {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+function appconfigDir(repoDir: string): string {
+  return path.join(repoDir, "roost/appconfig");
+}
+
 function plistPath(repoDir: string, domain: string): string {
-  return path.join(repoDir, "roost/appconfig", `${domain}.plist`);
+  return path.join(appconfigDir(repoDir), `${domain}.plist`);
 }
 
 function stripPrefix(id: string): string {
@@ -68,6 +72,16 @@ function stripPrefix(id: string): string {
 
 export const appconfigModule: SyncModule = {
   name: "appconfig",
+
+  async index(ctx: ModuleContext): Promise<import("@roost/shared").ModuleIndex> {
+    // `defaults` is a macOS system tool — always present, no probe needed.
+    let managed = 0;
+    const dir = appconfigDir(ctx.repoDir);
+    if (fs.existsSync(dir)) {
+      managed = fs.readdirSync(dir).filter((f) => f.endsWith(".plist")).length;
+    }
+    return { available: true, managed };
+  },
 
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const r = await ctx.exec.run("defaults", ["domains"]);
