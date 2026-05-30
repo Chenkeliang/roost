@@ -21,6 +21,16 @@ const SENSITIVE_PATH_FRAGMENTS = [".ssh/", ".aws/", ".config/gh/"];
 const SENSITIVE_EXACT_BASENAMES = new Set([".npmrc", ".git-credentials", ".netrc"]);
 const SENSITIVE_CONFIG_FILES = new Set(["env.sh"]);
 
+/**
+ * True for anything under the Roost-managed `~/.config/roost/` directory
+ * (e.g. the generated `env.sh` and `env-secrets/`). The `env` module owns these,
+ * so `dotfiles` must never discover or scan them to avoid double-management.
+ */
+export function isRoostManaged(absPath: string): boolean {
+  const normalized = absPath.replace(/\\/g, "/");
+  return normalized.endsWith("/.config/roost") || normalized.includes("/.config/roost/");
+}
+
 export function isSensitivePath(absPath: string): boolean {
   const base = path.basename(absPath);
   const normalized = absPath.replace(/\\/g, "/");
@@ -101,6 +111,7 @@ export const dotfilesModule: SyncModule = {
       const base = path.basename(entry.path);
       if (!base.startsWith(".")) continue; // only dotfiles/dotdirs at home level
       if (base === ".config") continue; // scanned into separately below
+      if (isRoostManaged(entry.path)) continue; // env module owns ~/.config/roost
       const rec = classifyDotfile(entry.path);
       if (rec === "exclude") continue;
       candidates.push({
@@ -117,6 +128,7 @@ export const dotfilesModule: SyncModule = {
     if (fs.existsSync(configDir)) {
       const configEntries = scanDir(configDir);
       for (const entry of configEntries) {
+        if (isRoostManaged(entry.path)) continue; // env module owns ~/.config/roost
         const rec = classifyDotfile(entry.path);
         if (rec === "exclude") continue;
         candidates.push({
