@@ -53,6 +53,7 @@ export default defineConfig({
           items: [
             { label: "Core Concepts", slug: "core-concepts" },
             { label: "Modules", slug: "modules" },
+            { label: "Projects", slug: "projects" },
             { label: "Aliases & Env", slug: "aliases-and-env" },
             { label: "Secrets", slug: "secrets" },
           ],

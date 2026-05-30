@@ -27,6 +27,19 @@ exactly which items each module tracks. Commands like `select`, `capture`,
 `load`, `status`, and `list` all read from it. If it isn't in `selection.yaml`,
 Roost doesn't touch it.
 
+## Content-first, on-demand discovery
+
+Roost never scans your disk automatically. Every module exposes two separate
+operations:
+
+- **`index`** — a cheap read of what is already managed. Runs at startup and
+  powers the dashboard's instant page loads.
+- **`discover`** — an explicit scan of the machine for new candidates. Triggered
+  only when you click a button in the dashboard or run a CLI command.
+
+This keeps the dashboard responsive regardless of home directory size, and means
+nothing unexpected happens in the background.
+
 ## Two complementary layers for shell config
 
 Roost can manage your shell setup two different ways, and they're meant to be
