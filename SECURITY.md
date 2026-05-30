@@ -6,14 +6,20 @@ Roost manages configuration and secrets, so trust is the product. Please read th
 Report privately via a [GitHub security advisory](https://docs.github.com/en/code-security/security-advisories) on this repository, or open a minimal issue asking for a private contact channel — do **not** disclose details in public issues. We aim to acknowledge within a few days.
 
 ## Trust model
-- **age key is the root of trust.** All secrets in your config repo are encrypted to your age key. If you lose it (and its recovery code / password-manager entry), encrypted data cannot be recovered. Back it up offline.
+- **age key is the root of trust — but only if you back up secrets.** If you don't use the secrets module, there is no key to worry about. If you do, secret files are encrypted to your age key; lose it (and any recovery copy) and that encrypted data is unrecoverable — so back it up offline.
 - **No telemetry, no server.** Roost never transmits your data anywhere. Your config repo and remotes are entirely under your control.
 - **Secrets never surface.** Secret values are never shown in the UI or written to logs; `capture` is gated by a plaintext-secret scanner that blocks unencrypted secrets from entering the repo.
 - **Plugins run with full user privileges.** A Roost module/plugin can read and execute as you. Only install plugins you trust; Roost will require explicit confirmation before installing a plugin (planned for the plugin loader, P2).
 
-## Recommended free secret backend: rbw (open-source Bitwarden CLI)
+## Encrypting secrets — optional, and the key backend is your choice
 
-Roost supports pluggable secret backends for retrieving the age private key at bootstrap.  The recommended zero-cost backend is **[rbw](https://github.com/doy/rbw)** — an open-source, unofficial Bitwarden CLI.
+Roost supports pluggable secret backends for retrieving the age private key at bootstrap.  **Secrets are an optional module** — if you only sync dotfiles, packages, app config, and projects, none of this applies. *When* you do encrypt secret files, they are encrypted with **[age](https://github.com/FiloSottile/age)** (a single-file, open-source tool — no password manager required). The only real question is how a **second** Mac obtains the **same** age private key. Pick one:
+
+- **(A) Manual — zero extra tools.** `age-keygen` once, then copy `~/.config/sops/age/keys.txt` to the other Mac yourself (AirDrop / USB / Keychain).
+- **(B) 1Password** (`op`) — if you already use it. Store the key; set `ROOST_AGE_OP_REF`.
+- **(C) rbw** (free, open-source Bitwarden CLI) — the recommended *free + automatic* option, detailed below. Set `ROOST_AGE_RBW_REF`.
+
+`bootstrap.sh` tries them in order and **falls back to generating a fresh local key** if none is configured. **rbw is never required** — it is just option C.
 
 ### How it works
 
