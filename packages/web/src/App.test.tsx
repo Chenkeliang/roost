@@ -14,6 +14,16 @@ vi.mock("./api", () => ({
   getIndex: vi.fn().mockResolvedValue({ index: {} }),
   postCapture: vi.fn().mockResolvedValue({ changes: [] }),
   postLoad: vi.fn().mockResolvedValue({ results: [] }),
+  getGitStatus: vi.fn().mockResolvedValue({
+    isRepo: false,
+    remote: null,
+    branch: null,
+    ahead: 0,
+    behind: 0,
+    clean: true,
+  }),
+  gitPush: vi.fn().mockResolvedValue({ ok: true, output: "" }),
+  gitPull: vi.fn().mockResolvedValue({ ok: true, output: "" }),
 }));
 
 describe("App", () => {

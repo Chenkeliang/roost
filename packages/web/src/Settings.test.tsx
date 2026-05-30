@@ -11,6 +11,16 @@ vi.mock("./api", () => ({
     ageKey: true,
   }),
   getModules: vi.fn().mockResolvedValue({ modules: ["dotfiles", "packages"] }),
+  getGitStatus: vi.fn().mockResolvedValue({
+    isRepo: true,
+    remote: "git@github.com:u/cfg.git",
+    branch: "main",
+    ahead: 1,
+    behind: 0,
+    clean: true,
+  }),
+  gitPush: vi.fn().mockResolvedValue({ ok: true, output: "Everything up-to-date" }),
+  gitPull: vi.fn().mockResolvedValue({ ok: true, output: "Already up to date." }),
 }));
 
 describe("Settings", () => {
@@ -51,6 +61,21 @@ describe("Settings", () => {
     await waitFor(() => {
       expect(screen.getByText("dotfiles")).toBeTruthy();
       expect(screen.getByText("packages")).toBeTruthy();
+    });
+  });
+
+  it("shows remote URL from getGitStatus", async () => {
+    await act(async () => { render(<Settings />); });
+    await waitFor(() => {
+      expect(screen.getByText("git@github.com:u/cfg.git")).toBeTruthy();
+    });
+  });
+
+  it("shows Push and Pull buttons", async () => {
+    await act(async () => { render(<Settings />); });
+    await waitFor(() => {
+      expect(screen.getByText("Push")).toBeTruthy();
+      expect(screen.getByText("Pull")).toBeTruthy();
     });
   });
 

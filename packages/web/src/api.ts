@@ -220,3 +220,31 @@ export function testProjectRemote(remote: string): Promise<{ reachable: boolean;
     body: JSON.stringify({ remote }),
   });
 }
+
+// ── Git remote & sync ─────────────────────────────────────────────────────────
+
+export interface GitStatus {
+  isRepo: boolean;
+  remote: string | null;
+  branch: string | null;
+  ahead: number;
+  behind: number;
+  clean: boolean;
+}
+
+export interface GitOpResult {
+  ok: boolean;
+  output: string;
+}
+
+export function getGitStatus(): Promise<GitStatus> {
+  return apiFetch<GitStatus>("/api/git/status");
+}
+
+export function gitPush(): Promise<GitOpResult> {
+  return apiFetch<GitOpResult>("/api/git/push", { method: "POST" });
+}
+
+export function gitPull(): Promise<GitOpResult> {
+  return apiFetch<GitOpResult>("/api/git/pull", { method: "POST" });
+}

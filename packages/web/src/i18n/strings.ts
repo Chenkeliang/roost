@@ -161,4 +161,14 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     zh: "Roost 完全在你的设备上运行。不向任何服务器发送数据。你的配置仓库是私有 git —— 归你所有。",
   },
   "settings.documentation": { en: "Documentation", zh: "文档" },
+  "settings.git.heading": { en: "Git remote & sync", zh: "Git 远端与同步" },
+  "settings.git.push": { en: "Push", zh: "推送" },
+  "settings.git.pull": { en: "Pull", zh: "拉取" },
+  "settings.git.noRemote": {
+    en: "No remote — run `roost init --github` to create a private repo",
+    zh: "无远端 —— 运行 `roost init --github` 以创建私有仓库",
+  },
+  "settings.git.inSync": { en: "in sync", zh: "已同步" },
+  "settings.git.pushed": { en: "Pushed", zh: "已推送" },
+  "settings.git.pulled": { en: "Pulled", zh: "已拉取" },
 };

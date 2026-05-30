@@ -5,10 +5,11 @@ import {
   ShieldCheck,
   ArrowSquareOut,
   Key,
+  GitBranch,
 } from "@phosphor-icons/react";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getHealth, getModules, type ModulesResponse } from "../api";
+import { getHealth, getModules, getGitStatus, gitPush, gitPull, type ModulesResponse, type GitStatus } from "../api";
 
 export function Settings() {
   const { t } = useT();
@@ -16,19 +17,53 @@ export function Settings() {
   const [repoDir, setRepoDir] = useState<string | null>(null);
   const [ageKey, setAgeKey] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [gitBusy, setGitBusy] = useState<"push" | "pull" | null>(null);
+  const [gitResult, setGitResult] = useState<{ kind: "push" | "pull"; ok: boolean; output: string } | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    Promise.allSettled([getHealth(), getModules()])
-      .then(([health, mods]) => {
+    Promise.allSettled([getHealth(), getModules(), getGitStatus()])
+      .then(([health, mods, git]) => {
         if (health.status === "fulfilled") {
           setRepoDir(health.value.repoDir ?? null);
           setAgeKey(health.value.ageKey ?? null);
         }
         if (mods.status === "fulfilled") setModules(mods.value);
+        if (git.status === "fulfilled") setGitStatus(git.value);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleGitPush() {
+    setGitBusy("push");
+    setGitResult(null);
+    try {
+      const res = await gitPush();
+      setGitResult({ kind: "push", ok: res.ok, output: res.output });
+      if (res.ok) {
+        const s = await getGitStatus().catch(() => null);
+        if (s) setGitStatus(s);
+      }
+    } finally {
+      setGitBusy(null);
+    }
+  }
+
+  async function handleGitPull() {
+    setGitBusy("pull");
+    setGitResult(null);
+    try {
+      const res = await gitPull();
+      setGitResult({ kind: "pull", ok: res.ok, output: res.output });
+      if (res.ok) {
+        const s = await getGitStatus().catch(() => null);
+        if (s) setGitStatus(s);
+      }
+    } finally {
+      setGitBusy(null);
+    }
+  }
 
   const sectionLabel: React.CSSProperties = {
     fontSize: 11,
@@ -140,6 +175,84 @@ export function Settings() {
         ) : (
           <div style={{ padding: "11px 14px", color: "var(--muted)", fontSize: 13 }}>
             No modules registered. Is the server running?
+          </div>
+        )}
+      </div>
+
+      {/* ── Git remote & sync ── */}
+      <div style={sectionLabel}>{t("settings.git.heading")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {/* Remote URL row */}
+        <div style={row}>
+          <GitBranch size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
+          <span style={{ color: "var(--muted)", minWidth: 80 }}>Remote</span>
+          {loading ? (
+            <Skeleton width={260} height={13} />
+          ) : gitStatus?.remote ? (
+            <span className="mono" style={{ color: "var(--text)", fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {gitStatus.remote}
+            </span>
+          ) : (
+            <span style={{ color: "var(--muted)", fontSize: 12 }}>{t("settings.git.noRemote")}</span>
+          )}
+        </div>
+
+        {/* Branch + ahead/behind row */}
+        {gitStatus?.isRepo && (
+          <div style={row}>
+            <GitBranch size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
+            <span style={{ color: "var(--muted)", minWidth: 80 }}>Branch</span>
+            <span className="mono" style={{ color: "var(--text)", fontSize: 12 }}>
+              {gitStatus.branch ?? "—"}
+            </span>
+            <span style={{ color: "var(--muted)", fontSize: 12, marginLeft: "auto" }}>
+              {gitStatus.ahead === 0 && gitStatus.behind === 0 && gitStatus.clean
+                ? t("settings.git.inSync")
+                : `↑${gitStatus.ahead} ↓${gitStatus.behind}`}
+            </span>
+          </div>
+        )}
+
+        {/* Push / Pull buttons */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => { void handleGitPush(); }}
+            disabled={!gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null}
+            style={{
+              padding: "7px 16px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-soft)",
+              borderRadius: "var(--rr)",
+              fontSize: 13,
+              cursor: !gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null ? "not-allowed" : "pointer",
+              opacity: !gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null ? 0.5 : 1,
+            }}
+          >
+            {gitBusy === "push" ? "…" : t("settings.git.push")}
+          </button>
+          <button
+            onClick={() => { void handleGitPull(); }}
+            disabled={!gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null}
+            style={{
+              padding: "7px 16px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-soft)",
+              borderRadius: "var(--rr)",
+              fontSize: 13,
+              cursor: !gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null ? "not-allowed" : "pointer",
+              opacity: !gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null ? 0.5 : 1,
+            }}
+          >
+            {gitBusy === "pull" ? "…" : t("settings.git.pull")}
+          </button>
+        </div>
+
+        {/* Inline result */}
+        {gitResult && (
+          <div style={{ fontSize: 12, color: gitResult.ok ? "var(--green)" : "var(--destructive)", padding: "4px 2px" }}>
+            {gitResult.ok
+              ? gitResult.kind === "push" ? t("settings.git.pushed") : t("settings.git.pulled")
+              : gitResult.output || "Failed"}
           </div>
         )}
       </div>
