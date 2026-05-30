@@ -32,6 +32,16 @@ export function parseRemoteProtocol(url: string | null): "ssh" | "https" | "othe
   return "other";
 }
 
+export function toHomeRelative(absPath: string, home: string): string {
+  const prefix = home.endsWith("/") ? home : home + "/";
+  return absPath === home ? "~" : absPath.startsWith(prefix) ? "~/" + absPath.slice(prefix.length) : absPath;
+}
+
+export function fromHomeRelative(stored: string, home: string): string {
+  if (stored === "~") return home;
+  return stored.startsWith("~/") ? path.join(home, stored.slice(2)) : stored;
+}
+
 // ── findGitRepos ──────────────────────────────────────────────────────────────
 
 // Directory names that never hold user projects but are enormous to walk. Without

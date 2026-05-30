@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
-import { findGitRepos, repoInfo, projectsModule, parseRemoteHost, parseRemoteProtocol } from "./projects.js";
+import { findGitRepos, repoInfo, projectsModule, parseRemoteHost, parseRemoteProtocol, toHomeRelative, fromHomeRelative } from "./projects.js";
 import { loadProjects } from "../projects.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -68,6 +68,21 @@ describe("parseRemoteHost / parseRemoteProtocol", () => {
   it("handles null / unknown", () => {
     expect(parseRemoteHost(null)).toBeNull();
     expect(parseRemoteProtocol(null)).toBe("other");
+  });
+});
+
+describe("home-relative paths", () => {
+  it("stores under home as ~/…", () => {
+    expect(toHomeRelative("/Users/keliang/go/src/x", "/Users/keliang")).toBe("~/go/src/x");
+  });
+  it("leaves outside-home paths absolute", () => {
+    expect(toHomeRelative("/Volumes/Work/x", "/Users/keliang")).toBe("/Volumes/Work/x");
+  });
+  it("resolves ~/… against home", () => {
+    expect(fromHomeRelative("~/go/src/x", "/Users/bob")).toBe("/Users/bob/go/src/x");
+  });
+  it("passes through absolute on resolve", () => {
+    expect(fromHomeRelative("/Volumes/Work/x", "/Users/bob")).toBe("/Volumes/Work/x");
   });
 });
 
