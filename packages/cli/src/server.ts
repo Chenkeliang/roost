@@ -27,6 +27,7 @@ import {
   recipientFromKey,
   encryptEnvSecret,
 } from "@roost/core";
+import { createTtlCache } from "./cache.js";
 
 export interface ServerDeps {
   repoDir: string;
@@ -39,6 +40,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const { repoDir, registry, makeCtx, webDir } = deps;
 
   const server = Fastify({ logger: false });
+
+  // Short-TTL response cache for the expensive read fan-outs (status/discover).
+  // Slow once, then instant for ~25s; wiped on any state-changing mutation below.
+  const cache = createTtlCache(25_000);
 
   // ── /api/health ─────────────────────────────────────────────────────────────
   server.get("/api/health", async (_req, reply) => {
@@ -68,8 +73,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ── /api/status ──────────────────────────────────────────────────────────────
   server.get("/api/status", async (_req, reply) => {
     try {
-      const sel = loadSelection(repoDir);
-      const reports = await statusAll(registry, makeCtx(true), sel);
+      const reports = await cache.getOrCompute("status", () => {
+        const sel = loadSelection(repoDir);
+        return statusAll(registry, makeCtx(true), sel);
+      });
       return reply.send({ reports });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -95,6 +102,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ── POST /api/capture ────────────────────────────────────────────────────────
   server.post("/api/capture", async (_req, reply) => {
     try {
+      cache.invalidateAll();
       const sel = loadSelection(repoDir);
       const changes = await captureAll(registry, makeCtx(false), sel);
       return reply.send({ changes });
@@ -109,6 +117,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   server.post<{ Body: LoadBody }>("/api/load", async (req, reply) => {
     try {
+      cache.invalidateAll();
       const apply = req.body?.apply === true;
       const dryRun = !apply;
       const backupDir = path.join(os.homedir(), ".roost-backups", "load");
@@ -126,6 +135,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   server.post<{ Body: SelectionMutateBody }>("/api/selection/add", async (req, reply) => {
     try {
+      cache.invalidateAll();
       const { module: mod, id } = req.body;
       let doc = loadSelection(repoDir);
       doc = addItem(doc, mod, id);
@@ -140,6 +150,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ── POST /api/selection/remove ───────────────────────────────────────────────
   server.post<{ Body: SelectionMutateBody }>("/api/selection/remove", async (req, reply) => {
     try {
+      cache.invalidateAll();
       const { module: mod, id } = req.body;
       let doc = loadSelection(repoDir);
       doc = removeItem(doc, mod, id);
@@ -164,7 +175,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ── GET /api/discover ────────────────────────────────────────────────────────
   server.get("/api/discover", async (_req, reply) => {
     try {
-      const candidates = await discoverAll(registry, makeCtx(true));
+      const candidates = await cache.getOrCompute("discover", () =>
+        discoverAll(registry, makeCtx(true)),
+      );
       return reply.send({ candidates });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -236,6 +249,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // with secret values blanked.
   server.put<{ Body: unknown }>("/api/env", async (req, reply) => {
     try {
+      cache.invalidateAll();
       let incoming: EnvData;
       try {
         incoming = validateEnvData(req.body);

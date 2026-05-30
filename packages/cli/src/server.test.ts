@@ -674,4 +674,101 @@ describe("buildServer", () => {
     expect(typeof body.error).toBe("string");
     await server.close();
   });
+
+  // ── short-TTL response cache (status/discover) ────────────────────────────────
+
+  it("GET /api/status → computes once across two quick calls (cached)", async () => {
+    let statusCalls = 0;
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        statusFn: async () => {
+          statusCalls += 1;
+          return { module: "dotfiles", items: [] };
+        },
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+
+    await server.inject({ method: "GET", url: "/api/status" });
+    await server.inject({ method: "GET", url: "/api/status" });
+    expect(statusCalls).toBe(1);
+
+    await server.close();
+  });
+
+  it("GET /api/discover → computes once across two quick calls (cached)", async () => {
+    let discoverCalls = 0;
+    const reg = new ModuleRegistry();
+    reg.register({
+      ...makeFakeModule({ name: "dotfiles" }),
+      async discover(): Promise<Candidate[]> {
+        discoverCalls += 1;
+        return [];
+      },
+    });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+
+    await server.inject({ method: "GET", url: "/api/discover" });
+    await server.inject({ method: "GET", url: "/api/discover" });
+    expect(discoverCalls).toBe(1);
+
+    await server.close();
+  });
+
+  it("POST /api/capture invalidates the cache → next /api/status recomputes", async () => {
+    let statusCalls = 0;
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        statusFn: async () => {
+          statusCalls += 1;
+          return { module: "dotfiles", items: [] };
+        },
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+
+    await server.inject({ method: "GET", url: "/api/status" }); // computes (1)
+    await server.inject({ method: "GET", url: "/api/status" }); // cached
+    expect(statusCalls).toBe(1);
+
+    await server.inject({ method: "POST", url: "/api/capture" }); // invalidates
+    await server.inject({ method: "GET", url: "/api/status" }); // recomputes (2)
+    expect(statusCalls).toBe(2);
+
+    await server.close();
+  });
+
+  it("PUT /api/env invalidates the cache → next /api/discover recomputes", async () => {
+    let discoverCalls = 0;
+    const reg = new ModuleRegistry();
+    reg.register({
+      ...makeFakeModule({ name: "dotfiles" }),
+      async discover(): Promise<Candidate[]> {
+        discoverCalls += 1;
+        return [];
+      },
+    });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+
+    await server.inject({ method: "GET", url: "/api/discover" }); // computes (1)
+    await server.inject({ method: "GET", url: "/api/discover" }); // cached
+    expect(discoverCalls).toBe(1);
+
+    await server.inject({
+      method: "PUT",
+      url: "/api/env",
+      payload: { schemaVersion: 1, aliases: [], env: [], path: [], functions: [] },
+      headers: { "content-type": "application/json" },
+    });
+    await server.inject({ method: "GET", url: "/api/discover" }); // recomputes (2)
+    expect(discoverCalls).toBe(2);
+
+    await server.close();
+  });
 });
