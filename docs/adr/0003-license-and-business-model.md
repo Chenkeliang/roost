@@ -1,6 +1,6 @@
 # ADR-0003: License & business model
 
-- **状态**: 提议(PROPOSED — 待 owner 拍板)。**在选定前:仓库维持 MIT + 私有 + 暂不合并外部 PR / 不接受外部贡献者。**
+- **状态**: 接受(ACCEPTED · 2026-05-30 — 选定 **方案 B:Open-core**)。引擎(core/cli/web/shared)保持开源 **MIT**;商业化 = 签名桌面 App + 可选 pro 功能 + 支持。公开前待办:① `CONTRIBUTING` 加 DCO 签署(已做);② 注册 "Roost" 文字商标;③ README 写明开源范围与商业条款(已做)。
 - **日期**: 2026-05-30
 
 ## 背景

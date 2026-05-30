@@ -30,5 +30,5 @@ node packages/cli/dist/index.js doctor   # later: `roost doctor`
 ## Built on
 [chezmoi](https://www.chezmoi.io/) (dotfiles + age encryption), Homebrew, [mise](https://mise.jdx.dev/), TypeScript. macOS only (v1).
 
-## License
-MIT — see [LICENSE](./LICENSE).
+## License & commercial
+The engine (CLI + libraries in this repo) is open source under the **MIT** license — see [LICENSE](./LICENSE) and [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md). Roost follows an **open-core** model: a signed desktop app and optional "pro" features may be offered commercially. Contributions require a DCO sign-off (`git commit -s`). See [docs/adr/0003-license-and-business-model.md](./docs/adr/0003-license-and-business-model.md).
