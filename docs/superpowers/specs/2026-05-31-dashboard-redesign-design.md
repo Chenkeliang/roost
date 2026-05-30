@@ -118,15 +118,19 @@ interface SyncModule {
 
 ### 5.4 Projects(你的 #1 重点)
 - **目的**:管理"要随身带"的 git 项目(换机一键重建)。
+- **真实场景(首台真机审计)**:95 仓库 · 无远端 0 · SSH 80/HTTPS 15 · 主机分布 `gitlab.luojilab.com`×72、`github.com`×20、`code.qschou.com`×3 —— **异构远端(多内网 GitLab + GitHub)是常态,设计必须按此**。
 - **内容(来源)**:
-  - **已纳管项目**(读 `projects.yaml`,便宜):名字、**远端地址**、**本地文件夹路径**、本地在否。
-  - **可发现项目**(按需扫描):遍历 home 找 `.git`(有界 MAX_VISITS),**读 `.git/config` 拿远端(不调 git 子进程)**;列出文件夹 + 远端。
+  - **已纳管项目**(读 `projects.yaml`,便宜):名字、**远端地址(原样保留 SSH/HTTPS)**、**本地文件夹路径**、本地在否、**远端主机**。
+  - **可发现项目**(按需扫描):有界遍历 home 找 `.git`(MAX_VISITS),**读 `.git/config` 拿远端(不调 git 子进程)**;列出文件夹 + 远端 + 解析出的主机。
+- **按主机分组/筛选**:页面顶部 chip = `全部 / github.com / gitlab.luojilab.com / code.qschou.com / 无远端`(按实际主机动态生成),区分内网/公网、工作/个人。
 - **按钮+交互**:
-  - **[扫描本机 git 项目]**(次):`/api/discover?module=projects` → 列表(文件夹 + 远端 + 本地/无远端标注),带加载进度("40/88")。
-  - 每行:**[测试]**(`git ls-remote <remote>` 验远端可达,按需单点)· **[保存/纳管]**(写 `projects.yaml`)· 已纳管但本地缺失的项 → **[克隆]**(`git clone`,走 apply)。
+  - **[扫描本机 git 项目]**(次):`/api/discover?module=projects` → 列表(文件夹 + 远端 + 主机 + 协议 + 无远端标注),带加载进度("40/88")。
+  - 每行:**[测试]**(`git ls-remote <remote>` 验"可达+可鉴权",按需单点;内网仓库借此暴露"需 VPN/无权限")· **[保存/纳管]**(写 `projects.yaml`,URL 原样)· 已纳管但本地缺失 → **[克隆]**(`git clone`,走 apply,失败逐个跳过+报告)。
   - 行内:编辑远端、移除纳管。
-- **状态**:未纳管 → 空态 + [扫描本机 git 项目];扫描中 → 进度;无远端的项 → 标注"无远端,无法按清单恢复"。
-- **技术**:index 读 projects.yaml(便宜);discover 有界扫 + 读 .git/config;test=`git ls-remote`(单点按需);clone=既有 apply 路径(按钮触发)。
+- **鉴权边界(诚实、不越界)**:SSH key / token / VPN 属用户环境,Roost **不存不管凭据**(I1 薄编排、I6 不碰密钥);只记 URL + 克隆 + 用 [测试]/恢复报告如实暴露可达性。`doctor` 可提示"N 个在内网主机,恢复需 VPN + SSH key"。
+- **状态**:未纳管 → 空态 + [扫描本机 git 项目];扫描中 → 进度;无远端 → 标注"无法按清单恢复";测试结果 ✓可恢复 / ✗(VPN/权限)。
+- **隐私**:`projects.yaml` 含内网仓库 URL(与 `inventory/` 同级敏感)→ 配置仓库须私有 + 公开前清洗。
+- **技术**:index 读 projects.yaml(便宜);discover 有界扫 + 读 .git/config + 解析 host;test=`git ls-remote`(单点按需);clone=既有 apply 路径。
 
 ### 5.5 App Config
 - **目的**:管理 macOS app 偏好域(`defaults`)。
@@ -220,8 +224,15 @@ interface SyncModule {
 
 ---
 
-## 12. 未决 / 风险 / 边界(诚实)
-- **"仓库切换"语义**未定(切本地 repoDir[重/可能要 ADR] vs 配 git 远端[轻] vs 工作区下拉)——P2 前需定义。
+## 12. 已定稿决策 / 未决 / 风险 / 边界(诚实)
+
+**已定稿(owner 评审中确认):**
+- **IA = 左侧分组侧栏**(顶部横排 → 竖排 + "模块"分组),已认可。
+- **"仓库切换" = Settings 的「Git 远端与同步」面板**(查看/设置配置仓库的 git 远端 + 领先/落后 + [Push]/[Pull] + 首次接 `roost init --github`),**不做**运行时多仓切换(小众、需改 server 作用域 + ADR,搁置)。排 P2。
+- **i18n 排 P2**(P1 重写视图后再统一抽字符串)。
+- **主/副机** P1 只显单本机真实卡 + "暂无其它机器"空态;真多机/角色待 P2(接 ADR-0005)。
+
+**未决 / 风险:**
 - **主/副角色**需要 ADR-0005(profile/机器画像)落地才能"真";在此之前不摆假。
 - **P1 是大前端重构**;Aliases & Env 已铺范式,按模块逐页推进,每页可独立交付验证。
 - `index()` 为可选、向后兼容;不强制所有模块同时实现。
