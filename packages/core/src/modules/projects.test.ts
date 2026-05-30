@@ -222,17 +222,16 @@ describe("repoInfo", () => {
 
 describe("projectsModule.discover", () => {
   it("emits track candidate for repo with remote", async () => {
-    // Create a real .git dir in home
+    // Create a real .git dir in home with an origin remote in config
     const home = tmpDir;
     const repoPath = path.join(home, "myproject");
     fs.mkdirSync(path.join(repoPath, ".git"), { recursive: true });
+    fs.writeFileSync(
+      path.join(repoPath, ".git", "config"),
+      '[remote "origin"]\n\turl = https://github.com/u/myproject.git\n',
+    );
 
-    const { exec } = makeFakeExec([
-      // repoInfo for myproject: remote present, clean
-      { code: 0, stdout: "https://github.com/u/myproject.git\n", stderr: "" },
-      { code: 0, stdout: "main\n", stderr: "" },
-      { code: 0, stdout: "", stderr: "" },
-    ]);
+    const { exec } = makeFakeExec([]);
     const ctx = makeCtx({ exec, home, repoDir: tmpDir });
     const candidates = await projectsModule.discover(ctx);
     const c = candidates.find((x) => x.id === repoPath);
@@ -244,14 +243,11 @@ describe("projectsModule.discover", () => {
   it("includes note 'no remote' for repo without remote", async () => {
     const home = tmpDir;
     const repoPath = path.join(home, "localonly");
+    // .git dir with no remote configured
     fs.mkdirSync(path.join(repoPath, ".git"), { recursive: true });
+    fs.writeFileSync(path.join(repoPath, ".git", "config"), "[core]\n\tbare = false\n");
 
-    const { exec } = makeFakeExec([
-      // remote get-url fails
-      { code: 128, stdout: "", stderr: "error: No such remote" },
-      { code: 0, stdout: "main\n", stderr: "" },
-      { code: 0, stdout: "", stderr: "" },
-    ]);
+    const { exec } = makeFakeExec([]);
     const ctx = makeCtx({ exec, home, repoDir: tmpDir });
     const candidates = await projectsModule.discover(ctx);
     const c = candidates.find((x) => x.id === repoPath);
@@ -259,17 +255,43 @@ describe("projectsModule.discover", () => {
     expect(c!.note).toMatch(/no remote/i);
   });
 
-  it("does NOT run `git status` during discover (perf guard) — only a remote probe", async () => {
+  it("does NOT call git at all during discover (perf guard) — reads .git/config from disk", async () => {
     const home = tmpDir;
-    fs.mkdirSync(path.join(home, "myproject", ".git"), { recursive: true });
-    const { exec, calls } = makeFakeExec([
-      { code: 0, stdout: "https://github.com/u/p.git\n", stderr: "" },
-    ]);
+    const repoPath = path.join(home, "myproject");
+    fs.mkdirSync(path.join(repoPath, ".git"), { recursive: true });
+    fs.writeFileSync(
+      path.join(repoPath, ".git", "config"),
+      '[remote "origin"]\n\turl = https://github.com/u/p.git\n',
+    );
+    const { exec, calls } = makeFakeExec([]);
     const ctx = makeCtx({ exec, home, repoDir: tmpDir });
     await projectsModule.discover(ctx);
-    expect(calls.some((c) => c.args.includes("remote"))).toBe(true);
-    expect(calls.some((c) => c.args.includes("status"))).toBe(false);
-    expect(calls.some((c) => c.args.includes("branch"))).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("projectsModule.discover enrichment", () => {
+  it("attaches remote/host/protocol from .git/config without per-repo git", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-disc-home-"));
+    const repo = path.join(home, "work", "app");
+    fs.mkdirSync(path.join(repo, ".git"), { recursive: true });
+    fs.writeFileSync(
+      path.join(repo, ".git", "config"),
+      '[remote "origin"]\n\turl = git@gitlab.luojilab.com:team/app.git\n',
+    );
+    // exec that throws if any git per-repo command runs (discover must read the file, not call git)
+    const exec = {
+      run: async () => { throw new Error("discover must not call git per repo"); },
+    } as unknown as import("@roost/shared").Exec;
+    const ctx = makeCtx({ exec, home, repoDir: home });
+    const cands = await projectsModule.discover(ctx);
+    const c = cands.find((x) => x.path.endsWith("work/app"));
+    expect(c).toBeDefined();
+    expect(c!.remote).toBe("git@gitlab.luojilab.com:team/app.git");
+    expect(c!.host).toBe("gitlab.luojilab.com");
+    expect(c!.protocol).toBe("ssh");
+    expect(c!.recommendation).toBe("track");
+    fs.rmSync(home, { recursive: true, force: true });
   });
 });
 
@@ -326,7 +348,7 @@ describe("projectsModule.capture", () => {
     expect(cs.written).toContain("roost/projects.yaml");
 
     const doc = loadProjects(repoDir);
-    const entry = doc.projects.find((e) => e.path === repoPath);
+    const entry = doc.projects.find((e) => fromHomeRelative(e.path, home) === repoPath);
     expect(entry).toBeDefined();
     expect(entry!.envTool).toBe("mise");
     expect(entry!.repo).toBe("git@github.com:u/proj.git");
@@ -350,7 +372,7 @@ describe("projectsModule.capture", () => {
 
     await projectsModule.capture(ctx, sel);
     const doc = loadProjects(repoDir);
-    const entry = doc.projects.find((e) => e.path === repoPath);
+    const entry = doc.projects.find((e) => fromHomeRelative(e.path, home) === repoPath);
     expect(entry!.envTool).toBe("none");
   });
 
@@ -375,7 +397,7 @@ describe("projectsModule.capture", () => {
     await projectsModule.capture(makeCtx({ exec: makeExecForCapture().exec, home, repoDir }), sel);
 
     const doc = loadProjects(repoDir);
-    expect(doc.projects.filter((e) => e.path === repoPath)).toHaveLength(1);
+    expect(doc.projects.filter((e) => fromHomeRelative(e.path, home) === repoPath)).toHaveLength(1);
   });
 });
 

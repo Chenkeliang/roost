@@ -42,6 +42,18 @@ export function fromHomeRelative(stored: string, home: string): string {
   return stored.startsWith("~/") ? path.join(home, stored.slice(2)) : stored;
 }
 
+export function readOriginUrl(repoDir: string): string | null {
+  try {
+    const cfg = fs.readFileSync(path.join(repoDir, ".git", "config"), "utf8");
+    const m = cfg.match(/\[remote "origin"\][\s\S]*?url\s*=\s*(.+)/);
+    if (m) return m[1]!.trim();
+    const any = cfg.match(/url\s*=\s*(.+)/);
+    return any ? any[1]!.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── findGitRepos ──────────────────────────────────────────────────────────────
 
 // Directory names that never hold user projects but are enormous to walk. Without
@@ -127,25 +139,6 @@ export async function repoInfo(
   return { remote, branch, dirty, hasMise };
 }
 
-// Run `fn` over items with bounded concurrency, preserving order. Keeps discover
-// fast (parallel git probes) without spawning hundreds of processes at once.
-async function mapLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T, idx: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const idx = next++;
-      results[idx] = await fn(items[idx]!, idx);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
-  return results;
-}
-
 // ── candidate roots ───────────────────────────────────────────────────────────
 
 const EXTRA_SUBDIRS = [
@@ -185,23 +178,24 @@ export const projectsModule: SyncModule = {
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const roots = candidateRoots(ctx.home);
     const capped = findGitRepos(roots).slice(0, 100);
-
-    // Discovery only needs to know whether a repo has an origin remote (to decide
-    // track vs exclude). That's ONE cheap git call per repo, run in parallel — NOT
-    // the full repoInfo (branch + `git status --porcelain` are slow and only needed
-    // at capture/status time for the small set of selected repos).
-    const hasRemote = await mapLimit(capped, 16, async (repoPath) => {
-      const r = await ctx.exec.run("git", ["-C", repoPath, "remote", "get-url", "origin"]);
-      return r.code === 0 && r.stdout.trim().length > 0;
+    return capped.map((repoPath) => {
+      const remote = readOriginUrl(repoPath);
+      const hasRemote = remote !== null && remote.length > 0;
+      const cand: Candidate = {
+        id: repoPath,
+        path: repoPath,
+        category: "projects",
+        recommendation: hasRemote ? "track" : "exclude",
+        note: hasRemote ? undefined : "no remote — cannot restore from manifest",
+      };
+      if (hasRemote) {
+        cand.remote = remote!;
+        const h = parseRemoteHost(remote);
+        if (h) cand.host = h;
+        cand.protocol = parseRemoteProtocol(remote);
+      }
+      return cand;
     });
-
-    return capped.map((repoPath, i) => ({
-      id: repoPath,
-      path: repoPath,
-      category: "projects",
-      recommendation: (hasRemote[i] ? "track" : "exclude") as "track" | "exclude",
-      note: hasRemote[i] ? undefined : "no remote — cannot restore from manifest",
-    }));
   },
 
   async capture(ctx: ModuleContext, sel: Selection): Promise<ChangeSet> {
@@ -211,12 +205,12 @@ export const projectsModule: SyncModule = {
     for (const repoPath of ids) {
       const info = await repoInfo(ctx.exec, repoPath);
       const entry = {
-        path: repoPath,
+        path: toHomeRelative(repoPath, ctx.home),
         repo: info.remote,
         envTool: (info.hasMise ? "mise" : "none") as "mise" | "none",
       };
 
-      const existing = doc.projects.findIndex((e) => e.path === repoPath);
+      const existing = doc.projects.findIndex((e) => fromHomeRelative(e.path, ctx.home) === repoPath);
       if (existing >= 0) {
         doc.projects[existing] = entry;
       } else {
