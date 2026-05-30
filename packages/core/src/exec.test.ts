@@ -17,4 +17,9 @@ describe("exec adapter", () => {
     const r = await exec.run("bash", ["-c", "kill -TERM $$"]);
     expect(r.code).toBe(-1);
   });
+  it("reports failure (not 0) when the command does not exist", async () => {
+    const exec = createExec();
+    const r = await exec.run("roost-definitely-not-a-real-command-xyz", []);
+    expect(r.code).not.toBe(0);
+  });
 });
