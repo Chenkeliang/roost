@@ -794,6 +794,45 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/packages/brewfile → 200 shape; parses an on-disk Brewfile", async () => {
+    const brewDir = path.join(tmpDir, "roost");
+    fs.mkdirSync(brewDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(brewDir, "Brewfile"),
+      ['tap "homebrew/services"', 'brew "git"', 'cask "firefox"', 'mas "Xcode", id: 1'].join("\n"),
+    );
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/packages/brewfile" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      available: boolean;
+      exists: boolean;
+      entries: { taps: string[]; formulae: string[]; casks: string[]; mas: string[] };
+    };
+    expect(typeof body.available).toBe("boolean"); // makeFakeExec → brew --version exits 0
+    expect(body.exists).toBe(true);
+    expect(body.entries.taps).toEqual(["homebrew/services"]);
+    expect(body.entries.formulae).toEqual(["git"]);
+    expect(body.entries.casks).toEqual(["firefox"]);
+    expect(body.entries.mas).toEqual(["Xcode"]);
+    await server.close();
+  });
+
+  it("GET /api/packages/brewfile → exists:false with empty entries when no Brewfile", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/packages/brewfile" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      exists: boolean;
+      entries: { formulae: string[] };
+    };
+    expect(body.exists).toBe(false);
+    expect(body.entries.formulae).toEqual([]);
+    await server.close();
+  });
+
   it("GET /api/index → 200 { index: { <module>: ModuleIndex } }", async () => {
     const reg = defaultRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });

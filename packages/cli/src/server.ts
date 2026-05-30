@@ -28,6 +28,7 @@ import {
   encryptEnvSecret,
   indexAll,
   testRemote,
+  parseBrewfile,
 } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 
@@ -105,6 +106,27 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
     const result = await testRemote(makeCtx(true).exec, remote);
     return reply.send(result);
+  });
+
+  // ── GET /api/packages/brewfile ───────────────────────────────────────────────
+  // Content-first: parse the repo Brewfile (cheap). available = `brew --version`
+  // exit 0; never runs brew bundle.
+  server.get("/api/packages/brewfile", async (_req, reply) => {
+    try {
+      const result = await cache.getOrCompute("packages:brewfile", async () => {
+        const brew = await makeCtx(true).exec.run("brew", ["--version"]);
+        const file = path.join(repoDir, "roost", "Brewfile");
+        const exists = fs.existsSync(file);
+        const entries = exists
+          ? parseBrewfile(fs.readFileSync(file, "utf8"))
+          : { taps: [], formulae: [], casks: [], mas: [] };
+        return { available: brew.code === 0, exists, entries };
+      });
+      return reply.send(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
   });
 
   // ── /api/machines ────────────────────────────────────────────────────────────
