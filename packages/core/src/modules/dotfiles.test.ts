@@ -371,3 +371,43 @@ describe("dotfilesModule.status guard", () => {
     expect(report.items).toHaveLength(0);
   });
 });
+
+// ── index ─────────────────────────────────────────────────────────────────────
+
+describe("dotfilesModule.index", () => {
+  it("is cheap: probes chezmoi --version + lists managed, never apply/diff/verify/fs scan", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push({ cmd, args });
+        if (cmd === "chezmoi" && args.includes("managed")) {
+          return { code: 0, stdout: "/home/u/.zshrc\n/home/u/.gitconfig\n", stderr: "" };
+        }
+        return { code: 0, stdout: "chezmoi version 2.x", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/tmp/home" });
+    const idx = await dotfilesModule.index!(ctx);
+    expect(idx.available).toBe(true);
+    expect(idx.reason).toBeUndefined();
+    expect(idx.managed).toBe(2);
+    expect(
+      calls.every(
+        (c) => !c.args.includes("apply") && !c.args.includes("diff") && !c.args.includes("verify"),
+      ),
+    ).toBe(true);
+  });
+
+  it("reports unavailable with reason when chezmoi is absent; managed falls back to 0", async () => {
+    const exec: Exec = {
+      async run(): Promise<ExecResult> {
+        return { code: 127, stdout: "", stderr: "command not found" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/tmp/home" });
+    const idx = await dotfilesModule.index!(ctx);
+    expect(idx.available).toBe(false);
+    expect(idx.reason).toBe("chezmoi not found");
+    expect(idx.managed).toBe(0);
+  });
+});

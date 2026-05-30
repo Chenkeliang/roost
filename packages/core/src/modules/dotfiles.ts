@@ -102,6 +102,22 @@ function deriveCategory(absPath: string): string {
 export const dotfilesModule: SyncModule = {
   name: "dotfiles",
 
+  async index(ctx: ModuleContext): Promise<import("@roost/shared").ModuleIndex> {
+    const probe = await ctx.exec.run("chezmoi", ["--version"]);
+    const available = probe.code === 0;
+    let managed = 0;
+    try {
+      managed = (await createChezmoi(ctx.exec, { sourceDir: ctx.repoDir }).managed()).length;
+    } catch {
+      managed = 0;
+    }
+    return {
+      available,
+      reason: available ? undefined : "chezmoi not found",
+      managed,
+    };
+  },
+
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const candidates: Candidate[] = [];
 
