@@ -772,6 +772,16 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/discover?module=projects → only the projects key", async () => {
+    const reg = defaultRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/discover?module=projects" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { candidates: Record<string, unknown[]> };
+    expect(Object.keys(body.candidates)).toEqual(["projects"]);
+    await server.close();
+  });
+
   it("GET /api/index → 200 { index: { <module>: ModuleIndex } }", async () => {
     const reg = defaultRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });

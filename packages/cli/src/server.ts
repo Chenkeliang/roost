@@ -185,8 +185,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   // ── GET /api/discover ────────────────────────────────────────────────────────
-  server.get("/api/discover", async (_req, reply) => {
+  server.get("/api/discover", async (req, reply) => {
     try {
+      const moduleName = (req.query as { module?: string } | undefined)?.module;
+      if (moduleName) {
+        const mod = registry.list().find((m) => m.name === moduleName);
+        if (!mod) return reply.status(404).send({ error: `unknown module: ${moduleName}` });
+        const candidates = await cache.getOrCompute(`discover:${moduleName}`, async () => ({
+          [moduleName]: await mod.discover(makeCtx(true)),
+        }));
+        return reply.send({ candidates });
+      }
       const candidates = await cache.getOrCompute("discover", () =>
         discoverAll(registry, makeCtx(true)),
       );
