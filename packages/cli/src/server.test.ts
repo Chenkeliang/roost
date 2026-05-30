@@ -250,4 +250,156 @@ describe("buildServer", () => {
     expect(typeof body.hint).toBe("string");
     await server.close();
   });
+
+  // ── Unit 2 — new endpoints ────────────────────────────────────────────────────
+
+  it("POST /api/selection/add → mutates on-disk selection and returns updated doc", async () => {
+    // Start with an empty selection
+    saveSelection(tmpDir, emptySelection());
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/selection/add",
+      payload: { module: "dotfiles", id: "/home/.zshrc" },
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { schemaVersion: number; modules: Record<string, string[]> };
+    expect(body.modules["dotfiles"]).toContain("/home/.zshrc");
+
+    // Verify on-disk state
+    const { loadSelection: _load } = await import("@roost/core");
+    const onDisk = _load(tmpDir);
+    expect(onDisk.modules["dotfiles"]).toContain("/home/.zshrc");
+
+    await server.close();
+  });
+
+  it("POST /api/selection/remove → mutates on-disk selection and returns updated doc", async () => {
+    let sel = emptySelection();
+    sel = addItem(sel, "dotfiles", "/home/.zshrc");
+    sel = addItem(sel, "dotfiles", "/home/.vimrc");
+    saveSelection(tmpDir, sel);
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/selection/remove",
+      payload: { module: "dotfiles", id: "/home/.zshrc" },
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { schemaVersion: number; modules: Record<string, string[]> };
+    expect(body.modules["dotfiles"]).not.toContain("/home/.zshrc");
+    expect(body.modules["dotfiles"]).toContain("/home/.vimrc");
+
+    await server.close();
+  });
+
+  it("GET /api/timeline → parses git log output into entries", async () => {
+    const sha = "abc123def456";
+    const subject = "feat: add something";
+    const date = "2026-05-30T10:00:00+00:00";
+    const gitLine = `${sha}\x1f${subject}\x1f${date}`;
+
+    function makeGitExec(): Exec {
+      return {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          if (cmd === "git" && args.includes("log")) {
+            return { code: 0, stdout: gitLine, stderr: "" };
+          }
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+    }
+
+    function makeGitCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makeGitExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeGitCtx(tmpDir, d) });
+
+    const res = await server.inject({ method: "GET", url: "/api/timeline" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { entries: { sha: string; subject: string; date: string }[] };
+    expect(body.entries).toHaveLength(1);
+    expect(body.entries[0]).toEqual({ sha, subject, date });
+
+    await server.close();
+  });
+
+  it("GET /api/timeline → returns [] on non-zero git exit", async () => {
+    function makeFailExec(): Exec {
+      return {
+        async run(): Promise<ExecResult> {
+          return { code: 128, stdout: "", stderr: "not a git repo" };
+        },
+      };
+    }
+
+    function makeFailCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makeFailExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeFailCtx(tmpDir, d) });
+
+    const res = await server.inject({ method: "GET", url: "/api/timeline" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { entries: unknown[] };
+    expect(body.entries).toEqual([]);
+
+    await server.close();
+  });
+
+  it("GET /api/diff → returns per-module diff text from registered modules", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        statusFn: async () => ({ module: "dotfiles", items: [] }),
+      }),
+    );
+
+    // Override diff on the fake module for this test
+    const modWithDiff: SyncModule = {
+      ...makeFakeModule({ name: "packages" }),
+      async diff(): Promise<string> { return "--- a\n+++ b\n@@ -1 +1 @@"; },
+    };
+    reg.register(modWithDiff);
+
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+
+    const res = await server.inject({ method: "GET", url: "/api/diff" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { diffs: { module: string; text: string }[] };
+    expect(Array.isArray(body.diffs)).toBe(true);
+    expect(body.diffs).toHaveLength(2);
+    const pkgDiff = body.diffs.find((d) => d.module === "packages");
+    expect(pkgDiff?.text).toContain("@@ -1 +1 @@");
+
+    await server.close();
+  });
 });

@@ -7,6 +7,9 @@ import type { ModuleContext } from "@roost/shared";
 import type { ModuleRegistry } from "@roost/core";
 import {
   loadSelection,
+  saveSelection,
+  addItem,
+  removeItem,
   listStateHosts,
   readState,
   captureAll,
@@ -102,6 +105,78 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const sel = loadSelection(repoDir);
       const results = await loadAll(registry, makeCtx(dryRun), sel, { dryRun, backupDir });
       return reply.send({ results });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── POST /api/selection/add ──────────────────────────────────────────────────
+  interface SelectionMutateBody { module: string; id: string }
+
+  server.post<{ Body: SelectionMutateBody }>("/api/selection/add", async (req, reply) => {
+    try {
+      const { module: mod, id } = req.body;
+      let doc = loadSelection(repoDir);
+      doc = addItem(doc, mod, id);
+      saveSelection(repoDir, doc);
+      return reply.send({ schemaVersion: doc.schemaVersion, modules: doc.modules });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── POST /api/selection/remove ───────────────────────────────────────────────
+  server.post<{ Body: SelectionMutateBody }>("/api/selection/remove", async (req, reply) => {
+    try {
+      const { module: mod, id } = req.body;
+      let doc = loadSelection(repoDir);
+      doc = removeItem(doc, mod, id);
+      saveSelection(repoDir, doc);
+      return reply.send({ schemaVersion: doc.schemaVersion, modules: doc.modules });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── GET /api/timeline ────────────────────────────────────────────────────────
+  server.get("/api/timeline", async (_req, reply) => {
+    try {
+      const exec = makeCtx(true).exec;
+      const result = await exec.run("git", [
+        "-C", repoDir,
+        "log",
+        "--pretty=format:%H\x1f%s\x1f%cI",
+        "-n", "50",
+      ]);
+      if (result.code !== 0) {
+        return reply.send({ entries: [] });
+      }
+      const entries = result.stdout
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        .map((line) => {
+          const [sha, subject, date] = line.split("\x1f");
+          return { sha: sha ?? "", subject: subject ?? "", date: date ?? "" };
+        });
+      return reply.send({ entries });
+    } catch {
+      return reply.send({ entries: [] });
+    }
+  });
+
+  // ── GET /api/diff ─────────────────────────────────────────────────────────────
+  server.get("/api/diff", async (_req, reply) => {
+    try {
+      const sel = loadSelection(repoDir);
+      const diffs: { module: string; text: string }[] = [];
+      for (const mod of registry.list()) {
+        const text = await mod.diff(makeCtx(true), sel);
+        diffs.push({ module: mod.name, text });
+      }
+      return reply.send({ diffs });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });
