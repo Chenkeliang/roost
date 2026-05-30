@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
 import * as prompts from "@clack/prompts";
-import { ModuleRegistry, exampleModule, createExec, createLogger, createT, defaultRegistry } from "@roost/core";
+import { ModuleRegistry, exampleModule, createExec, createLogger, createT, defaultRegistry, loadProfiles, resolveProfile, defaultAgeKeyPath } from "@roost/core";
 import * as readline from "node:readline";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
@@ -12,27 +12,47 @@ import { runSelect } from "./commands/select.js";
 import { runCapture } from "./commands/capture.js";
 import { runLoad } from "./commands/load.js";
 import { runList } from "./commands/list.js";
+import { runUnmanage } from "./commands/unmanage.js";
+import { runProfile } from "./commands/profile.js";
 import { runStatus } from "./commands/status.js";
 import { runDiff } from "./commands/diff.js";
 import { runLearn } from "./commands/learn.js";
 import { runImport } from "./commands/import.js";
 import { runAudit } from "./commands/audit.js";
 import { runKeyRotate } from "./commands/keyRotate.js";
+import { runKeyBackup, remindOfflineBackup } from "./commands/keyBackup.js";
 import { runPlugins } from "./commands/plugins.js";
 import { runServe } from "./server.js";
 
 const program = new Command();
 program.name("roost").description("Back up and migrate your Mac setup").version("0.0.0");
+program.option("--profile <name>", "Override the active machine profile");
 
 function buildCtx(opts: { dryRun?: boolean } = {}) {
   const home = os.homedir();
   const repoDir = process.env["ROOST_REPO"] ?? path.join(home, ".local", "share", "chezmoi");
+  // Profile resolution: --profile flag > ROOST_PROFILE env > hostname match > "base".
+  // profiles.yaml is an OPTIONAL additive data file (not selection.yaml).
+  let profiles: ReturnType<typeof loadProfiles> = [];
+  try {
+    profiles = loadProfiles(repoDir);
+  } catch {
+    // A malformed profiles.yaml must not break unrelated commands; fall back to base.
+    profiles = [];
+  }
+  const flag = program.opts<{ profile?: string }>().profile;
+  const { profile } = resolveProfile({
+    flag,
+    env: process.env["ROOST_PROFILE"],
+    hostname: os.hostname(),
+    profiles,
+  });
   return {
     repoDir,
     ctx: {
       repoDir,
       home,
-      profile: "base" as const,
+      profile,
       dryRun: opts.dryRun ?? false,
       exec: createExec(),
       log: createLogger(),
@@ -109,6 +129,9 @@ program
     } else {
       for (const f of created) ctx.log.info(`created: ${f}`);
     }
+
+    // If an age key is already present, remind the user (once) to back it up offline.
+    remindOfflineBackup({ keyPath: defaultAgeKeyPath(ctx.home), log: (msg) => ctx.log.warn(msg) });
   });
 
 program
@@ -149,6 +172,26 @@ program
   .action(async () => {
     const { repoDir, ctx } = buildCtx();
     await runList({ repoDir, ctx });
+  });
+
+program
+  .command("unmanage")
+  .description("Stop managing a single item: forget it from the repo and drop it from selection.yaml")
+  .argument("[module]", "Module that owns the item (e.g. dotfiles)")
+  .argument("[id]", "Item id to unmanage")
+  .option("--module <m>", "Module that owns the item")
+  .option("--id <id>", "Item id to unmanage")
+  .option("--dry-run", "Print intent and write nothing")
+  .action(async (modArg: string | undefined, idArg: string | undefined, opts: { module?: string; id?: string; dryRun?: boolean }) => {
+    const mod = modArg ?? opts.module;
+    const id = idArg ?? opts.id;
+    if (!mod || !id) {
+      console.error("usage: roost unmanage <module> <id>   (or --module <m> --id <id>)");
+      process.exit(1);
+    }
+    const { repoDir, ctx } = buildCtx({ dryRun: opts.dryRun });
+    const reg = defaultRegistry();
+    await runUnmanage({ repoDir, ctx, registry: reg, module: mod, id, dryRun: opts.dryRun });
   });
 
 program
@@ -262,7 +305,48 @@ keyCmd
     });
   });
 
+keyCmd
+  .command("backup")
+  .description("Show where the age key lives and how to back it up offline (recovery material)")
+  .option("--key <path>", "Path to the age private key", defaultAgeKeyPath(os.homedir()))
+  .option("--show", "Also print the key contents (handle with care)")
+  .action((opts: { key: string; show?: boolean }) => {
+    const { ctx } = buildCtx();
+    runKeyBackup({ keyPath: opts.key, show: opts.show, log: (msg) => ctx.log.info(msg) });
+  });
+
 // ── plugins ───────────────────────────────────────────────────────────────────
+
+// ── profile ───────────────────────────────────────────────────────────────────
+
+const profileCmd = program
+  .command("profile")
+  .description("Show the currently-resolved machine profile and how it was resolved")
+  .action(() => {
+    const { repoDir, ctx } = buildCtx();
+    runProfile({
+      repoDir,
+      hostname: os.hostname(),
+      flag: program.opts<{ profile?: string }>().profile,
+      env: process.env["ROOST_PROFILE"],
+      log: (msg) => ctx.log.info(msg),
+    });
+  });
+
+profileCmd
+  .command("list")
+  .description("List defined profiles and mark the active one")
+  .action(() => {
+    const { repoDir, ctx } = buildCtx();
+    runProfile({
+      repoDir,
+      hostname: os.hostname(),
+      flag: program.opts<{ profile?: string }>().profile,
+      env: process.env["ROOST_PROFILE"],
+      log: (msg) => ctx.log.info(msg),
+      list: true,
+    });
+  });
 
 program
   .command("plugins")
