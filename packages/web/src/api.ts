@@ -193,6 +193,16 @@ export function getBrewfile(): Promise<BrewfileResponse> {
   return apiFetch<BrewfileResponse>("/api/packages/brewfile");
 }
 
+// Server GET /api/dotfiles returns chezmoi availability + managed relative paths.
+export interface DotfilesResponse {
+  available: boolean;
+  managed: string[];
+}
+
+export function getDotfiles(): Promise<DotfilesResponse> {
+  return apiFetch<DotfilesResponse>("/api/dotfiles");
+}
+
 export function testProjectRemote(remote: string): Promise<{ reachable: boolean; message: string }> {
   return apiFetch("/api/projects/test", {
     method: "POST",

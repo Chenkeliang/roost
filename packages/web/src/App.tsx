@@ -11,14 +11,16 @@ import { Timeline } from "./views/Timeline";
 import { Settings } from "./views/Settings";
 import { Projects } from "./views/Projects";
 import { Packages } from "./views/Packages";
+import { Dotfiles } from "./views/Dotfiles";
 
-type Tab = "overview" | "manage" | "projects" | "packages" | "env" | "drift" | "timeline" | "settings";
+type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "env" | "drift" | "timeline" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "manage", label: "Manage" },
   { id: "projects", label: "Projects" },
   { id: "packages", label: "Packages" },
+  { id: "dotfiles", label: "Dotfiles" },
   { id: "env", label: "Aliases & Env" },
   { id: "drift", label: "Drift" },
   { id: "timeline", label: "Timeline" },
@@ -181,6 +183,7 @@ export function App() {
         {activeTab === "manage" && <Manage showHud={showHud} />}
         {activeTab === "projects" && <Projects showHud={showHud} />}
         {activeTab === "packages" && <Packages showHud={showHud} />}
+        {activeTab === "dotfiles" && <Dotfiles showHud={showHud} />}
         {activeTab === "env" && <AliasesEnv showHud={showHud} />}
         {activeTab === "drift" && <Drift />}
         {activeTab === "timeline" && <Timeline />}
