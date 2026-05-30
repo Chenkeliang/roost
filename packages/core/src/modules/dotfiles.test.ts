@@ -357,3 +357,17 @@ describe("dotfilesModule.doctor", () => {
     expect(health[0]!.detail).toBeTruthy();
   });
 });
+
+describe("dotfilesModule.status guard", () => {
+  it("does NOT call chezmoi when no dotfiles are managed", async () => {
+    const exec = {
+      run: async () => {
+        throw new Error("exec must not be called when dotfiles unmanaged");
+      },
+    } as unknown as import("@roost/shared").Exec;
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/tmp/home" });
+    const report = await dotfilesModule.status(ctx, { modules: {} });
+    expect(report.module).toBe("dotfiles");
+    expect(report.items).toHaveLength(0);
+  });
+});

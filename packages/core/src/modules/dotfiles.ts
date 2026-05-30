@@ -164,9 +164,13 @@ export const dotfilesModule: SyncModule = {
   },
 
   async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {
+    const ids = sel.modules["dotfiles"] ?? [];
+    // Unmanaged → cheap, no chezmoi call (cold-path guard).
+    if (ids.length === 0) {
+      return { module: "dotfiles", items: [] };
+    }
     const chezmoi = createChezmoi(ctx.exec, { sourceDir: ctx.repoDir });
     const ok = await chezmoi.verify();
-    const ids = sel.modules["dotfiles"] ?? [];
     return {
       module: "dotfiles",
       items: ids.map((id) => ({ id, state: ok ? "synced" : "drift" })),
