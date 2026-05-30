@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import type { Exec, Logger } from "@roost/shared";
 import { runInit } from "./init.js";
@@ -23,14 +25,54 @@ export interface InitGithubResult {
   dryRun: boolean;
 }
 
-/** Base64 of `x-access-token:<token>` for a transient Basic Authorization header. */
-function basicAuthHeaderValue(token: string): string {
-  const encoded = Buffer.from(`x-access-token:${token}`, "utf8").toString("base64");
-  return `AUTHORIZATION: basic ${encoded}`;
+/**
+ * Rewrite a clone URL to embed only the username (`x-access-token`), NOT the
+ * token: `https://github.com/o/r.git` → `https://x-access-token@github.com/o/r.git`.
+ * git asks GIT_ASKPASS for the password; the token never lands on argv or in
+ * .git/config. Returns the URL unchanged if it has no parseable https host.
+ */
+function usernameOnlyUrl(cloneUrl: string): string {
+  try {
+    const u = new URL(cloneUrl);
+    if (u.protocol !== "https:") return cloneUrl;
+    u.username = "x-access-token";
+    u.password = "";
+    return u.toString();
+  } catch {
+    return cloneUrl;
+  }
 }
 
-async function gitOrThrow(exec: Exec, repoDir: string, args: string[], what: string): Promise<void> {
-  const res = await exec.run("git", ["-C", repoDir, ...args]);
+/**
+ * Write a temp GIT_ASKPASS helper (mode 0700). The token is NOT in the script —
+ * the script prints whatever is in $ROOST_GH_TOKEN, which we pass via the child's
+ * env. So the secret is never on argv, never in the script file, never logged.
+ * Returns the script path; caller MUST remove it (finally) when done.
+ */
+function writeAskpassScript(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-askpass-"));
+  const scriptPath = path.join(dir, "askpass.sh");
+  fs.writeFileSync(scriptPath, `#!/bin/sh\nprintf '%s\\n' "$ROOST_GH_TOKEN"\n`, { mode: 0o700 });
+  return scriptPath;
+}
+
+/** Remove the askpass script and its temp dir; never throws. */
+function removeAskpassScript(scriptPath: string): void {
+  try {
+    fs.rmSync(path.dirname(scriptPath), { recursive: true, force: true });
+  } catch {
+    // best-effort cleanup
+  }
+}
+
+async function gitOrThrow(
+  exec: Exec,
+  repoDir: string,
+  args: string[],
+  what: string,
+  env?: NodeJS.ProcessEnv,
+): Promise<void> {
+  const res = await exec.run("git", ["-C", repoDir, ...args], env ? { env } : undefined);
   if (res.code !== 0) {
     throw new Error(`git ${what} failed: ${res.stderr.trim() || res.stdout.trim() || `exit ${res.code}`}`);
   }
@@ -48,12 +90,13 @@ async function detectBranch(exec: Exec, repoDir: string): Promise<string> {
  * `roost init --github`:
  *   1. Run the local init (scaffold) + ensure a git repo with an initial commit.
  *   2. Create the user's PRIVATE GitHub repo via the API (token used in memory).
- *   3. Wire `origin` to a credential-free clone URL and push, authenticating
- *      with the token via a transient `-c http.extraHeader` (never persisted).
+ *   3. Wire `origin` to a username-only URL (x-access-token@…, no token) and push,
+ *      supplying the token to git via GIT_ASKPASS — never on argv.
  *
- * The token is read once, passed only to the GitHub API and the one-off push
- * header, never written to disk/.git/config, never logged, and goes out of
- * scope when this function returns.
+ * The token is read once, passed only to the GitHub API and the child push's env
+ * (read by a temp askpass script that does NOT contain it). It is never on argv
+ * (so it can't leak via `ps`/`/proc/<pid>/cmdline`), never written to
+ * disk/.git/config, never logged, and goes out of scope when this returns.
  */
 export async function runInitGithub(deps: InitGithubDeps): Promise<InitGithubResult> {
   const { repoDir, exec, log, dryRun, getToken, getRepoName, fetchImpl } = deps;
@@ -76,8 +119,8 @@ export async function runInitGithub(deps: InitGithubDeps): Promise<InitGithubRes
   if (dryRun) {
     log.info("[dry-run] would prompt for a GitHub token (repo scope), used once and discarded");
     log.info(`[dry-run] would create a PRIVATE GitHub repo named "${repoName}"`);
-    log.info("[dry-run] would add 'origin' with a credential-free clone URL");
-    log.info(`[dry-run] would push branch "${branch}" using a transient auth header (not persisted)`);
+    log.info("[dry-run] would add 'origin' with a username-only URL (no token)");
+    log.info(`[dry-run] would push branch "${branch}" with the token supplied via GIT_ASKPASS (off argv)`);
     return { repoName, pushed: false, dryRun: true };
   }
 
@@ -91,19 +134,25 @@ export async function runInitGithub(deps: InitGithubDeps): Promise<InitGithubRes
   log.info(`Authenticated as ${login}`);
   const { cloneUrl, htmlUrl } = await createPrivateRepo(token, repoName, fetchImpl);
 
-  // 3) Wire origin WITHOUT credentials in the URL, then push with a transient header.
+  // 3) Wire origin with a username-only URL (no token), then push using GIT_ASKPASS.
   // Remove any pre-existing origin so re-runs don't fail (ignore failure if absent).
+  const originUrl = usernameOnlyUrl(cloneUrl);
   await exec.run("git", ["-C", repoDir, "remote", "remove", "origin"]);
-  await gitOrThrow(exec, repoDir, ["remote", "add", "origin", cloneUrl], "remote add origin");
+  await gitOrThrow(exec, repoDir, ["remote", "add", "origin", originUrl], "remote add origin");
 
-  // The token rides in a one-off `-c http.extraHeader` arg (redacted by the exec
-  // adapter's logging) and is NOT written to .git/config.
-  await gitOrThrow(
-    exec,
-    repoDir,
-    ["-c", `http.extraHeader=${basicAuthHeaderValue(token)}`, "push", "-u", "origin", branch],
-    "push",
-  );
+  // The token is supplied to git ONLY via the child's environment (read by a temp
+  // askpass script that does not contain it). It never appears on argv.
+  const askpass = writeAskpassScript();
+  try {
+    await gitOrThrow(exec, repoDir, ["push", "-u", "origin", branch], "push", {
+      ...process.env,
+      ROOST_GH_TOKEN: token,
+      GIT_ASKPASS: askpass,
+      GIT_TERMINAL_PROMPT: "0",
+    });
+  } finally {
+    removeAskpassScript(askpass);
+  }
 
   log.info(`Pushed to ${htmlUrl}`);
   return { repoName, htmlUrl, pushed: true, dryRun: false };

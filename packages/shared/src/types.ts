@@ -7,7 +7,7 @@ export function isRecommendation(v: string): v is Recommendation {
 
 export interface Logger { info(msg: string): void; warn(msg: string): void; error(msg: string): void; }
 export interface ExecResult { code: number; stdout: string; stderr: string; }
-export interface Exec { run(cmd: string, args: string[], opts?: { cwd?: string }): Promise<ExecResult>; }
+export interface Exec { run(cmd: string, args: string[], opts?: { cwd?: string; env?: NodeJS.ProcessEnv }): Promise<ExecResult>; }
 export type Translate = (key: string, vars?: Record<string, string>) => string;
 
 export interface ModuleContext {

@@ -10,15 +10,18 @@ import type { FetchImpl } from "./github.js";
 // Fakes
 // ---------------------------------------------------------------------------
 
-type CallRecord = { cmd: string; args: string[] };
+type CallRecord = { cmd: string; args: string[]; env?: NodeJS.ProcessEnv };
 
 function makeFakeExec(
   handler: (cmd: string, args: string[]) => ExecResult,
+  onCall?: (rec: CallRecord) => void,
 ): { exec: Exec; calls: CallRecord[] } {
   const calls: CallRecord[] = [];
   const exec: Exec = {
-    async run(cmd, args) {
-      calls.push({ cmd, args });
+    async run(cmd, args, opts) {
+      const rec: CallRecord = { cmd, args, env: opts?.env };
+      calls.push(rec);
+      onCall?.(rec);
       return handler(cmd, args);
     },
   };
@@ -95,8 +98,23 @@ function readAllFiles(dir: string): string {
 // ---------------------------------------------------------------------------
 
 describe("runInitGithub", () => {
-  it("happy path: creates repo, adds token-free origin, and pushes with a transient auth header", async () => {
-    const { exec, calls } = makeFakeExec(gitHappyHandler({ headExists: true }));
+  it("happy path: creates repo, adds username-only origin, and pushes with token off argv via GIT_ASKPASS", async () => {
+    // Snapshot the askpass script state AT PUSH TIME (it is removed afterwards).
+    let askpassAtPush: { existed: boolean; mode: number; body: string } | undefined;
+    const { exec, calls } = makeFakeExec(gitHappyHandler({ headExists: true }), (rec) => {
+      if (rec.args.includes("push")) {
+        const p = rec.env?.GIT_ASKPASS as string | undefined;
+        if (p && fs.existsSync(p)) {
+          askpassAtPush = {
+            existed: true,
+            mode: fs.statSync(p).mode & 0o777,
+            body: fs.readFileSync(p, "utf8"),
+          };
+        } else {
+          askpassAtPush = { existed: false, mode: 0, body: "" };
+        }
+      }
+    });
     const { fetchImpl, calls: fetchCalls } = makeFakeFetch((call) => {
       if (call.url.endsWith("/user")) return { status: 200, json: { login: "octocat" } };
       if (call.url.endsWith("/user/repos"))
@@ -118,23 +136,38 @@ describe("runInitGithub", () => {
     expect(result.pushed).toBe(true);
     expect(result.htmlUrl).toBe(HTML_URL);
 
-    // origin added with a CREDENTIAL-FREE clone URL (no token in the URL).
+    // origin added with a username-only URL (x-access-token@…), NO token in it.
     const remoteAdd = calls.find((c) => c.args.includes("remote") && c.args.includes("add"));
     expect(remoteAdd).toBeDefined();
     const originUrl = remoteAdd?.args[remoteAdd.args.length - 1] ?? "";
-    expect(originUrl).toBe(CLONE_URL);
+    expect(originUrl).toBe("https://x-access-token@github.com/octocat/roost-config.git");
     expect(originUrl).not.toContain(TOKEN);
 
-    // push happened, authenticated via a transient `-c http.extraHeader=...basic <base64>`.
+    // H1: the token is OFF argv entirely. It must not appear in ANY element of
+    // ANY git invocation (push included) — no `-c http.extraHeader` carrying it.
     const push = calls.find((c) => c.args.includes("push"));
     expect(push).toBeDefined();
-    const headerArg = push?.args.find((a) => a.startsWith("http.extraHeader="));
-    expect(headerArg).toBeDefined();
-    expect(headerArg).toMatch(/^http\.extraHeader=AUTHORIZATION: basic /);
-    // The header carries base64(x-access-token:<token>), NOT the raw token.
-    expect(headerArg).not.toContain(TOKEN);
-    const b64 = (headerArg ?? "").replace("http.extraHeader=AUTHORIZATION: basic ", "");
-    expect(Buffer.from(b64, "base64").toString("utf8")).toBe(`x-access-token:${TOKEN}`);
+    expect(push?.args.some((a) => a.includes("http.extraHeader"))).toBe(false);
+    for (const c of calls) {
+      for (const a of c.args) expect(a).not.toContain(TOKEN);
+    }
+
+    // H1: auth is supplied via GIT_ASKPASS pointing at a temp script + the token
+    // in ROOST_GH_TOKEN (read by the script, not embedded in it).
+    expect(push?.env).toBeDefined();
+    expect(push?.env?.GIT_ASKPASS).toBeTruthy();
+    expect(push?.env?.ROOST_GH_TOKEN).toBe(TOKEN);
+    expect(push?.env?.GIT_TERMINAL_PROMPT).toBe("0");
+    const askpassPath = push?.env?.GIT_ASKPASS as string;
+    // The askpass temp script is removed after the push (even on success).
+    expect(fs.existsSync(askpassPath)).toBe(false);
+
+    // At push time the script existed, was mode 0700, and did NOT embed the token
+    // (it reads $ROOST_GH_TOKEN from the environment).
+    expect(askpassAtPush?.existed).toBe(true);
+    expect(askpassAtPush?.mode).toBe(0o700);
+    expect(askpassAtPush?.body).not.toContain(TOKEN);
+    expect(askpassAtPush?.body).toContain("ROOST_GH_TOKEN");
 
     // The raw token never appears in any log line.
     expect(lines.join("\n")).not.toContain(TOKEN);
