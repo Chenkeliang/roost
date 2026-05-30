@@ -1,37 +1,60 @@
 // Prevents an extra console window from appearing on Windows in release mode.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-// These imports are used in the sidecar-spawn block below.
-// Uncomment them when the TODO is resolved.
-// use tauri::Manager;
-// use tauri_plugin_shell::ShellExt;
+use std::path::PathBuf;
+use std::process::Command;
 
 fn main() {
     tauri::Builder::default()
         // The shell plugin gives us sidecar + open capabilities.
         .plugin(tauri_plugin_shell::init())
-        .setup(|app| {
-            // ── Sidecar: roost-server ──────────────────────────────────────────
+        .setup(|_app| {
+            // ── Engine: spawn the Node CLI (`roost serve`) ────────────────────
             //
-            // The `roost-server` sidecar is the Node CLI (`@roost/cli`) compiled
-            // to a self-contained binary (see docs/desktop.md § Sidecar).
-            // It must exist at `src-tauri/binaries/roost-server-<target-triple>`
-            // before `tauri build` is invoked.
+            // For local dev (no code-signing), we spawn the system Node process
+            // directly instead of using a compiled sidecar binary.
             //
-            // At runtime Tauri extracts it to a temp dir and provides the path
-            // via the shell plugin's sidecar API.
+            // Path resolution order:
+            //   1. ROOST_ENGINE_ENTRY env var (absolute path to cli entry point)
+            //   2. Default: <repo-root>/packages/cli/dist/index.js
+            //      where <repo-root> is assumed to be three levels above the
+            //      Cargo workspace (src-tauri/ → web/ → packages/ → repo root).
             //
-            // TODO(sidecar): uncomment once the binary is present in binaries/:
-            //
-            //   let sidecar_cmd = app.shell().sidecar("roost-server")
-            //       .expect("roost-server sidecar not found — run `make sidecar`");
-            //   let (_rx, _child) = sidecar_cmd.spawn()
-            //       .expect("failed to spawn roost-server sidecar");
-            //
-            // In the meantime the app can run against a manually started
-            // `roost serve` on 127.0.0.1:4317 (browser-mode fallback).
+            // If spawn fails the app still opens; the user can run `roost serve`
+            // manually and the UI will reach the API at http://127.0.0.1:4317.
 
-            let _ = app; // suppress unused warning until the TODO is resolved
+            let entry: PathBuf = if let Ok(env_path) = std::env::var("ROOST_ENGINE_ENTRY") {
+                PathBuf::from(env_path)
+            } else {
+                // Resolve relative to the Cargo manifest directory baked in at
+                // compile time so it works regardless of cwd at launch.
+                let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                // src-tauri/ → web/ → packages/ → repo-root
+                manifest_dir
+                    .join("../../..") // repo root
+                    .join("packages/cli/dist/index.js")
+            };
+
+            match Command::new("node")
+                .arg(&entry)
+                .arg("serve")
+                .spawn()
+            {
+                Ok(_child) => {
+                    eprintln!("[roost-desktop] engine spawned: node {}", entry.display());
+                    // _child is intentionally not stored; the OS will reap it
+                    // when the Tauri process exits (macOS behaviour).
+                }
+                Err(e) => {
+                    eprintln!(
+                        "[roost-desktop] WARNING: could not spawn engine at {}: {}. \
+                         Start `roost serve` manually if the API is needed.",
+                        entry.display(),
+                        e
+                    );
+                }
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

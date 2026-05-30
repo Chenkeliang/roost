@@ -97,6 +97,70 @@ This writes `icons/32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.icns`,
 
 ---
 
+## Run locally (no signing)
+
+For local development you do **not** need a compiled sidecar binary or an
+Apple Developer certificate.  The Tauri app auto-spawns the system Node process
+to start the engine.
+
+### Prerequisites
+
+```sh
+# Build the CLI (produces packages/cli/dist/index.js)
+pnpm --filter @roost/cli build
+
+# Build the web UI
+pnpm --filter @roost/web build
+```
+
+Or build everything at once:
+
+```sh
+pnpm -r build
+```
+
+### Launch
+
+```sh
+# Start Tauri in dev mode (hot-reload via Vite at :5173)
+# The app auto-spawns: node packages/cli/dist/index.js serve
+pnpm --filter @roost/web tauri dev
+```
+
+Tauri resolves the engine entry point in this order:
+1. `ROOST_ENGINE_ENTRY` env var (absolute path) — override for custom setups.
+2. Default: `<repo-root>/packages/cli/dist/index.js` (relative to the compiled
+   Rust binary's source directory, so it works from any cwd).
+
+If spawn fails a warning is printed to stderr and the app still opens.
+
+### Manual fallback
+
+If you prefer to control the engine yourself (or `node` is not on the PATH
+Tauri sees):
+
+```sh
+node packages/cli/dist/index.js serve   # → http://127.0.0.1:4317
+pnpm --filter @roost/web tauri dev      # open Tauri window
+```
+
+Or without Tauri at all — open any browser at `http://localhost:5173` while
+the Vite dev server and engine are both running:
+
+```sh
+node packages/cli/dist/index.js serve
+pnpm --filter @roost/web dev
+```
+
+### About `binaries/roost-server-*`
+
+The stub file at `src-tauri/binaries/roost-server-aarch64-apple-darwin` is a
+placeholder for the **signed-release sidecar path** only.  For local dev the
+`std::process::Command`-based spawn above is used instead — no compiled
+sidecar binary is required.
+
+---
+
 ## Development build
 
 ```sh
