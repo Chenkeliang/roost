@@ -19,6 +19,14 @@ export interface Selection { modules: Record<string, string[]>; }
 export interface Candidate {
   id: string; path: string; category: string; sizeBytes?: number;
   recommendation: Recommendation; note?: string;
+  remote?: string; host?: string; protocol?: "ssh" | "https" | "other";
+}
+
+export interface ModuleIndex {
+  available: boolean;
+  reason?: string;
+  managed: number;
+  summary?: Record<string, number | string>;
 }
 export type DriftState = "synced" | "drift" | "conflict" | "untracked";
 export interface DriftItem { id: string; state: DriftState; detail?: string; }
@@ -50,6 +58,7 @@ export interface EnvData { schemaVersion: number; aliases: AliasItem[]; env: Env
 export interface SyncModule {
   name: string;
   discover(ctx: ModuleContext): Promise<Candidate[]>;
+  index?(ctx: ModuleContext): Promise<ModuleIndex>;
   status(ctx: ModuleContext, sel: Selection): Promise<DriftReport>;
   capture(ctx: ModuleContext, sel: Selection): Promise<ChangeSet>;
   apply(ctx: ModuleContext, plan: ApplyPlan): Promise<ApplyResult>;

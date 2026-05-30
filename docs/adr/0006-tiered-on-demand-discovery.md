@@ -1,6 +1,6 @@
 # ADR-0006: 分层按需发现(SyncModule.index)
 
-- **状态**: 提议(PROPOSED · 2026-05-31)。配套设计:`docs/superpowers/specs/2026-05-31-dashboard-redesign-design.md`。
+- **状态**: 接受(ACCEPTED · 2026-05-31)。配套设计:`docs/superpowers/specs/2026-05-31-dashboard-redesign-design.md`。
 - **日期**: 2026-05-31
 
 ## 背景
