@@ -273,6 +273,35 @@ describe("projectsModule.discover", () => {
   });
 });
 
+// ── index ─────────────────────────────────────────────────────────────────────
+
+describe("projectsModule.index", () => {
+  it("is cheap: reports git availability + managed count, never scans/loops git", async () => {
+    // Throwing exec for any per-repo git would fail; index may call `git --version` only.
+    const calls: string[][] = [];
+    const exec = {
+      run: async (_cmd: string, args: string[]) => {
+        calls.push(args);
+        return { code: 0, stdout: "git version 2.x", stderr: "" };
+      },
+    } as unknown as import("@roost/shared").Exec;
+    // repoDir with one managed project
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-idx-"));
+    fs.mkdirSync(path.join(repoDir, "roost"), { recursive: true });
+    fs.writeFileSync(
+      path.join(repoDir, "roost", "projects.yaml"),
+      "schemaVersion: 1\nprojects:\n  - path: ~/go/src/x\n    repo: git@github.com:u/x.git\n    envTool: none\n",
+    );
+    const ctx = makeCtx({ exec, repoDir, home: "/tmp/home" });
+    const idx = await projectsModule.index!(ctx);
+    expect(idx.available).toBe(true);
+    expect(idx.managed).toBe(1);
+    // No `ls-remote` / `status` / `remote` (no per-repo git in index)
+    expect(calls.every((a) => !a.includes("ls-remote") && !a.includes("status") && !a.includes("remote"))).toBe(true);
+    fs.rmSync(repoDir, { recursive: true, force: true });
+  });
+});
+
 // ── capture ───────────────────────────────────────────────────────────────────
 
 describe("projectsModule.capture", () => {

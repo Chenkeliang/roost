@@ -172,6 +172,16 @@ function candidateRoots(home: string): string[] {
 export const projectsModule: SyncModule = {
   name: "projects",
 
+  async index(ctx: ModuleContext): Promise<import("@roost/shared").ModuleIndex> {
+    const git = await ctx.exec.run("git", ["--version"]);
+    const doc = loadProjects(ctx.repoDir);
+    return {
+      available: git.code === 0,
+      reason: git.code === 0 ? undefined : "git not found",
+      managed: doc.projects.length,
+    };
+  },
+
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const roots = candidateRoots(ctx.home);
     const capped = findGitRepos(roots).slice(0, 100);
