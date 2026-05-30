@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Candidate } from "@roost/shared";
-import { buildSelection } from "./wizard.js";
+import { buildSelection, moduleLabel } from "./wizard.js";
 
 function makeCandidate(id: string, recommendation: Candidate["recommendation"] = "track"): Candidate {
   return { id, path: id, category: "misc", recommendation };
@@ -44,5 +44,30 @@ describe("buildSelection", () => {
     const result = buildSelection(byModule, chosen);
 
     expect(Object.keys(result.modules)).toHaveLength(0);
+  });
+
+  it("groups env-module candidates like any other module", () => {
+    const byModule: Record<string, Candidate[]> = {
+      env: [
+        { id: "alias:ll", path: "roost/env.yaml", category: "env", recommendation: "track" },
+        { id: "env:EDITOR", path: "roost/env.yaml", category: "env", recommendation: "track" },
+      ],
+    };
+    const chosen = new Set(["alias:ll", "env:EDITOR"]);
+
+    const result = buildSelection(byModule, chosen);
+
+    expect(result.modules["env"]).toEqual(["alias:ll", "env:EDITOR"]);
+  });
+});
+
+describe("moduleLabel", () => {
+  it("renders the env module as 'Aliases & Env'", () => {
+    expect(moduleLabel("env")).toBe("Aliases & Env");
+  });
+
+  it("falls back to the raw module name for unmapped modules", () => {
+    expect(moduleLabel("dotfiles")).toBe("dotfiles");
+    expect(moduleLabel("packages")).toBe("packages");
   });
 });

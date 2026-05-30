@@ -44,6 +44,8 @@ export const PRESETS: Preset[] = [
     name: "developer-essentials",
     description: "Core shell, git, and package manager files every developer needs",
     match(c: Candidate): boolean {
+      // Portable aliases / env vars / PATH / functions are core shell config.
+      if (c.category === "env") return true;
       const base = path.basename(c.id);
       if (DEVELOPER_ESSENTIAL_BASENAMES.has(base)) return true;
       if (c.id === "Brewfile") return true;
@@ -52,8 +54,10 @@ export const PRESETS: Preset[] = [
   },
   {
     name: "terminal",
-    description: "Shell RC files plus terminal emulator and editor app config domains",
+    description: "Shell RC files, portable aliases/env, plus terminal emulator and editor app config domains",
     match(c: Candidate): boolean {
+      // Aliases & Env module — portable shell aliases / env vars / PATH / functions.
+      if (c.category === "env") return true;
       const base = path.basename(c.id);
       if (SHELL_RC_BASENAMES.has(base)) return true;
       // appconfig candidates have ids like "domain:<bundle-id>"
@@ -66,8 +70,10 @@ export const PRESETS: Preset[] = [
   },
   {
     name: "shell-only",
-    description: "Shell RC files only (.zshrc, .zprofile, .zshenv, .bashrc, .bash_profile, .p10k.zsh)",
+    description: "Shell RC files plus portable aliases/env vars/PATH/functions (no app config)",
     match(c: Candidate): boolean {
+      // Aliases & Env module items live in the shell, so they belong here.
+      if (c.category === "env") return true;
       return SHELL_RC_BASENAMES.has(path.basename(c.id));
     },
   },

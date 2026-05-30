@@ -6,6 +6,11 @@ function makeCandidate(id: string, recommendation: "track" | "encrypt" | "exclud
   return { id, path: id, category: "other", recommendation };
 }
 
+// env-module candidates: category is "env" and ids are kind-prefixed (see modules/env.ts).
+function makeEnvCandidate(id: string, recommendation: "track" | "encrypt" | "exclude" = "track"): Candidate {
+  return { id, path: "roost/env.yaml", category: "env", recommendation };
+}
+
 const candidates: Candidate[] = [
   makeCandidate("/home/user/.zshrc"),
   makeCandidate("/home/user/.gitconfig"),
@@ -21,6 +26,12 @@ const candidates: Candidate[] = [
   makeCandidate("/home/user/.DS_Store", "exclude"),
   makeCandidate("domain:com.googlecode.iterm2"),
   makeCandidate("domain:com.apple.dock"),
+  // env module candidates (aliases / env vars / PATH / functions)
+  makeEnvCandidate("alias:ll"),
+  makeEnvCandidate("env:EDITOR"),
+  makeEnvCandidate("env:API_KEY", "encrypt"),
+  makeEnvCandidate("path:$HOME/bin"),
+  makeEnvCandidate("function:mkcd"),
 ];
 
 describe("PRESETS", () => {
@@ -94,6 +105,14 @@ describe("applyPreset developer-essentials", () => {
     const ids = applyPreset("developer-essentials", candidates);
     expect(ids.some((id) => id.endsWith(".vimrc"))).toBe(false);
   });
+
+  it("selects env module items (portable shell aliases/env/PATH every dev needs)", () => {
+    const ids = applyPreset("developer-essentials", candidates);
+    expect(ids).toContain("alias:ll");
+    expect(ids).toContain("env:EDITOR");
+    expect(ids).toContain("path:$HOME/bin");
+    expect(ids).toContain("function:mkcd");
+  });
 });
 
 describe("applyPreset terminal", () => {
@@ -125,6 +144,14 @@ describe("applyPreset terminal", () => {
     const ids = applyPreset("terminal", candidates);
     expect(ids).not.toContain("Brewfile");
   });
+
+  it("selects env module items (aliases, env vars, PATH, functions)", () => {
+    const ids = applyPreset("terminal", candidates);
+    expect(ids).toContain("alias:ll");
+    expect(ids).toContain("env:EDITOR");
+    expect(ids).toContain("path:$HOME/bin");
+    expect(ids).toContain("function:mkcd");
+  });
 });
 
 describe("applyPreset shell-only", () => {
@@ -149,6 +176,14 @@ describe("applyPreset shell-only", () => {
     const ids = applyPreset("shell-only", candidates);
     expect(ids.some((id) => id.startsWith("domain:"))).toBe(false);
   });
+
+  it("selects env module items (portable aliases / env / PATH belong in the shell)", () => {
+    const ids = applyPreset("shell-only", candidates);
+    expect(ids).toContain("alias:ll");
+    expect(ids).toContain("env:EDITOR");
+    expect(ids).toContain("path:$HOME/bin");
+    expect(ids).toContain("function:mkcd");
+  });
 });
 
 describe("applyPreset everything", () => {
@@ -162,5 +197,11 @@ describe("applyPreset everything", () => {
     const ids = applyPreset("everything", candidates);
     expect(ids.some((id) => id.endsWith(".zshrc"))).toBe(true);
     expect(ids.some((id) => id.endsWith(".npmrc"))).toBe(true); // encrypt but not excluded
+  });
+
+  it("includes env module items (track and encrypt)", () => {
+    const ids = applyPreset("everything", candidates);
+    expect(ids).toContain("alias:ll");
+    expect(ids).toContain("env:API_KEY"); // encrypt but not excluded
   });
 });

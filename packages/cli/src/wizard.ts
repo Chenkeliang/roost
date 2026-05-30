@@ -5,6 +5,15 @@ export interface BuildSelectionResult {
   modules: Record<string, string[]>;
 }
 
+/** Human-friendly display names for modules; falls back to the raw name. */
+const MODULE_LABELS: Record<string, string> = {
+  env: "Aliases & Env",
+};
+
+export function moduleLabel(moduleName: string): string {
+  return MODULE_LABELS[moduleName] ?? moduleName;
+}
+
 /**
  * Pure function: groups chosenIds by module, omitting modules with 0 chosen ids.
  */
@@ -47,7 +56,7 @@ export async function promptSelection(
       .map((c) => c.id);
 
     const selected = await prompts.multiselect<string>({
-      message: `[${moduleName}] Choose items to track`,
+      message: `[${moduleLabel(moduleName)}] Choose items to track`,
       options,
       initialValues,
       required: false,
