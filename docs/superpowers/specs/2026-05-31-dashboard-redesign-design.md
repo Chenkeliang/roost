@@ -176,6 +176,48 @@ interface SyncModule {
 
 ---
 
+## 7A. 路径可移植性与机器覆盖(跨切面 · 关键)
+
+> 核心问题:备份在**主机**采集、在**副机**应用——用户名/家目录/CPU 架构/工具路径都可能不同。设计必须假想各种场景:默认"自动对",差异处"可指定"。
+
+**值的三类(采集时分类,决定如何存/还原):**
+- **A 类 · 处处相同**:别名(`gs='git status'`)、`GOPROXY`、`GO111MODULE`、多数 env。原样存、原样应用。
+- **B 类 · 家目录/架构相对**:`~/…` 下路径、brew 前缀。存**可展开形式**(`$HOME`、`$(brew --prefix)`),apply 时按副机解析。
+- **C 类 · 机器特定**:必须因机而异(办公代理、某机独有路径、`.gitconfig` 邮箱、仅工作机的仓库)。**base + 机器覆盖**(Profiles/ADR-0005),dotfiles 另可用 chezmoi 模板。
+
+**总策略:**
+1. **默认家目录相对**:存 `~/go` 而非 `/Users/keliang/go`;apply 用副机 `$HOME` 还原 → 不同用户名自动对。
+2. **工具路径交还工具**:nvm/`g`/brew/orbstack 的 PATH 由各自 init 设(已留在 rc、不进 Roost)→ 版本/架构差异天然消化。
+3. **机器差异 → Profiles 覆盖(ADR-0005)**:同一项在不同机器取不同值/路径——这就是"可以指定"。
+4. **采集时检测并建议**:遇 `/Users/<当前用户>/…` 字面量 → 自动建议改 `~`;遇版本固定/架构固定/`/Volumes/…` 的"机器味"路径 → 标注"机器特定,建议设为覆盖项"。
+
+**假想场景 × 处理:**
+
+| 场景 | 处理 |
+|---|---|
+| 副机用户名/家目录不同(`/Users/bob`) | 家目录相对(`$HOME`/`~`)→ 自动对 |
+| Apple Silicon ↔ Intel(brew 前缀 `/opt/homebrew` vs `/usr/local`) | 不硬编码;`brew shellenv`/`$(brew --prefix)`;含前缀的 env 走 B 类 |
+| node 版本路径(nvm)、Go(`~/.g/go`)、cargo | 工具自管 PATH;不存版本固定路径(已清 rc 硬编码) |
+| `GOPATH=~/go` | B 类:存 `$HOME/go`,副机展开 |
+| 外置盘/工作目录绝对路径(`/Volumes/Work/…`) | C 类:覆盖项或排除;诚实标注"无法自动移植" |
+| 办公网代理 `HTTP_PROXY`(仅工作机) | C 类:work profile 设、home 不设(ADR-0005) |
+| `RUN_ENV=testing` 别机不同 | C 类:profile 覆盖 |
+| 同批仓库,副机想克隆到不同根(`~/work`) | projects 克隆基目录可配置 + 家目录相对 |
+| 仅工作机存在的内网仓库 | profile-scoped selection(仅 work profile 纳管,ADR-0005) |
+| app 只装在某台机 | appconfig/packages apply 时**优雅跳过**缺失项 |
+| 密钥位置 | age key 家目录相对;**op/rbw 引用与主机无关**,各机从自己密码管理器取值 → 天生可移植 |
+| `.gitconfig` 邮箱 work vs personal | chezmoi 模板按 hostname,或 profile |
+| 软链接 / 非标准 `$HOME` | 仍按 `$HOME` 相对,存逻辑路径 |
+| 副机无 VPN/权限(内网仓库) | clone 逐个失败跳过+报告;[测试] 提前暴露(§5.4) |
+
+**当前两处缺口(待修):**
+- env 值为单引号字面量,**无法表达会展开的家目录相对值** → 需支持 B 类 env 值安全展开(双引号 + C3 白名单)。我们写死的 `GOPATH=/Users/keliang/go` 即此问题。
+- projects 存**绝对路径** → 改家目录相对 + 可配置克隆基目录。
+
+**诚实限制:** 真正机器特定且无规律的路径(外置盘等)**无法自动移植**,只能显式覆盖或排除——Roost 检测并提示,但不假装能搬。
+
+---
+
 ## 8. API 与契约改动汇总
 
 | 改动 | 层 | 是否需 ADR |
@@ -214,10 +256,12 @@ interface SyncModule {
 - [ ] `index()` 契约 + `/api/index` + 各模块 index;`/api/discover?module=` 按需化。
 - [ ] 侧栏 IA;模块富页:**Projects(先)**→ Packages → Dotfiles → App Config。
 - [ ] 加载态(#4)。
-- **验收**:进任何模块页即时出已纳管真实内容;扫描/外呼仅按需;Projects 有远端/文件夹/[测试][克隆][保存];brew 缺失优雅态。
+- [ ] **路径可移植性(§7A)**:projects 存家目录相对路径 + 可配置克隆基目录;env B 类值支持安全展开(`$HOME`);采集时检测 `/Users/<user>/…` 并建议改 `~`。
+- **验收**:进任何模块页即时出已纳管真实内容;扫描/外呼仅按需;Projects 有远端/文件夹/[测试][克隆][保存] + 按主机分组;brew 缺失优雅态;采集的路径默认家目录相对、副机可还原。
 
 **P2 — 多机真实化 + 富操作 + i18n**
-- [ ] 真主/副机(per-host state + 角色,接 ADR-0005)、真跨机漂移;Timeline 回滚;App Config Learn Mode;**web i18n(en/zh)**;Settings 仓库/远端切换(待"未决"定义)。
+- [ ] **Profiles/机器画像(ADR-0005)**:机器特定路径/值覆盖(§7A C 类)+ profile-scoped selection;据此实现**真主/副机 + 真跨机漂移**。
+- [ ] Timeline 回滚;App Config Learn Mode;**web i18n(en/zh)**;Settings **「Git 远端与同步」面板**(查看/设置远端 + 领先落后 + Push/Pull)。
 
 **P3 — 发布与桌面**
 - [ ] Tauri 真构建 + 签名;`inventory/` 清洗;商标;文档站部署。
