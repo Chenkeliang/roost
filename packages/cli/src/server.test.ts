@@ -15,7 +15,7 @@ import type {
   Candidate,
   ApplyPlan,
 } from "@roost/shared";
-import { ModuleRegistry, saveSelection, emptySelection, addItem } from "@roost/core";
+import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry } from "@roost/core";
 import { buildServer } from "./server.js";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -769,6 +769,17 @@ describe("buildServer", () => {
     await server.inject({ method: "GET", url: "/api/discover" }); // recomputes (2)
     expect(discoverCalls).toBe(2);
 
+    await server.close();
+  });
+
+  it("GET /api/index → 200 { index: { <module>: ModuleIndex } }", async () => {
+    const reg = defaultRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/index" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { index: Record<string, { managed: number; available: boolean }> };
+    expect(body.index.projects).toBeDefined();
+    expect(typeof body.index.projects.managed).toBe("number");
     await server.close();
   });
 });

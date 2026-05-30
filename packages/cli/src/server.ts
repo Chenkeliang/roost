@@ -26,6 +26,7 @@ import {
   defaultAgeKeyPath,
   recipientFromKey,
   encryptEnvSecret,
+  indexAll,
 } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 
@@ -78,6 +79,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         return statusAll(registry, makeCtx(true), sel);
       });
       return reply.send({ reports });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── /api/index ───────────────────────────────────────────────────────────────
+  server.get("/api/index", async (_req, reply) => {
+    try {
+      const index = await cache.getOrCompute("index", () => indexAll(registry, makeCtx(true)));
+      return reply.send({ index });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });
