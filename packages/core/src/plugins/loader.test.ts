@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { SyncModule } from "@roost/shared";
 import { ModuleRegistry } from "../registry.js";
 import {
@@ -105,7 +105,9 @@ describe("loadPlugins", () => {
 
     const importer = async (_spec: string): Promise<unknown> => validPlugin;
 
-    const result = await loadPlugins(reg, ["roost-module-fonts"], importer);
+    const result = await loadPlugins(reg, ["roost-module-fonts"], importer, {
+      trusted: ["roost-module-fonts"],
+    });
 
     expect(result.loaded).toContain("roost-module-fonts");
     expect(result.rejected).toHaveLength(0);
@@ -122,7 +124,9 @@ describe("loadPlugins", () => {
 
     const importer = async (_spec: string): Promise<unknown> => mismatchPlugin;
 
-    const result = await loadPlugins(reg, ["roost-module-bad"], importer);
+    const result = await loadPlugins(reg, ["roost-module-bad"], importer, {
+      trusted: ["roost-module-bad"],
+    });
 
     expect(result.loaded).toHaveLength(0);
     expect(result.rejected).toHaveLength(1);
@@ -139,7 +143,9 @@ describe("loadPlugins", () => {
 
     const importer = async (_spec: string): Promise<unknown> => badPlugin;
 
-    const result = await loadPlugins(reg, ["roost-module-broken"], importer);
+    const result = await loadPlugins(reg, ["roost-module-broken"], importer, {
+      trusted: ["roost-module-broken"],
+    });
 
     expect(result.loaded).toHaveLength(0);
     expect(result.rejected).toHaveLength(1);
@@ -161,6 +167,7 @@ describe("loadPlugins", () => {
       reg,
       ["roost-module-throws", "roost-module-fonts"],
       importer,
+      { trusted: ["roost-module-throws", "roost-module-fonts"] },
     );
 
     expect(result.loaded).toContain("roost-module-fonts");
@@ -177,7 +184,9 @@ describe("loadPlugins", () => {
     const validPlugin = makeValidPlugin("roost-module-fonts", "fonts");
     const importer = async (_spec: string): Promise<unknown> => validPlugin;
 
-    const result = await loadPlugins(reg, ["roost-module-fonts"], importer);
+    const result = await loadPlugins(reg, ["roost-module-fonts"], importer, {
+      trusted: ["roost-module-fonts"],
+    });
 
     expect(result.loaded).toHaveLength(0);
     expect(result.rejected).toHaveLength(1);
@@ -192,7 +201,9 @@ describe("loadPlugins", () => {
     const defaultExportModule = { default: validPlugin };
     const importer = async (_spec: string): Promise<unknown> => defaultExportModule;
 
-    const result = await loadPlugins(reg, ["roost-module-fonts"], importer);
+    const result = await loadPlugins(reg, ["roost-module-fonts"], importer, {
+      trusted: ["roost-module-fonts"],
+    });
 
     expect(result.loaded).toContain("roost-module-fonts");
     expect(result.rejected).toHaveLength(0);
@@ -204,5 +215,100 @@ describe("loadPlugins", () => {
     const result = await loadPlugins(reg, [], async (_s) => ({}));
     expect(result.loaded).toHaveLength(0);
     expect(result.rejected).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Trust gate
+// ---------------------------------------------------------------------------
+
+describe("loadPlugins — trust gate", () => {
+  it("rejects all specs when no opts provided (safe default) and does NOT call importer", async () => {
+    const reg = new ModuleRegistry();
+    const importer = vi.fn(async (_spec: string): Promise<unknown> => makeValidPlugin("roost-module-fonts", "fonts"));
+
+    const result = await loadPlugins(reg, ["roost-module-fonts"]);
+
+    expect(result.loaded).toHaveLength(0);
+    expect(result.rejected).toHaveLength(1);
+    expect(result.rejected[0]!.spec).toBe("roost-module-fonts");
+    expect(result.rejected[0]!.reason).toMatch(/trust|allowlist|confirm/i);
+    // importer must NOT have been called for untrusted spec
+    expect(importer).not.toHaveBeenCalled();
+  });
+
+  it("loads a spec listed in opts.trusted and calls importer", async () => {
+    const reg = new ModuleRegistry();
+    const validPlugin = makeValidPlugin("roost-module-fonts", "fonts");
+    const importer = vi.fn(async (_spec: string): Promise<unknown> => validPlugin);
+
+    const result = await loadPlugins(reg, ["roost-module-fonts"], importer, {
+      trusted: ["roost-module-fonts"],
+    });
+
+    expect(result.loaded).toContain("roost-module-fonts");
+    expect(result.rejected).toHaveLength(0);
+    expect(importer).toHaveBeenCalledWith("roost-module-fonts");
+  });
+
+  it("rejects a spec NOT in opts.trusted and does NOT call importer", async () => {
+    const reg = new ModuleRegistry();
+    const importer = vi.fn(async (_spec: string): Promise<unknown> => makeValidPlugin("roost-module-evil", "evil"));
+
+    const result = await loadPlugins(reg, ["roost-module-evil"], importer, {
+      trusted: ["roost-module-safe"],
+    });
+
+    expect(result.loaded).toHaveLength(0);
+    expect(result.rejected).toHaveLength(1);
+    expect(result.rejected[0]!.spec).toBe("roost-module-evil");
+    expect(result.rejected[0]!.reason).toMatch(/trust|not trusted/i);
+    expect(importer).not.toHaveBeenCalled();
+  });
+
+  it("loads trusted spec and rejects untrusted spec in the same call", async () => {
+    const reg = new ModuleRegistry();
+    const importer = vi.fn(async (spec: string): Promise<unknown> => makeValidPlugin(spec, spec));
+
+    const result = await loadPlugins(
+      reg,
+      ["roost-module-trusted", "roost-module-evil"],
+      importer,
+      { trusted: ["roost-module-trusted"] },
+    );
+
+    expect(result.loaded).toContain("roost-module-trusted");
+    expect(result.rejected).toHaveLength(1);
+    expect(result.rejected[0]!.spec).toBe("roost-module-evil");
+    // importer called exactly once (for trusted only)
+    expect(importer).toHaveBeenCalledOnce();
+    expect(importer).toHaveBeenCalledWith("roost-module-trusted");
+  });
+
+  it("uses opts.confirm to approve a spec dynamically", async () => {
+    const reg = new ModuleRegistry();
+    const validPlugin = makeValidPlugin("roost-module-fonts", "fonts");
+    const importer = vi.fn(async (_spec: string): Promise<unknown> => validPlugin);
+    const confirm = vi.fn((_spec: string) => true);
+
+    const result = await loadPlugins(reg, ["roost-module-fonts"], importer, { confirm });
+
+    expect(result.loaded).toContain("roost-module-fonts");
+    expect(result.rejected).toHaveLength(0);
+    expect(confirm).toHaveBeenCalledWith("roost-module-fonts");
+  });
+
+  it("uses opts.confirm to deny a spec dynamically without calling importer", async () => {
+    const reg = new ModuleRegistry();
+    const importer = vi.fn(async (_spec: string): Promise<unknown> => ({}));
+    const confirm = vi.fn((_spec: string) => false);
+
+    const result = await loadPlugins(reg, ["roost-module-evil"], importer, { confirm });
+
+    expect(result.loaded).toHaveLength(0);
+    expect(result.rejected).toHaveLength(1);
+    expect(result.rejected[0]!.reason).toMatch(/trust|confirm|not trusted/i);
+    // confirm does not import, so importer must not be called
+    expect(importer).not.toHaveBeenCalled();
   });
 });

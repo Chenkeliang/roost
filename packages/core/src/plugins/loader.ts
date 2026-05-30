@@ -83,6 +83,26 @@ export function validatePlugin(x: unknown): RoostPlugin {
 }
 
 // ---------------------------------------------------------------------------
+// Trust gate options
+// ---------------------------------------------------------------------------
+
+export interface LoadPluginOpts {
+  /**
+   * Allowlist of spec names that are permitted to be imported and registered.
+   * Any spec not in this list is rejected without being imported.
+   * Takes precedence over `confirm` when both are provided.
+   */
+  trusted?: string[];
+  /**
+   * Callback invoked synchronously per spec to decide if it is trusted.
+   * Only used when `trusted` is not provided. The spec is rejected without
+   * import if the callback returns false. If both `trusted` and `confirm` are
+   * absent, all specs are rejected (safe default).
+   */
+  confirm?: (spec: string) => boolean | Promise<boolean>;
+}
+
+// ---------------------------------------------------------------------------
 // Loader
 // ---------------------------------------------------------------------------
 
@@ -90,19 +110,46 @@ const defaultImport = (spec: string): Promise<unknown> => import(spec);
 
 /**
  * Load each spec as a plugin, validate it, and register its module.
- * Any error (import failure, invalid shape, api mismatch, duplicate) is
- * caught and pushed to `rejected`; processing continues for the remaining
- * specs.
+ *
+ * Security: A spec is only imported and registered if it passes the trust gate:
+ *   - It is listed in `opts.trusted`, OR
+ *   - `opts.confirm(spec)` returns true.
+ * If neither option is provided, ALL specs are rejected (safe default).
+ *
+ * Any error (import failure, invalid shape, api mismatch, duplicate, trust
+ * failure) is caught and pushed to `rejected`; processing continues for the
+ * remaining specs.
  */
 export async function loadPlugins(
   registry: ModuleRegistry,
   specs: string[],
   importer: (spec: string) => Promise<unknown> = defaultImport,
+  opts?: LoadPluginOpts,
 ): Promise<LoadResult> {
   const loaded: string[] = [];
   const rejected: { spec: string; reason: string }[] = [];
 
   for (const spec of specs) {
+    // ── Trust gate ──────────────────────────────────────────────────────────
+    let trusted = false;
+    if (opts?.trusted !== undefined) {
+      trusted = opts.trusted.includes(spec);
+    } else if (opts?.confirm !== undefined) {
+      trusted = await opts.confirm(spec);
+    }
+    // If no trust mechanism provided, or spec is not in allowlist, reject.
+    if (!opts || (!opts.trusted && !opts.confirm)) {
+      rejected.push({
+        spec,
+        reason: "not trusted: no allowlist or confirm callback provided — all plugins require explicit trust",
+      });
+      continue;
+    }
+    if (!trusted) {
+      rejected.push({ spec, reason: "not trusted: spec is not in the allowlist" });
+      continue;
+    }
+
     try {
       const mod = await importer(spec);
       // Unwrap a default export: if the namespace lacks a top-level `manifest`
