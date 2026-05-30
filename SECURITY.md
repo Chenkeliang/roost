@@ -9,6 +9,7 @@ Report privately via a [GitHub security advisory](https://docs.github.com/en/cod
 - **age key is the root of trust — but only if you back up secrets.** If you don't use the secrets module, there is no key to worry about. If you do, secret files are encrypted to your age key; lose it (and any recovery copy) and that encrypted data is unrecoverable — so back it up offline.
 - **No telemetry, no server.** Roost never transmits your data anywhere. Your config repo and remotes are entirely under your control.
 - **Secrets never surface.** Secret values are never shown in the UI or written to logs; `capture` is gated by a plaintext-secret scanner that blocks unencrypted secrets from entering the repo.
+- **Non-secret env/alias values are stored verbatim.** Aliases, environment variables, and PATH entries you manage that are *not* marked `secret` are committed to your config repo in clear text and — with `roost init --github` — pushed to your remote. Mark anything sensitive (tokens, keys) as `secret` so Roost encrypts it with age instead.
 - **Plugins run with full user privileges.** A Roost module/plugin can read and execute as you. Only install plugins you trust; Roost will require explicit confirmation before installing a plugin (planned for the plugin loader, P2).
 
 ## Encrypting secrets — optional, and the key backend is your choice

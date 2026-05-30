@@ -182,6 +182,47 @@ describe("generateEnvSh", () => {
     });
     expect(generateEnvSh(data)).not.toContain("alias off=");
   });
+
+  // ── hostile input: belt-and-suspenders even if validation is bypassed ────────
+
+  it("C1: defensively skips items whose name is not a POSIX identifier", () => {
+    // Construct EnvData directly (bypassing validateEnvData) to prove the
+    // generator is itself a chokepoint and never emits an injectable name.
+    const data = sampleData({
+      aliases: [{ kind: "alias", name: "ll=1 && curl x|sh #", value: "ls", enabled: true }],
+      env: [{ kind: "env", name: 'X=1; rm -rf "$HOME"; Y', value: "v", secret: false, enabled: true }],
+      functions: [{ kind: "function", name: "g; rm -rf ~", body: "echo hi", enabled: true }],
+      path: [],
+    });
+    const out = generateEnvSh(data);
+    expect(out).not.toContain("curl x|sh");
+    expect(out).not.toContain("rm -rf");
+    expect(out).not.toContain("X=1;");
+  });
+
+  it("C2: collapses newlines in comments so they cannot start a new line", () => {
+    const data = sampleData({
+      aliases: [{ kind: "alias", name: "ll", value: "ls", enabled: true, comment: "x\nrm -rf ~ #" }],
+      env: [],
+      path: [],
+      functions: [],
+    });
+    const out = generateEnvSh(data);
+    // The comment text survives (collapsed onto one line) but never produces a
+    // bare second line `rm -rf ~ #` that the shell would execute.
+    expect(out).not.toMatch(/^rm -rf ~ #/m);
+    expect(out).toContain("# x rm -rf ~ #");
+  });
+
+  it("C3: still emits a valid PATH value double-quoted so $HOME expands", () => {
+    const data = sampleData({
+      path: [{ kind: "path", value: "$HOME/.local/bin", position: "prepend", enabled: true }],
+      aliases: [],
+      env: [],
+      functions: [],
+    });
+    expect(generateEnvSh(data)).toContain('export PATH="$HOME/.local/bin:$PATH"');
+  });
 });
 
 // ── rc source line helpers ────────────────────────────────────────────────────
@@ -213,6 +254,25 @@ describe("renderRcSourceLine / ensureRcSourced", () => {
     expect(changed).toBe(true);
     expect(rcHasMarker(content)).toBe(false);
     expect(content).toContain("export FOO=bar");
+  });
+
+  // M3: a substring `includes` check on the markers gives a false positive when
+  // an rc merely *mentions* the marker text in a comment, so the real source
+  // block is never appended and env.sh silently never loads.
+  it("M3: still appends the real block when the marker text only appears in prose", () => {
+    const rc = [
+      "# I once read about '# >>> roost env >>>' in the roost docs.",
+      "# The end marker is '# <<< roost env <<<' apparently.",
+      "export FOO=bar",
+    ].join("\n");
+    expect(rcHasMarker(rc)).toBe(false); // prose mention is NOT a real block
+    const { content, changed } = ensureRcSourced(rc);
+    expect(changed).toBe(true);
+    // The actual two-line block (with the source line between markers) is added.
+    expect(content).toMatch(
+      /^# >>> roost env >>>$[\s\S]*?\.config\/roost\/env\.sh[\s\S]*?^# <<< roost env <<<$/m,
+    );
+    expect(rcHasMarker(content)).toBe(true); // now it really is wired
   });
 });
 
@@ -435,6 +495,53 @@ describe("envModule.apply", () => {
     const live = fs.readFileSync(envShPath(tmpHome), "utf8");
     expect(live).toContain("export TOKEN='plain123'");
   });
+
+  // M1: if env.sh already exists 0644, the decrypted secret must NOT be written
+  // world-readable before a later chmod. Writing via temp-then-rename guarantees
+  // the final file (and every intermediate) is 0600.
+  it("M1: re-writing a pre-existing 0644 env.sh ends at 0600 with no world-readable window", async () => {
+    saveEnvData(tmpRepo, sampleData({
+      env: [{ kind: "env", name: "TOKEN", value: "plain123", secret: true, enabled: true }],
+    }));
+    writeFakeKey(tmpHome);
+    const { exec } = makeAgeExec();
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec });
+    await envModule.capture(ctx, { modules: {} });
+
+    // Pre-create env.sh world-readable, as a prior run / umask might.
+    const live = envShPath(tmpHome);
+    fs.mkdirSync(path.dirname(live), { recursive: true });
+    fs.writeFileSync(live, "# stale-world-readable\n");
+    fs.chmodSync(live, 0o644);
+    expect(fs.statSync(live).mode & 0o777).toBe(0o644);
+
+    // Hard-link the original (0644) inode aside. A safe atomic write replaces the
+    // directory entry with a BRAND-NEW 0600 inode via rename, so this link keeps
+    // the stale content. A direct in-place writeFileSync would instead truncate
+    // the SAME world-readable inode and the link would show the decrypted secret.
+    const sameInodeProbe = path.join(path.dirname(live), "probe-hardlink");
+    fs.linkSync(live, sameInodeProbe);
+    const originalIno = fs.statSync(live).ino;
+
+    await envModule.apply(ctx, { module: "env", actions: [] });
+
+    // Final state: secret inlined, mode 0600.
+    expect(fs.readFileSync(live, "utf8")).toContain("export TOKEN='plain123'");
+    expect(fs.statSync(live).mode & 0o777).toBe(0o600);
+
+    // The live path is now a NEW inode (rename), and the old world-readable inode
+    // never received the decrypted secret.
+    expect(fs.statSync(live).ino).not.toBe(originalIno);
+    const probe = fs.readFileSync(sameInodeProbe, "utf8");
+    expect(probe).toBe("# stale-world-readable\n");
+    expect(probe).not.toContain("plain123");
+
+    // No temp file left behind in the dir.
+    const leftovers = fs
+      .readdirSync(path.dirname(live))
+      .filter((f) => f !== "env.sh" && f !== "probe-hardlink");
+    expect(leftovers).toHaveLength(0);
+  });
 });
 
 // ── unmanage ──────────────────────────────────────────────────────────────────
@@ -481,6 +588,38 @@ describe("envModule.unmanage", () => {
     const res = await envModule.unmanage(ctx, { modules: { env: ["alias:ll"] } });
     expect(res.skipped).toContain("alias:ll");
     expect(fs.readFileSync(path.join(tmpRepo, "roost", "env.yaml"), "utf8")).toBe(before);
+  });
+
+  // L2: regenerating env.sh on unmanage must re-inline the REMAINING secrets
+  // (decrypt them like apply does), not blank them to the placeholder until the
+  // next apply.
+  it("L2: keeps unrelated secrets inlined when unmanaging an alias", async () => {
+    saveEnvData(tmpRepo, sampleData({
+      aliases: [
+        { kind: "alias", name: "ll", value: "ls -la", enabled: true },
+        { kind: "alias", name: "drop", value: "echo bye", enabled: true },
+      ],
+      env: [
+        { kind: "env", name: "TOKEN_A", value: "secretA", secret: true, enabled: true },
+        { kind: "env", name: "TOKEN_B", value: "secretB", secret: true, enabled: true },
+      ],
+    }));
+    writeFakeKey(tmpHome);
+    const { exec } = makeAgeExec();
+    const ctx = makeCtx({ repoDir: tmpRepo, home: tmpHome, exec });
+
+    // Encrypt + materialize env.sh so both secrets are inlined to start.
+    await envModule.capture(ctx, { modules: {} });
+    await envModule.apply(ctx, { module: "env", actions: [] });
+
+    // Unmanage an UNRELATED alias.
+    await envModule.unmanage(ctx, { modules: { env: ["alias:drop"] } });
+
+    const live = fs.readFileSync(envShPath(tmpHome), "utf8");
+    expect(live).toContain("export TOKEN_A='secretA'");
+    expect(live).toContain("export TOKEN_B='secretB'");
+    expect(live).not.toContain("<roost-secret:unset>");
+    expect(live).not.toContain("alias drop=");
   });
 });
 

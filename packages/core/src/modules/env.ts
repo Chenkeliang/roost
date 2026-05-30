@@ -54,6 +54,17 @@ function escapeSingleQuotes(value: string): string {
   return value.replace(/'/g, "'\\''");
 }
 
+// Defensive copy of the validator's identifier rule (see env-data.ts). Names are
+// interpolated raw into env.sh, so generateEnvSh refuses to emit any item whose
+// name isn't a POSIX identifier even if it somehow bypassed validateEnvData. (C1)
+const SAFE_SHELL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+// Comments are emitted after `# `; collapse any newline to a space so a crafted
+// comment can never inject a second, executable line. (C2, belt-and-suspenders.)
+function sanitizeComment(comment: string): string {
+  return comment.replace(/\r?\n/g, " ");
+}
+
 /**
  * Render the flat POSIX-sh env file from structured data.
  *
@@ -71,10 +82,13 @@ export function generateEnvSh(data: EnvData, secretValues?: Map<string, string>)
   lines.push("");
 
   // PATH
+  // NOTE: non-secret PATH/alias/env values are written verbatim into env.sh and,
+  // with `roost init --github`, pushed to the user's remote — mark sensitive
+  // values as `secret` so they are encrypted instead. (M2)
   lines.push("# PATH");
   for (const entry of data.path) {
     if (!entry.enabled) continue;
-    if (entry.comment) lines.push(`# ${entry.comment}`);
+    if (entry.comment) lines.push(`# ${sanitizeComment(entry.comment)}`);
     const v = entry.value;
     if (entry.position === "prepend") {
       lines.push(`export PATH="${v}:$PATH"`);
@@ -88,7 +102,8 @@ export function generateEnvSh(data: EnvData, secretValues?: Map<string, string>)
   lines.push("# Aliases");
   for (const a of data.aliases) {
     if (!a.enabled) continue;
-    if (a.comment) lines.push(`# ${a.comment}`);
+    if (!SAFE_SHELL_NAME.test(a.name)) continue; // defensive — see C1
+    if (a.comment) lines.push(`# ${sanitizeComment(a.comment)}`);
     lines.push(`alias ${a.name}='${escapeSingleQuotes(a.value)}'`);
   }
   lines.push("");
@@ -97,7 +112,8 @@ export function generateEnvSh(data: EnvData, secretValues?: Map<string, string>)
   lines.push("# Environment");
   for (const e of data.env) {
     if (!e.enabled) continue;
-    if (e.comment) lines.push(`# ${e.comment}`);
+    if (!SAFE_SHELL_NAME.test(e.name)) continue; // defensive — see C1
+    if (e.comment) lines.push(`# ${sanitizeComment(e.comment)}`);
     if (e.secret) {
       const resolved = secretValues?.get(e.name);
       if (resolved !== undefined) {
@@ -115,7 +131,8 @@ export function generateEnvSh(data: EnvData, secretValues?: Map<string, string>)
   lines.push("# Functions");
   for (const f of data.functions) {
     if (!f.enabled) continue;
-    if (f.comment) lines.push(`# ${f.comment}`);
+    if (!SAFE_SHELL_NAME.test(f.name)) continue; // defensive — see C1
+    if (f.comment) lines.push(`# ${sanitizeComment(f.comment)}`);
     lines.push(f.body);
   }
   lines.push("");
@@ -126,6 +143,12 @@ export function generateEnvSh(data: EnvData, secretValues?: Map<string, string>)
 const RC_MARKER_BEGIN = "# >>> roost env >>>";
 const RC_MARKER_END = "# <<< roost env <<<";
 
+// Matches a REAL marker block: the begin/end markers each on their own line with
+// the source line between. Using one anchored regex (instead of substring
+// `includes`) means a mere prose mention of the marker text is NOT a false
+// positive, and it agrees with removeRcMarker's line-based stripping. (M3)
+const RC_MARKER_BLOCK = /^# >>> roost env >>>$[\s\S]*?^# <<< roost env <<<$/m;
+
 /** The exact idempotent source block Roost appends to each rc file. */
 export function renderRcSourceLine(): string {
   return (
@@ -135,9 +158,9 @@ export function renderRcSourceLine(): string {
   );
 }
 
-/** True if the rc already contains the Roost source block. */
+/** True if the rc already contains the real Roost source block (not just prose). */
 export function rcHasMarker(rcContent: string): boolean {
-  return rcContent.includes(RC_MARKER_BEGIN) && rcContent.includes(RC_MARKER_END);
+  return RC_MARKER_BLOCK.test(rcContent);
 }
 
 /**
@@ -324,6 +347,75 @@ function existingRcFiles(home: string): string[] {
   return RC_FILES.map((f) => path.join(home, f)).filter((p) => fs.existsSync(p));
 }
 
+/**
+ * Read a file as utf8, returning null instead of throwing if it has vanished
+ * between an existsSync check and the read (TOCTOU) or is otherwise unreadable. (L1)
+ */
+function readFileSafe(p: string): string | null {
+  try {
+    return fs.readFileSync(p, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decrypt every enabled secret env value into a name→plaintext map for inlining
+ * into env.sh. Used by both apply and unmanage so a regenerated artifact keeps
+ * real secret values rather than the `<roost-secret:unset>` placeholder. (L2)
+ */
+async function decryptEnabledSecrets(ctx: ModuleContext, data: EnvData): Promise<Map<string, string>> {
+  const secrets = new Map<string, string>();
+  const keyPath = defaultAgeKeyPath(ctx.home);
+  for (const e of data.env) {
+    if (!e.secret || !e.enabled) continue;
+    const plain = await decryptEnvSecret(ctx.exec, { repoDir: ctx.repoDir, name: e.name, keyPath });
+    if (plain !== null) {
+      secrets.set(e.name, plain);
+    } else {
+      ctx.log.warn(`env: could not decrypt secret "${e.name}" — using placeholder.`);
+    }
+  }
+  return secrets;
+}
+
+/**
+ * `env.sh` can carry inlined secrets, so its backup copy must not be left
+ * world-readable. `backupFiles` mirrors the source's absolute path under
+ * backupDir; chmod that mirrored copy to 0600 if it exists. (M1)
+ */
+function chmodSecretBackups(backupDir: string, livePath: string): void {
+  const mirrored = path.join(backupDir, livePath.replace(/^[/\\]/, ""));
+  try {
+    if (fs.existsSync(mirrored)) fs.chmodSync(mirrored, 0o600);
+  } catch {
+    // best-effort hardening — never fail apply over a backup chmod
+  }
+}
+
+/**
+ * Atomically write `content` to `dest` with mode 0600. The bytes go to a fresh
+ * temp file in the SAME directory (so rename is atomic and stays on one device);
+ * O_CREAT guarantees the 0600 mode regardless of any pre-existing file's perms,
+ * then rename swaps it into place. This avoids the world-readable window that a
+ * plain writeFileSync onto an existing 0644 file would open before chmod. (M1)
+ */
+function writeFile0600Atomic(dest: string, content: string): void {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.tmp-${process.pid}`);
+  try {
+    fs.writeFileSync(tmp, content, { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(tmp, dest);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // best-effort cleanup
+    }
+    throw err;
+  }
+}
+
 // ── envModule ─────────────────────────────────────────────────────────────────
 
 export const envModule: SyncModule = {
@@ -377,20 +469,22 @@ export const envModule: SyncModule = {
     // Compare the non-secret preview against the live artifact.
     const preview = generateEnvSh(data);
     const livePath = envShPath(ctx.home);
-    if (!fs.existsSync(livePath)) {
+    const live = fs.existsSync(livePath) ? readFileSafe(livePath) : null;
+    if (live === null) {
       items.push({ id: "env.sh", state: "untracked", detail: "env.sh not generated yet" });
     } else {
-      const live = fs.readFileSync(livePath, "utf8");
       items.push({ id: "env.sh", state: live === preview ? "synced" : "drift" });
     }
 
     // Check the rc marker block in each existing rc file.
     for (const rc of existingRcFiles(ctx.home)) {
-      const content = fs.readFileSync(rc, "utf8");
+      const content = readFileSafe(rc);
+      if (content === null) continue;
+      const has = rcHasMarker(content);
       items.push({
         id: `rc:${path.basename(rc)}`,
-        state: rcHasMarker(content) ? "synced" : "drift",
-        detail: rcHasMarker(content) ? undefined : "source line missing",
+        state: has ? "synced" : "drift",
+        detail: has ? undefined : "source line missing",
       });
     }
 
@@ -475,7 +569,8 @@ export const envModule: SyncModule = {
       ctx.log.info(`env apply (dry-run): would write ${livePath}`);
       const skipped: string[] = [livePath];
       for (const rc of existingRcFiles(ctx.home)) {
-        const content = fs.readFileSync(rc, "utf8");
+        const content = readFileSafe(rc);
+        if (content === null) continue;
         if (!rcHasMarker(content)) {
           ctx.log.info(`env apply (dry-run): would add source line to ${rc}`);
           skipped.push(rc);
@@ -487,33 +582,23 @@ export const envModule: SyncModule = {
     }
 
     // Decrypt secret env values into a Map for inlining.
-    const secrets = new Map<string, string>();
-    const keyPath = defaultAgeKeyPath(ctx.home);
-    for (const e of data.env) {
-      if (!e.secret || !e.enabled) continue;
-      const plain = await decryptEnvSecret(ctx.exec, { repoDir: ctx.repoDir, name: e.name, keyPath });
-      if (plain !== null) {
-        secrets.set(e.name, plain);
-      } else {
-        ctx.log.warn(`env apply: could not decrypt secret "${e.name}" — using placeholder.`);
-      }
-    }
+    const secrets = await decryptEnabledSecrets(ctx, data);
 
     const applied: string[] = [];
     const backedUp: string[] = [];
 
-    // Backup + write env.sh chmod 600.
+    // Backup + write env.sh 0600 via temp-then-rename (no world-readable window).
     const newContent = generateEnvSh(data, secrets);
     const backupDir = path.join(ctx.home, ".roost-backups", "env");
     backedUp.push(...backupFiles([livePath], backupDir));
-    fs.mkdirSync(path.dirname(livePath), { recursive: true });
-    fs.writeFileSync(livePath, newContent, { encoding: "utf8", mode: 0o600 });
-    fs.chmodSync(livePath, 0o600);
+    chmodSecretBackups(backupDir, livePath);
+    writeFile0600Atomic(livePath, newContent);
     applied.push(livePath);
 
     // Ensure each existing rc sources the file (idempotent).
     for (const rc of existingRcFiles(ctx.home)) {
-      const content = fs.readFileSync(rc, "utf8");
+      const content = readFileSafe(rc);
+      if (content === null) continue;
       const { content: next, changed } = ensureRcSourced(content);
       if (changed) {
         backedUp.push(...backupFiles([rc], backupDir));
@@ -529,7 +614,7 @@ export const envModule: SyncModule = {
     const data = loadEnvData(ctx.repoDir);
     const regenerated = generateEnvSh(data); // secrets redacted (placeholder)
     const livePath = envShPath(ctx.home);
-    const live = fs.existsSync(livePath) ? fs.readFileSync(livePath, "utf8") : "";
+    const live = (fs.existsSync(livePath) ? readFileSafe(livePath) : null) ?? "";
     if (live === regenerated) return "";
 
     const liveLines = live.split("\n");
@@ -605,16 +690,19 @@ export const envModule: SyncModule = {
       next.functions.length === 0;
 
     if (fs.existsSync(livePath) || !isEmpty) {
+      // Re-inline the REMAINING secrets (decrypt like apply) so unmanaging one
+      // item doesn't blank the others to the placeholder until the next apply. (L2)
+      const secrets = await decryptEnabledSecrets(ctx, next);
       backedUp.push(...backupFiles([livePath], backupDir));
-      fs.mkdirSync(path.dirname(livePath), { recursive: true });
-      fs.writeFileSync(livePath, generateEnvSh(next), { encoding: "utf8", mode: 0o600 });
-      fs.chmodSync(livePath, 0o600);
+      chmodSecretBackups(backupDir, livePath);
+      writeFile0600Atomic(livePath, generateEnvSh(next, secrets));
     }
 
     // If nothing remains, offer to remove the rc marker block (backup first).
     if (isEmpty) {
       for (const rc of existingRcFiles(ctx.home)) {
-        const content = fs.readFileSync(rc, "utf8");
+        const content = readFileSafe(rc);
+        if (content === null) continue;
         const { content: stripped, changed } = removeRcMarker(content);
         if (changed) {
           backedUp.push(...backupFiles([rc], backupDir));
@@ -644,7 +732,10 @@ export const envModule: SyncModule = {
       detail: rcFiles.length > 0 ? rcFiles.map((r) => path.basename(r)).join(", ") : "no rc files found",
     });
 
-    const wired = rcFiles.some((rc) => rcHasMarker(fs.readFileSync(rc, "utf8")));
+    const wired = rcFiles.some((rc) => {
+      const content = readFileSafe(rc);
+      return content !== null && rcHasMarker(content);
+    });
     health.push({
       name: "rc-sourced",
       ok: wired,

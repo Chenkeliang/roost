@@ -34,6 +34,27 @@ function reqString(obj: Record<string, unknown>, key: string, ctx: string): stri
   return v;
 }
 
+// A POSIX shell identifier. Names are interpolated *raw* into generated env.sh
+// (`alias <name>=`, `export <name>=`, function declarations), so anything outside
+// this set could break out of the statement and run arbitrary code on apply. (C1)
+const SHELL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+// A PATH segment is emitted inside double quotes (`export PATH="<value>:$PATH"`)
+// so that `$HOME`/`${HOME}` still expand. This allow-list permits shell-var refs,
+// `~`, path separators and `-`, but rejects command substitution and any
+// metacharacter that could close the quote or chain a command. (C3)
+const PATH_VALUE = /^[A-Za-z0-9_/.${}:~-]+$/;
+
+function reqShellName(obj: Record<string, unknown>, ctx: string): string {
+  const name = reqString(obj, "name", ctx);
+  if (!SHELL_NAME.test(name)) {
+    throw new Error(
+      `env.yaml: ${ctx} field "name" must be a POSIX identifier (^[A-Za-z_][A-Za-z0-9_]*$): refusing "${name}"`,
+    );
+  }
+  return name;
+}
+
 function reqBool(obj: Record<string, unknown>, key: string, ctx: string): boolean {
   const v = obj[key];
   if (typeof v !== "boolean") {
@@ -48,6 +69,11 @@ function optComment(obj: Record<string, unknown>, ctx: string): string | undefin
   if (typeof v !== "string") {
     throw new Error(`env.yaml: ${ctx} field "comment" must be a string`);
   }
+  // Comments are emitted after `# ` in env.sh; a newline would start a fresh,
+  // executable line. Reject any embedded newline. (C2)
+  if (/\r?\n/.test(v)) {
+    throw new Error(`env.yaml: ${ctx} field "comment" must not contain a newline`);
+  }
   return v;
 }
 
@@ -60,7 +86,7 @@ function parseAlias(item: unknown): AliasItem {
   return withComment<AliasItem>(
     {
       kind: "alias",
-      name: reqString(obj, "name", "alias entry"),
+      name: reqShellName(obj, "alias entry"),
       value: reqString(obj, "value", "alias entry"),
       enabled: reqBool(obj, "enabled", "alias entry"),
     },
@@ -73,7 +99,7 @@ function parseEnv(item: unknown): EnvVarItem {
   return withComment<EnvVarItem>(
     {
       kind: "env",
-      name: reqString(obj, "name", "env entry"),
+      name: reqShellName(obj, "env entry"),
       value: reqString(obj, "value", "env entry"),
       secret: reqBool(obj, "secret", "env entry"),
       enabled: reqBool(obj, "enabled", "env entry"),
@@ -88,10 +114,17 @@ function parsePath(item: unknown): PathEntry {
   if (position !== "prepend" && position !== "append") {
     throw new Error(`env.yaml: path entry "position" must be "prepend" or "append"`);
   }
+  const value = reqString(obj, "value", "path entry");
+  if (!PATH_VALUE.test(value)) {
+    throw new Error(
+      `env.yaml: path entry "value" contains shell metacharacters or command ` +
+        `substitution and would be unsafe inside export PATH="...": refusing "${value}"`,
+    );
+  }
   return withComment<PathEntry>(
     {
       kind: "path",
-      value: reqString(obj, "value", "path entry"),
+      value,
       position,
       enabled: reqBool(obj, "enabled", "path entry"),
     },
@@ -104,7 +137,7 @@ function parseFunction(item: unknown): FunctionItem {
   return withComment<FunctionItem>(
     {
       kind: "function",
-      name: reqString(obj, "name", "function entry"),
+      name: reqShellName(obj, "function entry"),
       body: reqString(obj, "body", "function entry"),
       enabled: reqBool(obj, "enabled", "function entry"),
     },
