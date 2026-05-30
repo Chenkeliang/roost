@@ -29,6 +29,7 @@ import {
   indexAll,
   testRemote,
   parseBrewfile,
+  createChezmoi,
 } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 
@@ -121,6 +122,30 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
           ? parseBrewfile(fs.readFileSync(file, "utf8"))
           : { taps: [], formulae: [], casks: [], mas: [] };
         return { available: brew.code === 0, exists, entries };
+      });
+      return reply.send(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── GET /api/dotfiles ────────────────────────────────────────────────────────
+  // Content-first: list chezmoi-managed paths (cheap). available = `chezmoi
+  // --version` exit 0; graceful [] if chezmoi absent or the source dir is empty.
+  server.get("/api/dotfiles", async (_req, reply) => {
+    try {
+      const result = await cache.getOrCompute("dotfiles:managed", async () => {
+        const exec = makeCtx(true).exec;
+        const ver = await exec.run("chezmoi", ["--version"]);
+        const available = ver.code === 0;
+        let managed: string[] = [];
+        try {
+          managed = await createChezmoi(exec, { sourceDir: repoDir }).managed();
+        } catch {
+          managed = [];
+        }
+        return { available, managed };
       });
       return reply.send(result);
     } catch (err) {

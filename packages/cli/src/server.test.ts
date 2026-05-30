@@ -833,6 +833,17 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/dotfiles → 200 { available: boolean; managed: string[] }", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/dotfiles" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { available: boolean; managed: string[] };
+    expect(typeof body.available).toBe("boolean"); // makeFakeExec → chezmoi --version exits 0
+    expect(Array.isArray(body.managed)).toBe(true);
+    await server.close();
+  });
+
   it("GET /api/index → 200 { index: { <module>: ModuleIndex } }", async () => {
     const reg = defaultRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
