@@ -150,6 +150,54 @@ describe("AliasesEnv", () => {
     expect(secretItem.value).toBe("sk-newsecret");
   });
 
+  it("choosing a 1Password reference shows the ref input and hides the value field (ADR-0004)", async () => {
+    await renderView();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Env$/i }));
+    });
+    await waitFor(() => screen.getByLabelText("env value EDITOR"));
+
+    // Mark EDITOR secret so the source selector appears.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("switch", { name: /mark env EDITOR secret/i }));
+    });
+    // Switch its source to a 1Password reference.
+    const sourceSel = screen.getByLabelText("env source EDITOR") as HTMLSelectElement;
+    await act(async () => {
+      fireEvent.change(sourceSel, { target: { value: "ref:op" } });
+    });
+
+    // The ref input appears; the plaintext value field is gone.
+    expect(screen.getByLabelText("env ref EDITOR")).toBeTruthy();
+    expect(screen.queryByLabelText("env value EDITOR")).toBeNull();
+  });
+
+  it("PUT carries the ref source for a secret env item (ADR-0004)", async () => {
+    await renderView();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Env$/i }));
+    });
+    await waitFor(() => screen.getByLabelText("env value EDITOR"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("switch", { name: /mark env EDITOR secret/i }));
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("env source EDITOR"), { target: { value: "ref:rbw" } });
+    });
+    fireEvent.change(screen.getByLabelText("env ref EDITOR"), {
+      target: { value: "my-entry" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+    });
+
+    const sent = vi.mocked(putEnv).mock.calls[0]![0];
+    const item = sent.env.find((e) => e.name === "EDITOR")!;
+    expect(item.secret).toBe(true);
+    expect(item.source).toEqual({ kind: "ref", backend: "rbw", ref: "my-entry" });
+  });
+
   it("PATH add and reorder updates state", async () => {
     await renderView();
     await act(async () => {

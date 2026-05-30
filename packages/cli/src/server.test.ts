@@ -594,6 +594,72 @@ describe("buildServer", () => {
     }
   });
 
+  it("GET /api/env → returns source+ref but blanks the secret value (ADR-0004)", async () => {
+    const { saveEnvData } = await import("@roost/core");
+    saveEnvData(tmpDir, {
+      schemaVersion: 2,
+      aliases: [],
+      env: [
+        {
+          kind: "env",
+          name: "TOKEN",
+          value: "",
+          secret: true,
+          source: { kind: "ref", backend: "op", ref: "op://Vault/Item/field" },
+          enabled: true,
+        },
+      ],
+      path: [],
+      functions: [],
+    });
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/env" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      env: { name: string; value: string; source?: { kind: string; backend?: string; ref?: string } }[];
+    };
+    const token = body.env.find((e) => e.name === "TOKEN")!;
+    expect(token.value).toBe("");
+    expect(token.source).toEqual({ kind: "ref", backend: "op", ref: "op://Vault/Item/field" });
+    await server.close();
+  });
+
+  it("PUT /api/env → persists a ref item without encryption (ADR-0004)", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const payload = {
+      schemaVersion: 2,
+      aliases: [],
+      env: [
+        {
+          kind: "env",
+          name: "TOKEN",
+          value: "",
+          secret: true,
+          source: { kind: "ref", backend: "rbw", ref: "my-entry" },
+          enabled: true,
+        },
+      ],
+      path: [],
+      functions: [],
+    };
+    const res = await server.inject({
+      method: "PUT",
+      url: "/api/env",
+      payload,
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).toBe(200);
+    // No ciphertext for a ref item.
+    expect(fs.existsSync(path.join(tmpDir, "roost", "env-secrets", "TOKEN.age"))).toBe(false);
+    const { loadEnvData } = await import("@roost/core");
+    const onDisk = loadEnvData(tmpDir).env.find((e) => e.name === "TOKEN")!;
+    expect(onDisk.value).toBe("");
+    expect(onDisk.source).toEqual({ kind: "ref", backend: "rbw", ref: "my-entry" });
+    await server.close();
+  });
+
   it("PUT /api/env → 400 on malformed body", async () => {
     const reg = new ModuleRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });

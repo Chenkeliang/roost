@@ -18,6 +18,7 @@ import type {
   EnvData,
   AliasItem,
   EnvVarItem,
+  EnvSecretSource,
   PathEntry,
   FunctionItem,
   Candidate,
@@ -299,6 +300,16 @@ function AliasesTab({
 
 // ── Env tab ──────────────────────────────────────────────────────────────────
 
+// Secret env source selector value (ADR-0004). "age" ⇒ encrypted-into-repo;
+// "ref:op"/"ref:rbw" ⇒ resolved on apply from a password manager.
+type SourceSel = "age" | "ref:op" | "ref:rbw";
+
+function selToSource(sel: SourceSel): EnvSecretSource {
+  if (sel === "ref:op") return { kind: "ref", backend: "op", ref: "" };
+  if (sel === "ref:rbw") return { kind: "ref", backend: "rbw", ref: "" };
+  return { kind: "age" };
+}
+
 function EnvTabPanel({
   env,
   onChange,
@@ -358,9 +369,12 @@ function EnvTabPanel({
         ) : (
           shown.map((e) => {
             const idx = env.indexOf(e);
-            // A secret returned from the server has secret:true + empty value:
+            const sourceKind: SourceSel =
+              e.source?.kind === "ref" ? `ref:${e.source.backend}` : "age";
+            const isRef = e.secret && sourceKind !== "age";
+            // An age secret returned from the server has secret:true + empty value:
             // render an "encrypted" badge, never an input with the value.
-            const isStoredSecret = e.secret && e.value === "";
+            const isStoredSecret = e.secret && !isRef && e.value === "";
             const masked = e.secret && !reveal[idx];
             return (
               <div
@@ -380,7 +394,57 @@ function EnvTabPanel({
                   onChange={(ev) => patch(idx, { name: ev.target.value })}
                   style={{ ...inputStyle, width: 160 }}
                 />
-                {isStoredSecret ? (
+                {e.secret && (
+                  <select
+                    aria-label={`env source ${e.name}`}
+                    value={sourceKind}
+                    onChange={(ev) =>
+                      patch(idx, { source: selToSource(ev.target.value as SourceSel), value: "" })
+                    }
+                    style={{ ...inputStyle, fontFamily: "var(--font)", width: 132, cursor: "pointer" }}
+                  >
+                    <option value="age">Encrypted (age)</option>
+                    <option value="ref:op">1Password reference</option>
+                    <option value="ref:rbw">rbw reference</option>
+                  </select>
+                )}
+                {isRef ? (
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span
+                      data-testid={`encrypted-${e.name}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "3px 9px",
+                        borderRadius: 999,
+                        background: "rgba(255,99,99,.12)",
+                        border: "1px solid var(--accent)",
+                        color: "var(--accent)",
+                        fontSize: 11,
+                        fontWeight: 540,
+                      }}
+                    >
+                      <LockKey size={11} weight="fill" />
+                      {sourceKind === "ref:op" ? "1Password" : "rbw"}
+                    </span>
+                    <input
+                      aria-label={`env ref ${e.name}`}
+                      placeholder={sourceKind === "ref:op" ? "op://Vault/Item/field" : "entry name"}
+                      value={e.source?.kind === "ref" ? e.source.ref : ""}
+                      onChange={(ev) =>
+                        patch(idx, {
+                          source: {
+                            kind: "ref",
+                            backend: sourceKind === "ref:op" ? "op" : "rbw",
+                            ref: ev.target.value,
+                          },
+                        })
+                      }
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                  </div>
+                ) : isStoredSecret ? (
                   <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
                     <span
                       data-testid={`encrypted-${e.name}`}
