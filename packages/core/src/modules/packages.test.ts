@@ -182,6 +182,19 @@ describe("packagesModule.status", () => {
 
     expect(report.items[0]!.state).toBe("drift");
   });
+
+  it("does NOT call brew when packages are not selected (status guard)", async () => {
+    // A throwing exec proves no external command runs on the unmanaged path.
+    const exec = {
+      run: async () => {
+        throw new Error("exec must not be called when packages unmanaged");
+      },
+    } as unknown as import("@roost/shared").Exec;
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo" });
+    const report = await packagesModule.status(ctx, { modules: {} });
+    expect(report.module).toBe("packages");
+    expect(report.items).toHaveLength(0);
+  });
 });
 
 // ── diff ──────────────────────────────────────────────────────────────────────

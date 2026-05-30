@@ -70,7 +70,12 @@ export const packagesModule: SyncModule = {
     return { module: "packages", applied: [BREWFILE_ID], backedUp: [], skipped: [] };
   },
 
-  async status(ctx: ModuleContext, _sel: Selection): Promise<DriftReport> {
+  async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {
+    // Unmanaged → cheap, no brew call (cold-path fix).
+    const selected = (sel.modules["packages"] ?? []).includes(BREWFILE_ID);
+    if (!selected) {
+      return { module: "packages", items: [] };
+    }
     const r = await ctx.exec.run("brew", [
       "bundle",
       "check",
