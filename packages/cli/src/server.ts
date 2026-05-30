@@ -27,6 +27,7 @@ import {
   recipientFromKey,
   encryptEnvSecret,
   indexAll,
+  testRemote,
 } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 
@@ -94,6 +95,16 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });
     }
+  });
+
+  // ── POST /api/projects/test ──────────────────────────────────────────────────
+  server.post<{ Body: { remote?: string } }>("/api/projects/test", async (req, reply) => {
+    const remote = req.body?.remote;
+    if (typeof remote !== "string" || remote.length === 0) {
+      return reply.status(400).send({ error: "remote is required" });
+    }
+    const result = await testRemote(makeCtx(true).exec, remote);
+    return reply.send(result);
   });
 
   // ── /api/machines ────────────────────────────────────────────────────────────

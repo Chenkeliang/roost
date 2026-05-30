@@ -772,6 +772,18 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("POST /api/projects/test → { reachable, message } (400 on missing remote)", async () => {
+    const reg = defaultRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const bad = await server.inject({ method: "POST", url: "/api/projects/test", payload: {} });
+    expect(bad.statusCode).toBe(400);
+    const ok = await server.inject({ method: "POST", url: "/api/projects/test", payload: { remote: "git@github.com:u/r.git" } });
+    expect(ok.statusCode).toBe(200);
+    const body = ok.json() as { reachable: boolean; message: string };
+    expect(typeof body.reachable).toBe("boolean");
+    await server.close();
+  });
+
   it("GET /api/discover?module=projects → only the projects key", async () => {
     const reg = defaultRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });

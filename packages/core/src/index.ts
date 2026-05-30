@@ -28,7 +28,7 @@ export type { ScanCandidate } from "./discovery/scan.js";
 export { dotfilesModule, classifyDotfile, isSensitivePath, isRoostManaged } from "./modules/dotfiles.js";
 export { packagesModule } from "./modules/packages.js";
 export { appconfigModule, classifyDomain, SENSITIVE_DOMAIN_HINTS } from "./modules/appconfig.js";
-export { projectsModule, findGitRepos, repoInfo } from "./modules/projects.js";
+export { projectsModule, findGitRepos, repoInfo, testRemote } from "./modules/projects.js";
 export {
   envModule,
   generateEnvSh,
