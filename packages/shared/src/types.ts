@@ -36,8 +36,13 @@ export interface Health { name: string; ok: boolean; detail?: string; }
 // additive layer distinct from `dotfiles` (which backs up existing config FILES).
 export type ShellItemKind = "alias" | "env" | "path" | "function";
 export interface AliasItem { kind: "alias"; name: string; value: string; comment?: string; enabled: boolean }
+// Source of a secret env value (ADR-0004). Absent ⇒ treated as { kind: "age" }
+// for back-compat. Only meaningful when `secret: true`.
+export type EnvSecretSource =
+  | { kind: "age" }
+  | { kind: "ref"; backend: "op" | "rbw"; ref: string };
 // when secret:true, `value` is '' in committed yaml + API responses
-export interface EnvVarItem { kind: "env"; name: string; value: string; secret: boolean; comment?: string; enabled: boolean }
+export interface EnvVarItem { kind: "env"; name: string; value: string; secret: boolean; source?: EnvSecretSource; comment?: string; enabled: boolean }
 export interface PathEntry { kind: "path"; value: string; position: "prepend" | "append"; comment?: string; enabled: boolean }
 export interface FunctionItem { kind: "function"; name: string; body: string; comment?: string; enabled: boolean }
 export interface EnvData { schemaVersion: number; aliases: AliasItem[]; env: EnvVarItem[]; path: PathEntry[]; functions: FunctionItem[] }
