@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
-import { findGitRepos, repoInfo, projectsModule, parseRemoteHost, parseRemoteProtocol, toHomeRelative, fromHomeRelative } from "./projects.js";
+import { findGitRepos, repoInfo, projectsModule, parseRemoteHost, parseRemoteProtocol, toHomeRelative, fromHomeRelative, testRemote } from "./projects.js";
 import { loadProjects } from "../projects.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -292,6 +292,20 @@ describe("projectsModule.discover enrichment", () => {
     expect(c!.protocol).toBe("ssh");
     expect(c!.recommendation).toBe("track");
     fs.rmSync(home, { recursive: true, force: true });
+  });
+});
+
+describe("testRemote", () => {
+  it("reachable when git ls-remote exits 0", async () => {
+    const exec = { run: async () => ({ code: 0, stdout: "ref\tHEAD", stderr: "" }) } as unknown as import("@roost/shared").Exec;
+    const r = await testRemote(exec, "git@github.com:u/r.git");
+    expect(r.reachable).toBe(true);
+  });
+  it("unreachable when git ls-remote fails (no credentials in message)", async () => {
+    const exec = { run: async () => ({ code: 128, stdout: "", stderr: "fatal: Could not read from remote repository" }) } as unknown as import("@roost/shared").Exec;
+    const r = await testRemote(exec, "git@gitlab.luojilab.com:t/p.git");
+    expect(r.reachable).toBe(false);
+    expect(r.message).toMatch(/unreachable|denied|remote/i);
   });
 });
 

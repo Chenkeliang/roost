@@ -42,6 +42,16 @@ export function fromHomeRelative(stored: string, home: string): string {
   return stored.startsWith("~/") ? path.join(home, stored.slice(2)) : stored;
 }
 
+export async function testRemote(
+  exec: Exec,
+  remoteUrl: string,
+): Promise<{ reachable: boolean; message: string }> {
+  const r = await exec.run("git", ["ls-remote", "--heads", remoteUrl]);
+  // Never surface credentials; map to a short status only.
+  if (r.code === 0) return { reachable: true, message: "reachable" };
+  return { reachable: false, message: "unreachable (network, VPN, or access denied)" };
+}
+
 export function readOriginUrl(repoDir: string): string | null {
   try {
     const cfg = fs.readFileSync(path.join(repoDir, ".git", "config"), "utf8");
@@ -227,10 +237,10 @@ export const projectsModule: SyncModule = {
     const skipped: string[] = [];
 
     const doc = loadProjects(ctx.repoDir);
-    const entryMap = new Map(doc.projects.map((e) => [e.path, e]));
+    const entryMap = new Map(doc.projects.map((e) => [fromHomeRelative(e.path, ctx.home), e]));
 
     for (const action of plan.actions) {
-      const targetPath = action.id;
+      const targetPath = fromHomeRelative(action.id, ctx.home);
 
       if (ctx.dryRun) {
         skipped.push(targetPath);
