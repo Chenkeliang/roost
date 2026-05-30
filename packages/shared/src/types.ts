@@ -30,6 +30,18 @@ export interface ApplyPlan { module: string; actions: ApplyAction[]; }
 export interface ApplyResult { module: string; applied: string[]; backedUp: string[]; skipped: string[]; }
 export interface Health { name: string; ok: boolean; detail?: string; }
 
+// ── env module ("Aliases & Env") ───────────────────────────────────────────────
+// Portable aliases / env vars / PATH entries / shell functions that Roost manages
+// structurally and injects into the shell via a single generated file. This is an
+// additive layer distinct from `dotfiles` (which backs up existing config FILES).
+export type ShellItemKind = "alias" | "env" | "path" | "function";
+export interface AliasItem { kind: "alias"; name: string; value: string; comment?: string; enabled: boolean }
+// when secret:true, `value` is '' in committed yaml + API responses
+export interface EnvVarItem { kind: "env"; name: string; value: string; secret: boolean; comment?: string; enabled: boolean }
+export interface PathEntry { kind: "path"; value: string; position: "prepend" | "append"; comment?: string; enabled: boolean }
+export interface FunctionItem { kind: "function"; name: string; body: string; comment?: string; enabled: boolean }
+export interface EnvData { schemaVersion: number; aliases: AliasItem[]; env: EnvVarItem[]; path: PathEntry[]; functions: FunctionItem[] }
+
 export interface SyncModule {
   name: string;
   discover(ctx: ModuleContext): Promise<Candidate[]>;
