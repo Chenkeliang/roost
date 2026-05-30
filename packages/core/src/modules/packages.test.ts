@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
-import { packagesModule } from "./packages.js";
+import { packagesModule, parseBrewfile } from "./packages.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -344,6 +344,34 @@ describe("packagesModule.doctor", () => {
     const mas = health.find((h) => h.name === "mas");
     expect(mas!.ok).toBe(false);
     expect(mas!.detail).toContain("App Store");
+  });
+});
+
+// ── parseBrewfile ───────────────────────────────────────────────────────────────
+
+describe("parseBrewfile", () => {
+  it("parses taps, formulae, casks, and mas into grouped arrays", () => {
+    const text = [
+      "# a comment",
+      "",
+      'tap "homebrew/cask-fonts"',
+      'brew "git"',
+      'brew "jq"',
+      'cask "firefox"',
+      'mas "Xcode", id: 497799835',
+      "  # indented comment",
+      'tap "homebrew/services"',
+    ].join("\n");
+    const result = parseBrewfile(text);
+    expect(result.taps).toEqual(["homebrew/cask-fonts", "homebrew/services"]);
+    expect(result.formulae).toEqual(["git", "jq"]);
+    expect(result.casks).toEqual(["firefox"]);
+    expect(result.mas).toEqual(["Xcode"]);
+  });
+
+  it("returns empty arrays for empty/comment-only input", () => {
+    const result = parseBrewfile("# just a comment\n\n");
+    expect(result).toEqual({ taps: [], formulae: [], casks: [], mas: [] });
   });
 });
 

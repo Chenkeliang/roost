@@ -19,6 +19,39 @@ function brewfilePath(repoDir: string): string {
   return path.join(repoDir, "roost", "Brewfile");
 }
 
+export interface BrewfileEntries {
+  taps: string[];
+  formulae: string[];
+  casks: string[];
+  mas: string[];
+}
+
+/**
+ * Parse Brewfile text into grouped entries. Lines:
+ *   tap "x"            → taps
+ *   brew "x"           → formulae
+ *   cask "x"           → casks
+ *   mas "Name", id: N  → mas (the quoted name)
+ * Comments (#) and blank lines are ignored.
+ */
+export function parseBrewfile(text: string): BrewfileEntries {
+  const entries: BrewfileEntries = { taps: [], formulae: [], casks: [], mas: [] };
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (line.length === 0 || line.startsWith("#")) continue;
+    const m = /^(tap|brew|cask|mas)\s+"([^"]+)"/.exec(line);
+    if (!m) continue;
+    const name = m[2]!;
+    switch (m[1]) {
+      case "tap": entries.taps.push(name); break;
+      case "brew": entries.formulae.push(name); break;
+      case "cask": entries.casks.push(name); break;
+      case "mas": entries.mas.push(name); break;
+    }
+  }
+  return entries;
+}
+
 export const packagesModule: SyncModule = {
   name: "packages",
 
