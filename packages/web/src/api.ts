@@ -1,8 +1,8 @@
 // Typed fetch wrapper for Roost API endpoints
-import type { ChangeSet, ApplyResult, DriftReport, DriftItem } from "@roost/shared";
+import type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate } from "@roost/shared";
 
 // Re-export shared types for component use
-export type { ChangeSet, ApplyResult, DriftReport, DriftItem };
+export type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate };
 
 export interface HealthResponse {
   ok: boolean;
@@ -84,4 +84,59 @@ export function postLoad(apply = false): Promise<LoadResponse> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apply }),
   });
+}
+
+// Server GET /api/discover returns { candidates: Record<string, Candidate[]> }
+export interface DiscoverResponse {
+  candidates: Record<string, Candidate[]>;
+}
+
+export function getDiscover(): Promise<DiscoverResponse> {
+  return apiFetch<DiscoverResponse>("/api/discover");
+}
+
+// Server POST /api/selection/add|remove returns updated SelectionResponse
+export function addSelection(module: string, id: string): Promise<SelectionResponse> {
+  return apiFetch<SelectionResponse>("/api/selection/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ module, id }),
+  });
+}
+
+export function removeSelection(module: string, id: string): Promise<SelectionResponse> {
+  return apiFetch<SelectionResponse>("/api/selection/remove", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ module, id }),
+  });
+}
+
+// Server GET /api/timeline returns { entries: TimelineEntry[] }
+export interface TimelineEntry {
+  sha: string;
+  subject: string;
+  date: string;
+}
+
+export interface TimelineResponse {
+  entries: TimelineEntry[];
+}
+
+export function getTimeline(): Promise<TimelineResponse> {
+  return apiFetch<TimelineResponse>("/api/timeline");
+}
+
+// Server GET /api/diff returns { diffs: DiffEntry[] }
+export interface DiffEntry {
+  module: string;
+  text: string;
+}
+
+export interface DiffResponse {
+  diffs: DiffEntry[];
+}
+
+export function getDiff(): Promise<DiffResponse> {
+  return apiFetch<DiffResponse>("/api/diff");
 }

@@ -165,7 +165,7 @@ export function App() {
       {/* Main content */}
       <main style={{ paddingBottom: 60 }}>
         {activeTab === "overview" && <Overview showHud={showHud} />}
-        {activeTab === "manage" && <Manage />}
+        {activeTab === "manage" && <Manage showHud={showHud} />}
         {activeTab === "drift" && <Drift />}
         {activeTab === "timeline" && <Timeline />}
         {activeTab === "settings" && <Settings />}
