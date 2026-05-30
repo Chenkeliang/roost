@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
 import * as prompts from "@clack/prompts";
-import { ModuleRegistry, exampleModule, createExec, createLogger, createT, defaultRegistry, loadProfiles, resolveProfile, defaultAgeKeyPath } from "@roost/core";
+import { createExec, createLogger, createT, defaultRegistry, loadProfiles, resolveProfile, defaultAgeKeyPath } from "@roost/core";
 import * as readline from "node:readline";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
@@ -93,8 +93,7 @@ async function promptRepoName(defaultName: string): Promise<string> {
 }
 
 program.command("doctor").description("Check dependencies and module health").action(async () => {
-  const reg = new ModuleRegistry();
-  reg.register(exampleModule);
+  const reg = defaultRegistry();
   const { ctx } = buildCtx({ dryRun: true });
   for (const h of await runDoctor(reg, ctx)) {
     console.log(`${h.ok ? "ok " : "FAIL"} ${h.name}${h.detail ? " — " + h.detail : ""}`);
