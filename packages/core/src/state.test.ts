@@ -157,7 +157,12 @@ describe("commitRepo", () => {
     expect(calls[0]!.cmd).toBe("git");
     expect(calls[0]!.args).toEqual(["-C", "/my/repo", "add", "-A"]);
     expect(calls[1]!.cmd).toBe("git");
-    expect(calls[1]!.args).toEqual(["-C", "/my/repo", "commit", "-m", "test: save state"]);
+    expect(calls[1]!.args).toEqual([
+      "-C", "/my/repo",
+      "-c", "user.name=Roost",
+      "-c", "user.email=roost@localhost",
+      "commit", "-m", "test: save state",
+    ]);
   });
 
   it("does not throw when commit exits non-zero with 'nothing to commit' stdout", async () => {

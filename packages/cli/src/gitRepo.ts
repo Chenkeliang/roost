@@ -23,7 +23,14 @@ export async function ensureGitRepo(exec: Exec, repoDir: string): Promise<void> 
   const hasHead = await exec.run("git", ["-C", repoDir, "rev-parse", "--verify", "HEAD"]);
   if (hasHead.code !== 0) {
     await gitOrThrow(exec, repoDir, ["add", "-A"], "add");
-    const commit = await exec.run("git", ["-C", repoDir, "commit", "-m", "roost: init"]);
+    // Explicit identity so init works on a machine/CI with no git user configured
+    // (`-c` is per-command; it does not modify the user's git config).
+    const commit = await exec.run("git", [
+      "-C", repoDir,
+      "-c", "user.name=Roost",
+      "-c", "user.email=roost@localhost",
+      "commit", "-m", "roost: init",
+    ]);
     if (commit.code !== 0) {
       const combined = `${commit.stdout}\n${commit.stderr}`;
       if (!combined.includes("nothing to commit")) {

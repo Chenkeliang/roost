@@ -64,7 +64,15 @@ export async function commitRepo(
   message: string,
 ): Promise<void> {
   await exec.run("git", ["-C", repoDir, "add", "-A"]);
-  const r = await exec.run("git", ["-C", repoDir, "commit", "-m", message]);
+  // Pass an explicit identity for Roost's automated commit so capture works on a
+  // machine (or CI runner) with no global git user.name/email configured. `-c`
+  // applies only to this command — it does NOT touch the user's git config.
+  const r = await exec.run("git", [
+    "-C", repoDir,
+    "-c", "user.name=Roost",
+    "-c", "user.email=roost@localhost",
+    "commit", "-m", message,
+  ]);
   if (r.code !== 0) {
     const combined = `${r.stdout}\n${r.stderr}`;
     if (combined.includes("nothing to commit")) return;
