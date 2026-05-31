@@ -22,9 +22,9 @@ afterEach(() => {
 });
 
 describe("default catalog", () => {
-  it("includes VS Code and JetBrains; JetBrains is encrypt-recommended; only file paths (no plist)", () => {
+  it("includes VS Code family and JetBrains; JetBrains is encrypt-recommended; only file paths (no plist)", () => {
     const names = DEFAULT_APP_CONFIG_CATALOG.map((a) => a.name);
-    expect(names).toContain("VS Code");
+    expect(names.some((n) => n.includes("VS Code"))).toBe(true);
     expect(names).toContain("JetBrains");
     const jb = DEFAULT_APP_CONFIG_CATALOG.find((a) => a.name === "JetBrains")!;
     expect(jb.encryptRecommended).toBe(true);

@@ -18,19 +18,15 @@ export interface CatalogApp {
 // so captures never slurp caches.
 export const DEFAULT_APP_CONFIG_CATALOG: CatalogApp[] = [
   {
-    name: "VS Code",
+    // VS Code AND all its forks (Cursor, Cursor Nightly, VSCodium, Windsurf,
+    // Kiro, Qoder, Trae, Code - Insiders, …) share the same User/ config layout.
+    // The glob auto-covers whichever are installed — no per-fork hardcoding.
+    name: "VS Code family",
     paths: [
-      "Library/Application Support/Code/User/settings.json",
-      "Library/Application Support/Code/User/keybindings.json",
-      "Library/Application Support/Code/User/snippets",
-    ],
-  },
-  {
-    name: "Cursor",
-    paths: [
-      "Library/Application Support/Cursor/User/settings.json",
-      "Library/Application Support/Cursor/User/keybindings.json",
-      "Library/Application Support/Cursor/User/snippets",
+      "Library/Application Support/*/User/settings.json",
+      "Library/Application Support/*/User/keybindings.json",
+      "Library/Application Support/*/User/snippets",
+      "Library/Application Support/*/User/prompts",
     ],
   },
   {
@@ -43,6 +39,14 @@ export const DEFAULT_APP_CONFIG_CATALOG: CatalogApp[] = [
     ],
     encryptRecommended: true,
   },
+  {
+    name: "Sublime Text",
+    paths: [
+      "Library/Application Support/Sublime Text/Packages/User",
+      "Library/Application Support/Sublime Text 3/Packages/User",
+    ],
+  },
+  { name: "Zed", paths: [".config/zed/settings.json", ".config/zed/keymap.json"] },
   { name: "Alacritty", paths: [".config/alacritty", ".alacritty.toml"] },
   { name: "Kitty", paths: [".config/kitty"] },
   { name: "WezTerm", paths: [".config/wezterm", ".wezterm.lua"] },
