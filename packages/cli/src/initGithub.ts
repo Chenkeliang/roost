@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Exec, Logger } from "@roost/shared";
 import { runInit } from "./init.js";
+import { ensureGitRepo } from "./gitRepo.js";
 import { getGitHubLogin, createPrivateRepo, type FetchImpl } from "./github.js";
 
 export interface InitGithubDeps {
@@ -110,7 +111,7 @@ export async function runInitGithub(deps: InitGithubDeps): Promise<InitGithubRes
   }
 
   // Ensure a git repo + initial commit exist (idempotent; safe to re-run).
-  await ensureGitRepo(exec, repoDir, log);
+  await ensureGitRepo(exec, repoDir);
 
   const branch = await detectBranch(exec, repoDir);
   const defaultName = path.basename(repoDir) || "roost-config";
@@ -156,21 +157,4 @@ export async function runInitGithub(deps: InitGithubDeps): Promise<InitGithubRes
 
   log.info(`Pushed to ${htmlUrl}`);
   return { repoName, htmlUrl, pushed: true, dryRun: false };
-}
-
-/** Initialize a git repo (if needed) and create an initial commit (if needed). */
-async function ensureGitRepo(exec: Exec, repoDir: string, log: Logger): Promise<void> {
-  const inside = await exec.run("git", ["-C", repoDir, "rev-parse", "--is-inside-work-tree"]);
-  if (inside.code !== 0 || inside.stdout.trim() !== "true") {
-    await gitOrThrow(exec, repoDir, ["init", "-b", "main"], "init");
-    log.info("Initialized empty git repository");
-  }
-
-  // Is there at least one commit?
-  const hasHead = await exec.run("git", ["-C", repoDir, "rev-parse", "--verify", "HEAD"]);
-  if (hasHead.code !== 0) {
-    await gitOrThrow(exec, repoDir, ["add", "-A"], "add");
-    await gitOrThrow(exec, repoDir, ["commit", "-m", "chore: initial roost config"], "commit");
-    log.info("Created initial commit");
-  }
 }

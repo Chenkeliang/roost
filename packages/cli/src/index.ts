@@ -7,6 +7,7 @@ import { createExec, createLogger, createT, defaultRegistry, loadProfiles, resol
 import * as readline from "node:readline";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
+import { ensureGitRepo } from "./gitRepo.js";
 import { runInitGithub } from "./initGithub.js";
 import { runSelect } from "./commands/select.js";
 import { runCapture } from "./commands/capture.js";
@@ -128,6 +129,10 @@ program
     } else {
       for (const f of created) ctx.log.info(`created: ${f}`);
     }
+
+    // Ensure the scaffolded repo is a real git repo with an initial commit so
+    // a subsequent `roost capture` (which commits) works (idempotent).
+    await ensureGitRepo(ctx.exec, resolvedRepo);
 
     // If an age key is already present, remind the user (once) to back it up offline.
     remindOfflineBackup({ keyPath: defaultAgeKeyPath(ctx.home), log: (msg) => ctx.log.warn(msg) });
