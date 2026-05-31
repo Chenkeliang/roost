@@ -98,6 +98,11 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   },
   "dotfiles.scan": { en: "Scan for dotfiles", zh: "扫描 Dotfiles" },
   "dotfiles.scanning": { en: "Scanning…", zh: "扫描中…" },
+  "dotfiles.addPath": { en: "Add path", zh: "添加路径" },
+  "dotfiles.customPathPlaceholder": {
+    en: "Back up any absolute path — e.g. /Users/you/Library/Application Support/JetBrains/DataGrip2024.1/options",
+    zh: "备份任意绝对路径 — 例如 /Users/你/Library/Application Support/JetBrains/DataGrip2024.1/options",
+  },
   "dotfiles.discovered": { en: "Discovered", zh: "发现" },
   "dotfiles.added": { en: "Added", zh: "已添加" },
   "dotfiles.remove": { en: "Remove", zh: "移除" },

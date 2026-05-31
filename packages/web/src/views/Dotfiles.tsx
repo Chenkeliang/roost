@@ -39,6 +39,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set()); // in selection.yaml (pending capture)
   const [checked, setChecked] = useState<Set<string>>(new Set()); // batch UI checkboxes
   const [busy, setBusy] = useState(false);
+  const [customPath, setCustomPath] = useState("");
 
   const load = useCallback(async () => {
     const [, df, sel] = await Promise.all([getIndex(), getDotfiles(), getSelection()]);
@@ -84,6 +85,21 @@ export function Dotfiles({ showHud }: DotfilesProps) {
       showHud?.({ text: e instanceof Error ? e.message : "Remove failed", type: "error" });
     }
   }, [showHud]);
+
+  // Add an arbitrary path (e.g. an app's config under ~/Library/Application
+  // Support) — chezmoi manages any path, so this just selects it like a dotfile.
+  const addCustomPath = useCallback(async () => {
+    const p = customPath.trim();
+    if (!p) return;
+    try {
+      await addSelection("dotfiles", p);
+      setSelected((s) => new Set(s).add(p));
+      setCustomPath("");
+      showHud?.({ text: `Added ${p}`, type: "success" });
+    } catch (e) {
+      showHud?.({ text: e instanceof Error ? e.message : "Add failed", type: "error" });
+    }
+  }, [customPath, showHud]);
 
   // Primary list = what you've SELECTED (selection.yaml), shown persistently
   // whether or not it's been captured yet. The Discovered section below is for
@@ -160,6 +176,19 @@ export function Dotfiles({ showHud }: DotfilesProps) {
         <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
           {scanning ? t("dotfiles.scanning") : t("dotfiles.scan")}
+        </button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <input
+          value={customPath}
+          onChange={(e) => setCustomPath(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void addCustomPath(); }}
+          placeholder={t("dotfiles.customPathPlaceholder")}
+          style={{ flex: 1, maxWidth: 560, appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 12.5, padding: "6px 10px", borderRadius: 6, boxSizing: "border-box" }}
+        />
+        <button onClick={() => void addCustomPath()} disabled={!customPath.trim()} style={{ ...ic, color: "var(--accent)", padding: "6px 12px", fontSize: 13, opacity: customPath.trim() ? 1 : 0.5 }}>
+          <FloppyDisk size={14} />{t("dotfiles.addPath")}
         </button>
       </div>
 
