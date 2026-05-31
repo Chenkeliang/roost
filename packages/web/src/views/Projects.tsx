@@ -4,6 +4,7 @@ import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
+import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
 import { getIndex, getDiscoverModule, testProjectRemote, addSelection, removeSelection, getSelection } from "../api";
 
@@ -26,6 +27,7 @@ export function Projects({ showHud }: ProjectsProps) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"selected" | "discovered">("selected");
 
   useEffect(() => {
     void (async () => {
@@ -47,6 +49,7 @@ export function Projects({ showHud }: ProjectsProps) {
     try {
       const { candidates } = await getDiscoverModule("projects");
       setCands(candidates.projects ?? []);
+      setTab("discovered");
     } catch (e) {
       showHud?.({ text: e instanceof Error ? e.message : "Scan failed", type: "error" });
     } finally {
@@ -124,9 +127,31 @@ export function Projects({ showHud }: ProjectsProps) {
         {t("projects.explainer")} {t("common.selected")}: {saved.size} · {t("common.managed")}: {loading ? "…" : managed}.
       </p>
 
-      {saved.size > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 8px" }}>{t("common.selected")} ({saved.size})</div>
+      {!available && (
+        <div role="alert" style={{ padding: "10px 14px", background: "rgba(242,85,90,.1)", border: "1px solid var(--red)", borderRadius: "var(--rr)", color: "var(--red)", fontSize: 13, marginBottom: 14 }}>
+          {reason ?? "git not available"}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <TabSwitch
+          active={tab}
+          onChange={(id) => setTab(id as "selected" | "discovered")}
+          tabs={[
+            { id: "selected", label: t("common.selectedTab"), count: saved.size },
+            { id: "discovered", label: t("common.discoveredTab"), count: cands === null ? undefined : cands.length },
+          ]}
+        />
+        <button onClick={() => void scan()} disabled={scanning || !available} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13, marginLeft: "auto" }}>
+          {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
+          {scanning ? t("projects.scanning") : t("projects.scan")}
+        </button>
+      </div>
+
+      {tab === "selected" && (
+        saved.size === 0 ? (
+          <EmptyState icon={<GitBranch size={24} />} title={t("projects.emptyTitle")} subtitle={t("projects.noScanSubtitle")} />
+        ) : (
           <div style={card}>
             {[...saved].sort().map((id) => (
               <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
@@ -136,22 +161,11 @@ export function Projects({ showHud }: ProjectsProps) {
               </div>
             ))}
           </div>
-        </div>
+        )
       )}
 
-      {!available && (
-        <div role="alert" style={{ padding: "10px 14px", background: "rgba(242,85,90,.1)", border: "1px solid var(--red)", borderRadius: "var(--rr)", color: "var(--red)", fontSize: 13, marginBottom: 14 }}>
-          {reason ?? "git not available"}
-        </div>
-      )}
-
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <button onClick={() => void scan()} disabled={scanning || !available} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
-          {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
-          {scanning ? t("projects.scanning") : t("projects.scan")}
-        </button>
-      </div>
-
+      {tab === "discovered" && (
+      <>
       {cands && cands.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
           {["all", ...hosts].map((h) => (
@@ -214,6 +228,8 @@ export function Projects({ showHud }: ProjectsProps) {
             ))}
           </div>
         </>
+      )}
+      </>
       )}
     </div>
   );

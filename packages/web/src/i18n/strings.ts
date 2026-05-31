@@ -18,6 +18,10 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "common.shownItems": { en: "shown", zh: "项" },
   "common.captured": { en: "captured", zh: "已捕获" },
   "common.pending": { en: "pending capture", zh: "待捕获" },
+  "common.selectedTab": { en: "Selected", zh: "已选" },
+  "common.discoveredTab": { en: "Discovered", zh: "未选/发现" },
+  "common.allAddedTitle": { en: "All discovered items added", zh: "发现项已全部添加" },
+  "common.allAddedSubtitle": { en: "Everything found is already in your selection.", zh: "扫描到的都已在你的选单里。" },
 
   // ── App shell: sidebar nav ──────────────────────────────────────────────
   "nav.overview": { en: "Overview", zh: "总览" },

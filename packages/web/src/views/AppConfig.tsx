@@ -4,6 +4,7 @@ import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
+import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
 import { getIndex, getAppConfig, getDiscoverModule, addSelection, removeSelection, getSelection } from "../api";
 
@@ -28,6 +29,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set()); // in selection.yaml (pending capture)
   const [checked, setChecked] = useState<Set<string>>(new Set()); // batch UI checkboxes
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"selected" | "discovered">("selected");
 
   const load = useCallback(async () => {
     const [, ac, sel] = await Promise.all([getIndex(), getAppConfig(), getSelection()]);
@@ -47,6 +49,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
     try {
       const { candidates } = await getDiscoverModule("appconfig");
       setCands(candidates.appconfig ?? []);
+      setTab("discovered");
     } catch (e) {
       showHud?.({ text: e instanceof Error ? e.message : "Scan failed", type: "error" });
     } finally {
@@ -134,7 +137,15 @@ export function AppConfig({ showHud }: AppConfigProps) {
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <div style={{ position: "relative", flex: 1, maxWidth: 320 }}>
+        <TabSwitch
+          active={tab}
+          onChange={(id) => setTab(id as "selected" | "discovered")}
+          tabs={[
+            { id: "selected", label: t("common.selectedTab"), count: selected.size },
+            { id: "discovered", label: t("common.discoveredTab"), count: cands === null ? undefined : newCands.length },
+          ]}
+        />
+        <div style={{ position: "relative", flex: 1, maxWidth: 260 }}>
           <MagnifyingGlass size={14} style={{ position: "absolute", left: 9, top: 8, color: "var(--muted)" }} />
           <input
             value={filter}
@@ -149,44 +160,50 @@ export function AppConfig({ showHud }: AppConfigProps) {
         </button>
       </div>
 
-      {selectedList.length === 0 ? (
-        <EmptyState
-          icon={<Sliders size={24} />}
-          title={selected.size > 0 ? t("appconfig.emptyMatchTitle") : t("appconfig.emptyTitle")}
-          subtitle={selected.size > 0 ? t("appconfig.emptyMatchSubtitle") : t("appconfig.emptySubtitle")}
-        />
-      ) : (
-        <div style={card}>
-          {selectedList.map((id) => {
-            const domain = candidateDomain(id);
-            const captured = (managed ?? []).includes(domain);
-            return (
-              <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
-                <AppWindow size={14} style={{ color: "var(--muted)" }} />
-                <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{domain}</span>
-                <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("common.captured") : t("common.pending")}</span>
-                <button onClick={() => void remove(id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${domain}`}><X size={11} />{t("common.remove")}</button>
-              </div>
-            );
-          })}
-        </div>
+      {tab === "selected" && (
+        selectedList.length === 0 ? (
+          <EmptyState
+            icon={<Sliders size={24} />}
+            title={selected.size > 0 ? t("appconfig.emptyMatchTitle") : t("appconfig.emptyTitle")}
+            subtitle={selected.size > 0 ? t("appconfig.emptyMatchSubtitle") : t("appconfig.emptySubtitle")}
+          />
+        ) : (
+          <div style={card}>
+            {selectedList.map((id) => {
+              const domain = candidateDomain(id);
+              const captured = (managed ?? []).includes(domain);
+              return (
+                <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                  <AppWindow size={14} style={{ color: "var(--muted)" }} />
+                  <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{domain}</span>
+                  <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("common.captured") : t("common.pending")}</span>
+                  <button onClick={() => void remove(id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${domain}`}><X size={11} />{t("common.remove")}</button>
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
-      {cands !== null && newCands.length > 0 && (
-        <div style={{ marginTop: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                aria-label="select all discovered"
-                checked={checked.size > 0 && newCands.every((c) => checked.has(c.id))}
-                onChange={(e) => setChecked(e.target.checked ? new Set(newCands.map((c) => c.id)) : new Set())}
-              />
-              {t("common.discovered")} ({newCands.length})
-            </label>
-            {checked.size > 0 && (
+      {tab === "discovered" && (
+        cands === null ? (
+          <EmptyState icon={<Sliders size={24} />} title={t("appconfig.emptyTitle")} subtitle={t("appconfig.emptySubtitle")} />
+        ) : newCands.length === 0 ? (
+          <EmptyState icon={<CheckCircle size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
+        ) : (
+        <div>
+          {checked.size > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  aria-label="select all discovered"
+                  checked={checked.size > 0 && newCands.every((c) => checked.has(c.id))}
+                  onChange={(e) => setChecked(e.target.checked ? new Set(newCands.map((c) => c.id)) : new Set())}
+                />
+                {checked.size} {t("common.selected")}
+              </label>
               <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <span style={{ color: "var(--muted)", fontSize: 12 }}>{checked.size} {t("common.selected")}</span>
                 <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
                   <FloppyDisk size={11} />{t("common.addSelected")}
                 </button>
@@ -194,8 +211,8 @@ export function AppConfig({ showHud }: AppConfigProps) {
                   <X size={11} />{t("common.removeSelected")}
                 </button>
               </span>
-            )}
-          </div>
+            </div>
+          )}
           <div style={card}>
             {newCands.map((c) => {
               const domain = candidateDomain(c.id);
@@ -218,6 +235,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
             })}
           </div>
         </div>
+        )
       )}
     </div>
   );

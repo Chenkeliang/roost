@@ -4,6 +4,7 @@ import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
+import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
 import { getIndex, getDotfiles, getDiscoverModule, addSelection, removeSelection, getSelection } from "../api";
 
@@ -40,6 +41,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
   const [checked, setChecked] = useState<Set<string>>(new Set()); // batch UI checkboxes
   const [busy, setBusy] = useState(false);
   const [customPath, setCustomPath] = useState("");
+  const [tab, setTab] = useState<"selected" | "discovered">("selected");
 
   const load = useCallback(async () => {
     const [, df, sel] = await Promise.all([getIndex(), getDotfiles(), getSelection()]);
@@ -59,6 +61,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
     try {
       const { candidates } = await getDiscoverModule("dotfiles");
       setCands(candidates.dotfiles ?? []);
+      setTab("discovered"); // jump to the discovered tab after a scan
     } catch (e) {
       showHud?.({ text: e instanceof Error ? e.message : "Scan failed", type: "error" });
     } finally {
@@ -164,7 +167,15 @@ export function Dotfiles({ showHud }: DotfilesProps) {
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <div style={{ position: "relative", flex: 1, maxWidth: 320 }}>
+        <TabSwitch
+          active={tab}
+          onChange={(id) => setTab(id as "selected" | "discovered")}
+          tabs={[
+            { id: "selected", label: t("common.selectedTab"), count: selected.size },
+            { id: "discovered", label: t("common.discoveredTab"), count: cands === null ? undefined : newCands.length },
+          ]}
+        />
+        <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
           <MagnifyingGlass size={14} style={{ position: "absolute", left: 9, top: 8, color: "var(--muted)" }} />
           <input
             value={filter}
@@ -179,83 +190,92 @@ export function Dotfiles({ showHud }: DotfilesProps) {
         </button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <input
-          value={customPath}
-          onChange={(e) => setCustomPath(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") void addCustomPath(); }}
-          placeholder={t("dotfiles.customPathPlaceholder")}
-          style={{ flex: 1, maxWidth: 560, appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 12.5, padding: "6px 10px", borderRadius: 6, boxSizing: "border-box" }}
-        />
-        <button onClick={() => void addCustomPath()} disabled={!customPath.trim()} style={{ ...ic, color: "var(--accent)", padding: "6px 12px", fontSize: 13, opacity: customPath.trim() ? 1 : 0.5 }}>
-          <FloppyDisk size={14} />{t("dotfiles.addPath")}
-        </button>
-      </div>
+      {tab === "selected" && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <input
+              value={customPath}
+              onChange={(e) => setCustomPath(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void addCustomPath(); }}
+              placeholder={t("dotfiles.customPathPlaceholder")}
+              style={{ flex: 1, maxWidth: 560, appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 12.5, padding: "6px 10px", borderRadius: 6, boxSizing: "border-box" }}
+            />
+            <button onClick={() => void addCustomPath()} disabled={!customPath.trim()} style={{ ...ic, color: "var(--accent)", padding: "6px 12px", fontSize: 13, opacity: customPath.trim() ? 1 : 0.5 }}>
+              <FloppyDisk size={14} />{t("dotfiles.addPath")}
+            </button>
+          </div>
 
-      {selectedList.length === 0 ? (
-        <EmptyState icon={<File size={24} />} title={selected.size > 0 ? t("dotfiles.emptyMatchTitle") : t("dotfiles.emptyTitle")} subtitle={selected.size > 0 ? t("dotfiles.emptyMatchSubtitle") : t("dotfiles.emptySubtitle")} />
-      ) : (
-        <div style={card}>
-          {selectedList.map((p) => {
-            const cat = categorize(p);
-            const captured = (managed ?? []).some((m) => p.endsWith(m) || m.endsWith(p));
-            return (
-              <div key={p} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
-                <CategoryIcon category={cat} />
-                <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("common.captured") : t("common.pending")}</span>
-                <button onClick={() => void remove(p)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${p}`}><X size={11} />{t("common.remove")}</button>
-              </div>
-            );
-          })}
-        </div>
+          {selectedList.length === 0 ? (
+            <EmptyState icon={<File size={24} />} title={selected.size > 0 ? t("dotfiles.emptyMatchTitle") : t("dotfiles.emptyTitle")} subtitle={selected.size > 0 ? t("dotfiles.emptyMatchSubtitle") : t("dotfiles.emptySubtitle")} />
+          ) : (
+            <div style={card}>
+              {selectedList.map((p) => {
+                const cat = categorize(p);
+                const captured = (managed ?? []).some((m) => p.endsWith(m) || m.endsWith(p));
+                return (
+                  <div key={p} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                    <CategoryIcon category={cat} />
+                    <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
+                    <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("common.captured") : t("common.pending")}</span>
+                    <button onClick={() => void remove(p)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${p}`}><X size={11} />{t("common.remove")}</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
-      {cands !== null && newCands.length > 0 && (
-        <div style={{ marginTop: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                aria-label="select all discovered"
-                checked={checked.size > 0 && newCands.every((c) => checked.has(c.id))}
-                onChange={(e) => setChecked(e.target.checked ? new Set(newCands.map((c) => c.id)) : new Set())}
-              />
-              {t("dotfiles.discovered")} ({newCands.length})
-            </label>
+      {tab === "discovered" && (
+        cands === null ? (
+          <EmptyState icon={<File size={24} />} title={t("dotfiles.emptyTitle")} subtitle={t("dotfiles.emptySubtitle")} />
+        ) : newCands.length === 0 ? (
+          <EmptyState icon={<CheckCircle size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
+        ) : (
+          <div>
             {checked.size > 0 && (
-              <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <span style={{ color: "var(--muted)", fontSize: 12 }}>{checked.size} {t("dotfiles.selected")}</span>
-                <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
-                  <FloppyDisk size={11} />{t("dotfiles.addSelected")}
-                </button>
-                <button onClick={() => void batch("remove")} disabled={busy} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}>
-                  <X size={11} />{t("dotfiles.removeSelected")}
-                </button>
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    aria-label="select all discovered"
+                    checked={checked.size > 0 && newCands.every((c) => checked.has(c.id))}
+                    onChange={(e) => setChecked(e.target.checked ? new Set(newCands.map((c) => c.id)) : new Set())}
+                  />
+                  {checked.size} {t("common.selected")}
+                </label>
+                <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
+                    <FloppyDisk size={11} />{t("common.addSelected")}
+                  </button>
+                  <button onClick={() => void batch("remove")} disabled={busy} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}>
+                    <X size={11} />{t("common.removeSelected")}
+                  </button>
+                </span>
+              </div>
             )}
+            <div style={card}>
+              {newCands.map((c) => {
+                const isAdded = selected.has(c.id);
+                return (
+                  <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                    <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
+                    <CategoryIcon category={categorize(c.path)} />
+                    <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
+                    {isAdded ? (
+                      <>
+                        <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} added`}><CheckCircle size={11} weight="fill" />{t("common.added")}</span>
+                        <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
+                      </>
+                    ) : (
+                      <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />Add</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div style={card}>
-            {newCands.map((c) => {
-              const isAdded = selected.has(c.id);
-              return (
-                <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
-                  <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
-                  <CategoryIcon category={categorize(c.path)} />
-                  <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
-                  {isAdded ? (
-                    <>
-                      <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} added`}><CheckCircle size={11} weight="fill" />{t("dotfiles.added")}</span>
-                      <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("dotfiles.remove")}</button>
-                    </>
-                  ) : (
-                    <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />Add</button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        )
       )}
     </div>
   );
