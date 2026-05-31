@@ -93,7 +93,15 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     zh: "将已安装的 Homebrew 软件包导入仓库以进行管理。",
   },
   "packages.import": { en: "Import from this Mac", zh: "从此 Mac 导入" },
-  "packages.importing": { en: "Importing…", zh: "导入中…" },
+  "packages.importing": { en: "Scanning…", zh: "扫描中…" },
+  "packages.scan": { en: "Scan installed packages", zh: "扫描已装软件包" },
+  "packages.installSelected": { en: "Install selected", zh: "安装选中" },
+  "packages.installAll": { en: "Install all", zh: "全部安装" },
+  "packages.expand": { en: "Expand to per-package", zh: "展开为逐项" },
+  "packages.legacyBanner": {
+    en: "Whole Brewfile (legacy). Expand it to manage and install packages individually.",
+    zh: "整份 Brewfile(旧版)。展开后即可逐个管理与安装。",
+  },
 
   // ── Dotfiles ─────────────────────────────────────────────────────────────
   "dotfiles.explainer": {

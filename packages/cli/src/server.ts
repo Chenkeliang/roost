@@ -32,6 +32,7 @@ import {
   indexAll,
   testRemote,
   parseBrewfile,
+  brewfileText,
   createChezmoi,
 } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -131,6 +132,27 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── POST /api/packages/install ───────────────────────────────────────────────
+  // Selective install (ADR-0009 Phase 2): write a temp Brewfile from the chosen
+  // per-package ids and `brew bundle` only those — the follower picks a subset.
+  server.post<{ Body: { ids?: string[] } }>("/api/packages/install", async (req, reply) => {
+    try {
+      const ids = (req.body?.ids ?? []).filter((s) => typeof s === "string" && s.includes(":"));
+      if (ids.length === 0) return reply.status(400).send({ error: "no packages selected to install" });
+      const ctx = makeCtx(false);
+      const tmp = path.join(os.tmpdir(), `roost-install-${Date.now()}.Brewfile`);
+      fs.writeFileSync(tmp, `${brewfileText(ids)}\n`, "utf8");
+      try {
+        const r = await ctx.exec.run("brew", ["bundle", "--file", tmp]);
+        return reply.send({ ok: r.code === 0, installed: ids.length, output: r.code === 0 ? r.stdout : r.stderr });
+      } finally {
+        try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+      }
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
     }
   });
 

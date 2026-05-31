@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { Packages } from "./views/Packages";
 
@@ -10,32 +10,47 @@ vi.mock("./api", () => ({
     exists: true,
     entries: { taps: ["homebrew/services"], formulae: ["git"], casks: ["firefox"], mas: [] },
   }),
-  addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: ["Brewfile"] } }),
-  removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: [] } }),
-  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: ["Brewfile"] } }),
-  postCapture: vi.fn().mockResolvedValue({ changes: [] }),
+  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: ["brew:git", "cask:firefox"] } }),
+  getDiscoverModule: vi.fn().mockResolvedValue({
+    candidates: { packages: [{ id: "brew:fd", path: "roost/Brewfile", category: "packages", recommendation: "track", note: "formula" }] },
+  }),
+  addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
+  removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
+  installPackages: vi.fn().mockResolvedValue({ ok: true, installed: 2, output: "" }),
 }));
 
 describe("Packages", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("brew absent → honest 'not installed' empty state, no brewfile list", async () => {
+  it("brew absent → honest 'not installed' empty state", async () => {
     const api = await import("./api");
     (api.getBrewfile as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      available: false,
-      exists: false,
-      entries: { taps: [], formulae: [], casks: [], mas: [] },
+      available: false, exists: false, entries: { taps: [], formulae: [], casks: [], mas: [] },
     });
     await act(async () => { render(<Packages showHud={vi.fn()} />); });
     await waitFor(() => expect(screen.getByText(/not installed/i)).toBeInTheDocument());
-    expect(screen.queryByText(/Formulae/)).not.toBeInTheDocument();
   });
 
-  it("brew present + entries → renders a formula and a cask in their sections", async () => {
+  it("Selected tab lists per-package selection with a Remove action", async () => {
     await act(async () => { render(<Packages showHud={vi.fn()} />); });
     await waitFor(() => expect(screen.getByText("git")).toBeInTheDocument());
     expect(screen.getByText("firefox")).toBeInTheDocument();
-    expect(screen.getByText(/Formulae/)).toBeInTheDocument();
-    expect(screen.getByText(/Casks/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove brew:git/i })).toBeInTheDocument();
+  });
+
+  it("Install all calls installPackages with the selected ids", async () => {
+    const api = await import("./api");
+    await act(async () => { render(<Packages showHud={vi.fn()} />); });
+    await waitFor(() => expect(screen.getByText("git")).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /install all/i })); });
+    expect(api.installPackages).toHaveBeenCalledWith(["brew:git", "cask:firefox"]);
+  });
+
+  it("Scan calls getDiscoverModule('packages')", async () => {
+    const api = await import("./api");
+    await act(async () => { render(<Packages showHud={vi.fn()} />); });
+    await waitFor(() => expect(screen.getByText("git")).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /scan installed packages/i })); });
+    expect(api.getDiscoverModule).toHaveBeenCalledWith("packages");
   });
 });

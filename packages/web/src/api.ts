@@ -217,6 +217,16 @@ export function getBrewfile(): Promise<BrewfileResponse> {
   return apiFetch<BrewfileResponse>("/api/packages/brewfile");
 }
 
+// Server POST /api/packages/install installs a chosen subset of per-package ids.
+export interface InstallResult { ok: boolean; installed: number; output: string }
+export function installPackages(ids: string[]): Promise<InstallResult> {
+  return apiFetch<InstallResult>("/api/packages/install", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+}
+
 // Server GET /api/dotfiles returns chezmoi availability + managed relative paths.
 export interface DotfilesResponse {
   available: boolean;
