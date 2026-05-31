@@ -123,4 +123,10 @@ describe("createChezmoi", () => {
     const chezmoi = createChezmoi(exec, { sourceDir });
     await expect(chezmoi.forget("/home/user/.zshrc")).rejects.toThrow("forget failed");
   });
+
+  it("forget: tolerates 'not managed' as a no-op (path was never captured)", async () => {
+    const { exec } = makeFakeExec([{ code: 1, stdout: "", stderr: "chezmoi: /home/user/.zshr: not managed" }]);
+    const chezmoi = createChezmoi(exec, { sourceDir });
+    await expect(chezmoi.forget("/home/user/.zshr")).resolves.toBeUndefined();
+  });
 });

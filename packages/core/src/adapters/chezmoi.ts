@@ -46,7 +46,14 @@ export function createChezmoi(exec: Exec, opts: { sourceDir: string }): Chezmoi 
     },
 
     async forget(forgetPath: string): Promise<void> {
-      await runChecked(["forget", "--force", forgetPath]);
+      const r = await exec.run("chezmoi", ["--source", sourceDir, "forget", "--force", forgetPath]);
+      if (r.code !== 0) {
+        // Forgetting a path chezmoi never managed is already the desired end
+        // state (e.g. removing a dotfile that was selected but not yet captured),
+        // so treat "not managed" as a successful no-op rather than an error.
+        if (/not managed/i.test(r.stderr)) return;
+        throw new Error(r.stderr || `chezmoi exited with code ${r.code}`);
+      }
     },
   };
 }
