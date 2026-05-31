@@ -316,7 +316,7 @@ export function App() {
         </aside>
 
         {/* Main content */}
-        <main style={{ flex: 1, minWidth: 0, paddingBottom: 60 }}>
+        <main style={{ flex: 1, minWidth: 0, paddingTop: 28, paddingBottom: 60 }}>
           {activeTab === "overview" && <Overview showHud={showHud} />}
           {activeTab === "manage" && <Manage showHud={showHud} />}
           {activeTab === "projects" && <Projects showHud={showHud} />}
