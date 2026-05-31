@@ -66,10 +66,12 @@ function NavButton({
   active,
   onClick,
   label,
+  indent = false,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
+  indent?: boolean;
 }) {
   return (
     <button
@@ -87,7 +89,8 @@ function NavButton({
         fontFamily: "var(--font)",
         fontSize: 13,
         textAlign: "left",
-        padding: "7px 12px",
+        // Module-group items are indented so they read as members of MODULES.
+        padding: indent ? "7px 12px 7px 24px" : "7px 12px",
         borderRadius: "var(--rr)",
         cursor: "pointer",
         transition: "background .12s, color .12s",
@@ -246,6 +249,7 @@ export function App() {
               label={t(item.labelKey)}
               active={activeTab === item.id}
               onClick={() => setActiveTab(item.id)}
+              indent
             />
           ))}
 
@@ -302,15 +306,6 @@ export function App() {
             </a>
             <span style={{ marginLeft: "auto" }}>
               <LanguageSwitcher locale={locale} setLocale={setLocale} />
-            </span>
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "var(--muted)",
-              }}
-            >
-              ⌘K
             </span>
           </div>
         </aside>
