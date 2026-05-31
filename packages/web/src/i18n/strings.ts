@@ -85,6 +85,12 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   },
   "dotfiles.scan": { en: "Scan for dotfiles", zh: "扫描 Dotfiles" },
   "dotfiles.scanning": { en: "Scanning…", zh: "扫描中…" },
+  "dotfiles.discovered": { en: "Discovered", zh: "发现" },
+  "dotfiles.added": { en: "Added", zh: "已添加" },
+  "dotfiles.remove": { en: "Remove", zh: "移除" },
+  "dotfiles.selected": { en: "selected", zh: "已选" },
+  "dotfiles.addSelected": { en: "Add selected", zh: "添加选中" },
+  "dotfiles.removeSelected": { en: "Remove selected", zh: "移除选中" },
   "dotfiles.noChezmoiTitle": { en: "chezmoi not installed", zh: "未安装 chezmoi" },
   "dotfiles.noChezmoiSubtitle": {
     en: "Install chezmoi to manage dotfiles — Roost won't run chezmoi until it's available.",

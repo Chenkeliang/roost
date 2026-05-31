@@ -10,6 +10,8 @@ vi.mock("./api", () => ({
     candidates: { dotfiles: [{ id: "~/.vimrc", path: "~/.vimrc", category: "editor", recommendation: "include" }] },
   }),
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: ["~/.vimrc"] } }),
+  removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: [] } }),
+  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: [] } }),
 }));
 
 describe("Dotfiles", () => {

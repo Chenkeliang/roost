@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { File, MagnifyingGlass, ArrowsClockwise, FloppyDisk, Terminal, GitBranch, Pencil } from "@phosphor-icons/react";
+import { File, MagnifyingGlass, ArrowsClockwise, FloppyDisk, Terminal, GitBranch, Pencil, CheckCircle, X } from "@phosphor-icons/react";
 import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getIndex, getDotfiles, getDiscoverModule, addSelection } from "../api";
+import { getIndex, getDotfiles, getDiscoverModule, addSelection, removeSelection, getSelection } from "../api";
 
 interface DotfilesProps { showHud?: (m: HudMessage) => void; }
 type Category = "shell" | "git" | "editor" | "other";
@@ -36,11 +36,15 @@ export function Dotfiles({ showHud }: DotfilesProps) {
   const [filter, setFilter] = useState("");
   const [cands, setCands] = useState<Candidate[] | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set()); // in selection.yaml (pending capture)
+  const [checked, setChecked] = useState<Set<string>>(new Set()); // batch UI checkboxes
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [, df] = await Promise.all([getIndex(), getDotfiles()]);
+    const [, df, sel] = await Promise.all([getIndex(), getDotfiles(), getSelection()]);
     setAvailable(df.available);
     setManaged(df.managed);
+    setSelected(new Set(sel.modules.dotfiles ?? []));
   }, []);
 
   useEffect(() => {
@@ -64,15 +68,53 @@ export function Dotfiles({ showHud }: DotfilesProps) {
   const add = useCallback(async (c: Candidate) => {
     try {
       await addSelection("dotfiles", c.id);
-      await load();
+      setSelected((s) => new Set(s).add(c.id));
       showHud?.({ text: `Added ${c.path}`, type: "success" });
     } catch (e) {
       showHud?.({ text: e instanceof Error ? e.message : "Add failed", type: "error" });
     }
-  }, [load, showHud]);
+  }, [showHud]);
+
+  const remove = useCallback(async (id: string) => {
+    try {
+      await removeSelection("dotfiles", id);
+      setSelected((s) => { const n = new Set(s); n.delete(id); return n; });
+      showHud?.({ text: `Removed ${id}`, type: "success" });
+    } catch (e) {
+      showHud?.({ text: e instanceof Error ? e.message : "Remove failed", type: "error" });
+    }
+  }, [showHud]);
 
   const shown = (managed ?? []).filter((p) => p.toLowerCase().includes(filter.toLowerCase()));
   const newCands = (cands ?? []).filter((c) => !(managed ?? []).includes(c.id));
+
+  const toggleCheck = useCallback((id: string) => {
+    setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }, []);
+
+  // Batch add/remove every checked candidate, then clear the checkbox selection.
+  const batch = useCallback(async (action: "add" | "remove") => {
+    const ids = [...checked];
+    if (ids.length === 0) return;
+    setBusy(true);
+    try {
+      for (const id of ids) {
+        if (action === "add") await addSelection("dotfiles", id);
+        else await removeSelection("dotfiles", id);
+      }
+      setSelected((s) => {
+        const n = new Set(s);
+        for (const id of ids) { if (action === "add") n.add(id); else n.delete(id); }
+        return n;
+      });
+      setChecked(new Set());
+      showHud?.({ text: `${action === "add" ? "Added" : "Removed"} ${ids.length} item(s)`, type: "success" });
+    } catch (e) {
+      showHud?.({ text: e instanceof Error ? e.message : "Batch failed", type: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }, [checked, showHud]);
 
   if (loading) {
     return (
@@ -135,15 +177,47 @@ export function Dotfiles({ showHud }: DotfilesProps) {
 
       {cands !== null && newCands.length > 0 && (
         <div style={{ marginTop: 18 }}>
-          <div style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 8px" }}>Discovered ({newCands.length})</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                aria-label="select all discovered"
+                checked={checked.size > 0 && newCands.every((c) => checked.has(c.id))}
+                onChange={(e) => setChecked(e.target.checked ? new Set(newCands.map((c) => c.id)) : new Set())}
+              />
+              {t("dotfiles.discovered")} ({newCands.length})
+            </label>
+            {checked.size > 0 && (
+              <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: "var(--muted)", fontSize: 12 }}>{checked.size} {t("dotfiles.selected")}</span>
+                <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
+                  <FloppyDisk size={11} />{t("dotfiles.addSelected")}
+                </button>
+                <button onClick={() => void batch("remove")} disabled={busy} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}>
+                  <X size={11} />{t("dotfiles.removeSelected")}
+                </button>
+              </span>
+            )}
+          </div>
           <div style={card}>
-            {newCands.map((c) => (
-              <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
-                <CategoryIcon category={categorize(c.path)} />
-                <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
-                <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />Add</button>
-              </div>
-            ))}
+            {newCands.map((c) => {
+              const isAdded = selected.has(c.id);
+              return (
+                <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                  <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
+                  <CategoryIcon category={categorize(c.path)} />
+                  <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
+                  {isAdded ? (
+                    <>
+                      <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} added`}><CheckCircle size={11} weight="fill" />{t("dotfiles.added")}</span>
+                      <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("dotfiles.remove")}</button>
+                    </>
+                  ) : (
+                    <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />Add</button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
