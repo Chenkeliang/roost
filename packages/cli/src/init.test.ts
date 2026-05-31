@@ -23,6 +23,17 @@ describe("runInit", () => {
     expect(created).toContain(path.join(repoDir, ".chezmoi.toml.tmpl"));
   });
 
+  it("writes a .chezmoiignore that excludes Roost's own metadata (roost/ and state/)", async () => {
+    const { created } = await runInit({ repoDir });
+    const ignorePath = path.join(repoDir, ".chezmoiignore");
+    expect(created).toContain(ignorePath);
+    const body = fs.readFileSync(ignorePath, "utf8");
+    expect(body).toMatch(/^roost$/m);
+    expect(body).toMatch(/^roost\/\*\*$/m);
+    expect(body).toMatch(/^state$/m);
+    expect(body).toMatch(/^state\/\*\*$/m);
+  });
+
   it("creates the expected files on disk", async () => {
     await runInit({ repoDir });
     expect(fs.existsSync(path.join(repoDir, "roost"))).toBe(true);
