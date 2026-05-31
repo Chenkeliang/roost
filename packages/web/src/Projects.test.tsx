@@ -15,6 +15,8 @@ vi.mock("./api", () => ({
   }),
   testProjectRemote: vi.fn().mockResolvedValue({ reachable: true, message: "reachable" }),
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { projects: ["/Users/k/work/a"] } }),
+  removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { projects: [] } }),
+  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { projects: [] } }),
 }));
 
 describe("Projects", () => {

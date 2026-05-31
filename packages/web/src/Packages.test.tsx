@@ -11,6 +11,8 @@ vi.mock("./api", () => ({
     entries: { taps: ["homebrew/services"], formulae: ["git"], casks: ["firefox"], mas: [] },
   }),
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: ["Brewfile"] } }),
+  removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: [] } }),
+  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: ["Brewfile"] } }),
   postCapture: vi.fn().mockResolvedValue({ changes: [] }),
 }));
 

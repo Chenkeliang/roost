@@ -6,6 +6,17 @@
 export type Locale = "en" | "zh";
 
 export const STRINGS: Record<string, { en: string; zh: string }> = {
+  // ── Shared across module pages (discover / select / manage) ──────────────
+  "common.discovered": { en: "Discovered", zh: "发现" },
+  "common.added": { en: "Added", zh: "已添加" },
+  "common.remove": { en: "Remove", zh: "移除" },
+  "common.selected": { en: "selected", zh: "已选" },
+  "common.addSelected": { en: "Add selected", zh: "添加选中" },
+  "common.removeSelected": { en: "Remove selected", zh: "移除选中" },
+  "common.stopManaging": { en: "Stop managing", zh: "停止管理" },
+  "common.managed": { en: "Managed", zh: "已纳管" },
+  "common.shownItems": { en: "shown", zh: "项" },
+
   // ── App shell: sidebar nav ──────────────────────────────────────────────
   "nav.overview": { en: "Overview", zh: "总览" },
   "nav.dotfiles": { en: "Dotfiles", zh: "Dotfiles" },

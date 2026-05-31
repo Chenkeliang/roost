@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { GitBranch, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, XCircle } from "@phosphor-icons/react";
+import { GitBranch, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, XCircle, X } from "@phosphor-icons/react";
 import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getIndex, getDiscoverModule, testProjectRemote, addSelection, getSelection } from "../api";
+import { getIndex, getDiscoverModule, testProjectRemote, addSelection, removeSelection, getSelection } from "../api";
 
 interface ProjectsProps { showHud?: (m: HudMessage) => void; }
 type TestState = Record<string, "ok" | "fail" | "testing">;
@@ -23,6 +23,8 @@ export function Projects({ showHud }: ProjectsProps) {
   const [host, setHost] = useState<string>("all");
   const [tested, setTested] = useState<TestState>({});
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,6 +77,44 @@ export function Projects({ showHud }: ProjectsProps) {
     }
   }, [showHud]);
 
+  const remove = useCallback(async (id: string) => {
+    try {
+      await removeSelection("projects", id);
+      setManaged((m) => Math.max(0, (m ?? 1) - 1));
+      setSaved((s) => { const n = new Set(s); n.delete(id); return n; });
+      showHud?.({ text: `Removed ${id}`, type: "success" });
+    } catch (e) {
+      showHud?.({ text: e instanceof Error ? e.message : "Remove failed", type: "error" });
+    }
+  }, [showHud]);
+
+  const toggleCheck = useCallback((id: string) => {
+    setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }, []);
+
+  const batch = useCallback(async (action: "add" | "remove") => {
+    const ids = [...checked];
+    if (ids.length === 0) return;
+    setBusy(true);
+    try {
+      for (const id of ids) {
+        if (action === "add") await addSelection("projects", id);
+        else await removeSelection("projects", id);
+      }
+      setSaved((s) => {
+        const n = new Set(s);
+        for (const id of ids) { if (action === "add") n.add(id); else n.delete(id); }
+        return n;
+      });
+      setChecked(new Set());
+      showHud?.({ text: `${action === "add" ? "Saved" : "Removed"} ${ids.length} project(s)`, type: "success" });
+    } catch (e) {
+      showHud?.({ text: e instanceof Error ? e.message : "Batch failed", type: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }, [checked, showHud]);
+
   const hosts = cands ? [...new Set(cands.map((c) => c.host ?? "no-remote"))].sort() : [];
   const shown = (cands ?? []).filter((c) => host === "all" || (c.host ?? "no-remote") === host);
 
@@ -115,22 +155,50 @@ export function Projects({ showHud }: ProjectsProps) {
       ) : shown.length === 0 ? (
         <EmptyState icon={<GitBranch size={24} />} title={t("projects.emptyTitle")} subtitle={t("projects.emptySubtitle")} />
       ) : (
-        <div style={card}>
-          {shown.map((c) => (
-            <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
-              <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
-              <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 150, fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.remote ?? "no remote"}</span>
-              {tested[c.id] === "ok" && <CheckCircle size={14} weight="fill" style={{ color: "var(--green)" }} />}
-              {tested[c.id] === "fail" && <XCircle size={14} weight="fill" style={{ color: "var(--red)" }} />}
-              <button onClick={() => void test(c)} disabled={!c.remote || tested[c.id] === "testing"} style={ic} aria-label={`test ${c.path}`}>Test</button>
-              {saved.has(c.id) ? (
-                <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} saved`}><CheckCircle size={11} weight="fill" />{t("projects.saved")}</span>
-              ) : (
-                <button onClick={() => void save(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><FloppyDisk size={11} />Save</button>
-              )}
-            </div>
-          ))}
-        </div>
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                aria-label="select all shown"
+                checked={checked.size > 0 && shown.every((c) => checked.has(c.id))}
+                onChange={(e) => setChecked(e.target.checked ? new Set(shown.map((c) => c.id)) : new Set())}
+              />
+              {shown.length} {t("common.shownItems")}
+            </label>
+            {checked.size > 0 && (
+              <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: "var(--muted)", fontSize: 12 }}>{checked.size} {t("common.selected")}</span>
+                <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
+                  <FloppyDisk size={11} />{t("common.addSelected")}
+                </button>
+                <button onClick={() => void batch("remove")} disabled={busy} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}>
+                  <X size={11} />{t("common.removeSelected")}
+                </button>
+              </span>
+            )}
+          </div>
+          <div style={card}>
+            {shown.map((c) => (
+              <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
+                <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
+                <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 150, fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.remote ?? "no remote"}</span>
+                {tested[c.id] === "ok" && <CheckCircle size={14} weight="fill" style={{ color: "var(--green)" }} />}
+                {tested[c.id] === "fail" && <XCircle size={14} weight="fill" style={{ color: "var(--red)" }} />}
+                <button onClick={() => void test(c)} disabled={!c.remote || tested[c.id] === "testing"} style={ic} aria-label={`test ${c.path}`}>Test</button>
+                {saved.has(c.id) ? (
+                  <>
+                    <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} saved`}><CheckCircle size={11} weight="fill" />{t("projects.saved")}</span>
+                    <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
+                  </>
+                ) : (
+                  <button onClick={() => void save(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><FloppyDisk size={11} />Save</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

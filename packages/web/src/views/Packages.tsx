@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Package, Cube, AppStoreLogo, Storefront, DownloadSimple } from "@phosphor-icons/react";
+import { Package, Cube, AppStoreLogo, Storefront, DownloadSimple, CheckCircle, X } from "@phosphor-icons/react";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getIndex, getBrewfile, addSelection, postCapture, type BrewfileResponse } from "../api";
+import { getIndex, getBrewfile, addSelection, removeSelection, getSelection, postCapture, type BrewfileResponse } from "../api";
 
 interface PackagesProps { showHud?: (m: HudMessage) => void; }
 
@@ -37,11 +37,14 @@ export function Packages({ showHud }: PackagesProps) {
   const [brewfile, setBrewfile] = useState<BrewfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [isManaged, setIsManaged] = useState(false); // Brewfile in selection.yaml
+  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ index }, bf] = await Promise.all([getIndex(), getBrewfile()]);
+    const [{ index }, bf, sel] = await Promise.all([getIndex(), getBrewfile(), getSelection()]);
     setManaged(index.packages?.managed ?? 0);
     setBrewfile(bf);
+    setIsManaged((sel.modules.packages ?? []).includes("Brewfile"));
   }, []);
 
   useEffect(() => {
@@ -63,6 +66,21 @@ export function Packages({ showHud }: PackagesProps) {
       setImporting(false);
     }
   }, [load, showHud]);
+
+  // Stop managing the Brewfile: drop it from selection. Leaves the captured
+  // Brewfile in the repo (history is preserved); a future capture won't refresh it.
+  const stopManaging = useCallback(async () => {
+    setRemoving(true);
+    try {
+      await removeSelection("packages", "Brewfile");
+      setIsManaged(false);
+      showHud?.({ text: "Stopped managing the Brewfile", type: "success" });
+    } catch (e) {
+      showHud?.({ text: e instanceof Error ? e.message : "Remove failed", type: "error" });
+    } finally {
+      setRemoving(false);
+    }
+  }, [showHud]);
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
@@ -92,6 +110,16 @@ export function Packages({ showHud }: PackagesProps) {
         />
       ) : (
         <>
+          {isManaged && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }}>
+                <CheckCircle size={11} weight="fill" />{t("common.managed")}
+              </span>
+              <button onClick={() => void stopManaging()} disabled={removing} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}>
+                <X size={11} />{t("common.stopManaging")}
+              </button>
+            </div>
+          )}
           <Section icon={<Package size={15} />} title="Formulae" items={brewfile.entries.formulae} />
           <Section icon={<Cube size={15} />} title="Casks" items={brewfile.entries.casks} />
           <Section icon={<AppStoreLogo size={15} />} title="App Store" items={brewfile.entries.mas} />
