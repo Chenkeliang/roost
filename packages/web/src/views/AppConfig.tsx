@@ -102,7 +102,9 @@ export function AppConfig({ showHud }: AppConfigProps) {
   }, [checked, showHud]);
 
   const shown = (managed ?? []).filter((d) => d.toLowerCase().includes(filter.toLowerCase()));
-  const newCands = (cands ?? []).filter((c) => !(managed ?? []).includes(candidateDomain(c.id)));
+  const newCands = (cands ?? [])
+    .filter((c) => !(managed ?? []).includes(candidateDomain(c.id)))
+    .filter((c) => candidateDomain(c.id).toLowerCase().includes(filter.toLowerCase()));
 
   if (loading) {
     return (

@@ -44,6 +44,11 @@ export const SENSITIVE_DOMAIN_HINTS: RegExp[] = [
   /bitwarden/i,
 ];
 
+// Generous runaway guard for discover(); far above any real machine's domain
+// count (~700), so it never truncates real results — it only bounds pathological
+// output. Not a feature limit.
+const MAX_DISCOVERED_DOMAINS = 2000;
+
 export function classifyDomain(domain: string): "track" | "skip" {
   for (const re of SKIP_PATTERNS) {
     if (re.test(domain)) return "skip";
@@ -90,7 +95,10 @@ export const appconfigModule: SyncModule = {
 
     const domains = raw.split(", ").map((d) => d.trim()).filter(Boolean);
     const tracked = domains.filter((d) => classifyDomain(d) === "track");
-    const capped = tracked.slice(0, 80);
+    // Listing domain NAMES is cheap — the expensive `defaults export` runs per
+    // domain only at capture. A real Mac has hundreds of domains (700+), so we
+    // don't truncate to a small number; only a generous runaway guard remains.
+    const capped = tracked.slice(0, MAX_DISCOVERED_DOMAINS);
 
     return capped.map((domain) => ({
       id: `domain:${domain}`,

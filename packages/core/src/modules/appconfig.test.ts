@@ -134,13 +134,14 @@ describe("appconfigModule.discover", () => {
     }
   });
 
-  it("caps output at 80 candidates", async () => {
-    // Generate 100 trackable domains
-    const domains = Array.from({ length: 100 }, (_, i) => `com.test.app${i}`).join(", ");
+  it("returns all trackable domains (real Macs have hundreds; no small cap)", async () => {
+    // A real Mac can have 700+ preference domains. Listing names is cheap, so
+    // discover must not truncate to a tiny number.
+    const domains = Array.from({ length: 300 }, (_, i) => `com.test.app${i}`).join(", ");
     const { exec } = makeFakeExec([{ code: 0, stdout: domains, stderr: "" }]);
     const ctx = makeCtx({ exec, repoDir: tmpDir });
     const candidates = await appconfigModule.discover(ctx);
-    expect(candidates.length).toBeLessThanOrEqual(80);
+    expect(candidates.length).toBe(300);
   });
 
   it("path is roost/appconfig/<domain>.plist", async () => {
