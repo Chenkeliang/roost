@@ -278,6 +278,27 @@ describe("dotfilesModule.capture", () => {
     fs.rmSync(repoDir, { recursive: true, force: true });
   });
 
+  it("encrypts a path marked in 'dotfiles-encrypt' even if its content has secrets (ADR-0010)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-mark-home-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-mark-src-"));
+    fs.mkdirSync(path.join(home, ".config", "sops", "age"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".config", "sops", "age", "keys.txt"), "AGE-SECRET-KEY-X");
+    const file = path.join(dir, "clash.yaml");
+    fs.writeFileSync(file, "password: longsecretvalue12345"); // would normally be blocked
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "age1recipientkey", stderr: "" }, // age-keygen -y
+      { code: 0, stdout: "", stderr: "" }, // chezmoi add --encrypt
+    ]);
+    const ctx = makeCtx({ exec, home, repoDir: fs.mkdtempSync(path.join(os.tmpdir(), "roost-mark-repo-")) });
+    const sel: Selection = { modules: { dotfiles: [file], "dotfiles-encrypt": [file] } };
+    const result = await dotfilesModule.capture(ctx, sel);
+    expect(result.encrypted).toContain(file);
+    expect(result.blocked ?? []).not.toContain(file);
+    expect(calls.find((c) => c.args.includes("add"))!.args).toContain("--encrypt");
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   it("blocks an encrypt-wanted item when NO age key exists (no chezmoi add)", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-nokey-home-"));
     const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);

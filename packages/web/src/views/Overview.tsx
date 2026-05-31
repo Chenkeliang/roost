@@ -13,6 +13,7 @@ import {
   getStatus,
   postCapture,
   postLoad,
+  addSelection,
   type HealthResponse,
   type MachinesResponse,
   type StatusResponse,
@@ -89,6 +90,8 @@ export function Overview({ showHud }: OverviewProps) {
   const [capturing, setCapturing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<string[]>([]);
+  const [retrying, setRetrying] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoadingData(true);
@@ -117,12 +120,44 @@ export function Overview({ showHud }: OverviewProps) {
     setCapturing(true);
     try {
       const result = await postCapture();
-      showHud({ text: `Captured ${result.changes.length} item${result.changes.length === 1 ? "" : "s"}`, type: "success" });
+      const blockedPaths = result.changes.flatMap((c) => c.blocked ?? []);
+      setBlocked(blockedPaths);
+      const written = result.changes.reduce((n, c) => n + c.written.length + c.encrypted.length, 0);
+      showHud({
+        text: blockedPaths.length > 0
+          ? `Captured ${written} · ${blockedPaths.length} blocked (potential secrets)`
+          : `Captured ${written} item${written === 1 ? "" : "s"}`,
+        type: blockedPaths.length > 0 ? "error" : "success",
+      });
       void fetchData();
     } catch (e) {
       showHud({ text: e instanceof Error ? e.message : "Capture failed", type: "error" });
     } finally {
       setCapturing(false);
+    }
+  };
+
+  // Mark the blocked secret-bearing paths to encrypt, then re-capture so they
+  // go in as encrypted_*.age instead of being skipped (ADR-0010).
+  const handleEncryptRetry = async (paths: string[]) => {
+    setRetrying(true);
+    try {
+      for (const p of paths) await addSelection("dotfiles-encrypt", p);
+      const result = await postCapture();
+      const stillBlocked = result.changes.flatMap((c) => c.blocked ?? []);
+      setBlocked(stillBlocked);
+      const enc = result.changes.reduce((n, c) => n + c.encrypted.length, 0);
+      showHud({
+        text: stillBlocked.length > 0
+          ? `Encrypted & retried · ${stillBlocked.length} still blocked`
+          : `Encrypted & captured (${enc} encrypted)`,
+        type: stillBlocked.length > 0 ? "error" : "success",
+      });
+      void fetchData();
+    } catch (e) {
+      showHud({ text: e instanceof Error ? e.message : "Encrypt retry failed", type: "error" });
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -299,6 +334,39 @@ export function Overview({ showHud }: OverviewProps) {
           ↵ to capture · <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>⌘K actions</span>
         </span>
       </div>
+
+      {/* Blocked-on-capture panel (ADR-0010): secret-bearing items skipped. */}
+      {blocked.length > 0 && (
+        <section style={{ border: "1px solid var(--amber)", borderRadius: "var(--rc)", padding: "13px 14px", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <Lock size={14} style={{ color: "var(--amber)" }} />
+            <span style={{ fontSize: 13, fontWeight: 540, color: "var(--text)" }}>
+              {blocked.length} {t("overview.blockedTitle")}
+            </span>
+            <button
+              onClick={() => void handleEncryptRetry(blocked)}
+              disabled={retrying}
+              style={{ marginLeft: "auto", appearance: "none", border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12, padding: "5px 11px", borderRadius: "var(--rr)", cursor: retrying ? "default" : "pointer" }}
+            >
+              <Lock size={12} weight="fill" style={{ marginRight: 5, verticalAlign: "-1px" }} />
+              {retrying ? t("overview.encrypting") : t("overview.encryptRetryAll")}
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>{t("overview.blockedHint")}</div>
+          {blocked.map((p) => (
+            <div key={p} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border-soft)", fontSize: 12.5 }}>
+              <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{p}</span>
+              <button
+                onClick={() => void handleEncryptRetry([p])}
+                disabled={retrying}
+                style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 9px", borderRadius: 6, cursor: retrying ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                <Lock size={11} />{t("overview.encryptRetry")}
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Module Health */}
       <section

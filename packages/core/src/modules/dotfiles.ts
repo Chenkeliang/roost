@@ -255,6 +255,9 @@ export const dotfilesModule: SyncModule = {
         .flatMap((a) => a.paths)
         .flatMap((p) => expandCatalogPath(ctx.home, p)),
     );
+    // Paths the user explicitly marked to encrypt (ADR-0010), e.g. retrying a
+    // blocked secret-bearing dotfile. Stored as a convention key in selection.
+    const markedEncrypt = new Set(sel.modules["dotfiles-encrypt"] ?? []);
     // chezmoi --encrypt needs an age recipient configured; ensure it lazily, once.
     let ageReady: boolean | null = null;
 
@@ -264,7 +267,7 @@ export const dotfilesModule: SyncModule = {
         blocked.push(id);
         continue;
       }
-      const wantsEncrypt = isSensitivePath(id) || encryptByCatalog.has(id);
+      const wantsEncrypt = isSensitivePath(id) || encryptByCatalog.has(id) || markedEncrypt.has(id);
       const scan = scanPathForSecrets(id);
 
       // H3: never slurp an oversized path (e.g. a whole app-support dir with caches).

@@ -42,6 +42,14 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "overview.load": { en: "Load (dry-run)", zh: "加载（预演）" },
   "overview.loading": { en: "Loading…", zh: "加载中…" },
   "overview.moduleHealth": { en: "Module Health", zh: "模块健康度" },
+  "overview.blockedTitle": { en: "items blocked — potential secrets", zh: "项被拦下 —— 疑似密钥" },
+  "overview.blockedHint": {
+    en: "These weren't committed because they look like they contain secrets. Encrypt & retry to back them up as encrypted .age files (needs an age key).",
+    zh: "这些因疑似含密钥未入库。点「加密并重试」把它们以加密 .age 形式备份(需 age 密钥)。",
+  },
+  "overview.encryptRetry": { en: "Encrypt & retry", zh: "加密并重试" },
+  "overview.encryptRetryAll": { en: "Encrypt & retry all", zh: "全部加密重试" },
+  "overview.encrypting": { en: "Encrypting…", zh: "加密中…" },
   "overview.noStatus": {
     en: "No module status available. Is the Roost server running?",
     zh: "暂无模块状态。Roost 服务是否在运行？",
