@@ -17,7 +17,7 @@ Roost is an open-source macOS configuration backup & migration tool. On your mai
 > Roost is to your config repo what git is to your code repo. We build the tool; you own the data.
 
 ## Status
-Early development (P0 foundation). See `docs/ROADMAP.md` for phases (P0 scaffold → P1 MVP → P2 extend → P3 desktop app) and `docs/superpowers/specs/` for the locked design.
+Active development. The CLI (P0 foundation + P1 MVP) and the local web dashboard work today: `init` / `select` / `capture` / `load` plus a content-first dashboard for dotfiles, packages, projects, app config, and aliases/env. Next up is real multi-machine sync (P2) and a signed desktop app (P3). See `docs/ROADMAP.md` for the phases and `docs/superpowers/specs/` for the locked design.
 
 ## Quick start (dev)
 ```bash

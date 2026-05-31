@@ -91,6 +91,21 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 参见[核心概念](/zh-cn/core-concepts/)。
 </Aside>
 
+## 想用图形界面?
+
+上面的全部流程也能在本地 Web 仪表盘里完成——以内容为先地查看你的 dotfiles、
+软件包、项目、应用配置与别名/环境变量,支持按需发现,并带有 Git 远端/同步面板。
+先构建一次 web 包,然后启动:
+
+```sh
+pnpm --filter @roost/web build
+roost serve --web packages/web/dist
+# 从源码运行:node packages/cli/dist/index.js serve --web packages/web/dist
+```
+
+打开终端打印的地址(默认 `http://127.0.0.1:4317`)。仪表盘**完全运行在你本机**
+——无服务器、无账号、无遥测。各页面用途见[仪表盘](/zh-cn/dashboard/)。
+
 ## 接下来
 
 - [核心概念](/zh-cn/core-concepts/)——capture/load 与 `selection.yaml` 背后的模型。

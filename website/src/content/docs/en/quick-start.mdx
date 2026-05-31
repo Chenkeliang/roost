@@ -99,6 +99,22 @@ Loading flows **one way**: from your config repo (your primary's captured state)
 onto a follower machine. See [Core Concepts](/core-concepts/).
 </Aside>
 
+## Prefer a visual interface?
+
+Everything above also works from a local web dashboard — a content-first view of
+your dotfiles, packages, projects, app config, and aliases/env, with on-demand
+discovery and a Git remote/sync panel. Build the web bundle once, then serve it:
+
+```sh
+pnpm --filter @roost/web build
+roost serve --web packages/web/dist
+# from source: node packages/cli/dist/index.js serve --web packages/web/dist
+```
+
+Open the printed URL (default `http://127.0.0.1:4317`). The dashboard runs
+entirely on your machine — no server, account, or telemetry. See
+[Dashboard](/dashboard/) for a tour of each page.
+
 ## Where to go next
 
 - [Core Concepts](/core-concepts/) — the model behind capture/load and `selection.yaml`.
