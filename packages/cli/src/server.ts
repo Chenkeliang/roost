@@ -455,9 +455,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   // ── static / SPA ─────────────────────────────────────────────────────────────
   if (webDir && fs.existsSync(webDir)) {
+    // @fastify/static requires an absolute root; resolve a relative --web path
+    // (the docs show `--web packages/web/dist`) against the current directory.
+    const webRoot = path.resolve(webDir);
     // Dynamic import to avoid touching this code path in tests that skip webDir
     void server.register(import("@fastify/static"), {
-      root: webDir,
+      root: webRoot,
       prefix: "/",
     });
   } else {

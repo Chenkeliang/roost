@@ -111,6 +111,19 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("becomes ready with a RELATIVE webDir (docs show --web packages/web/dist)", async () => {
+    // @fastify/static rejects a non-absolute root; the server must resolve it.
+    // Regression for the documented `roost serve --web packages/web/dist`.
+    const webAbs = fs.mkdtempSync(path.join(os.tmpdir(), "roost-web-"));
+    fs.writeFileSync(path.join(webAbs, "index.html"), "<!doctype html>");
+    const relWeb = path.relative(process.cwd(), webAbs);
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d), webDir: relWeb });
+    await expect(server.ready()).resolves.toBeDefined();
+    await server.close();
+    fs.rmSync(webAbs, { recursive: true, force: true });
+  });
+
   it("GET /api/modules → 200 lists registered module names", async () => {
     const reg = new ModuleRegistry();
     reg.register(makeFakeModule({ name: "alpha" }));
