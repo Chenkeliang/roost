@@ -12,11 +12,53 @@ import type {
   Health,
 } from "@roost/shared";
 
-const BREWFILE_ID = "Brewfile";
+const BREWFILE_ID = "Brewfile"; // legacy whole-Brewfile sentinel (back-compat)
 const BREWFILE_PATH = "roost/Brewfile";
 
 function brewfilePath(repoDir: string): string {
   return path.join(repoDir, "roost", "Brewfile");
+}
+
+// Per-package selection ids (ADR-0009): "brew:git", "cask:firefox",
+// "mas:<id>", "tap:org/repo". Opaque strings stored in selection.yaml.
+function splitId(id: string): { kind: string; val: string } | null {
+  const i = id.indexOf(":");
+  if (i < 0) return null;
+  return { kind: id.slice(0, i), val: id.slice(i + 1) };
+}
+
+/**
+ * Render a Brewfile from per-package selection ids. mas entries need a display
+ * name (`mas "Name", id: N`); `masNames` maps id→name, falling back to the id.
+ * Output is deterministic (sorted within each section) for idempotent captures.
+ */
+export function brewfileText(ids: string[], masNames?: Map<string, string>): string {
+  const taps: string[] = [];
+  const brews: string[] = [];
+  const casks: string[] = [];
+  const mas: string[] = [];
+  for (const id of ids) {
+    const s = splitId(id);
+    if (!s) continue;
+    if (s.kind === "tap") taps.push(`tap "${s.val}"`);
+    else if (s.kind === "brew") brews.push(`brew "${s.val}"`);
+    else if (s.kind === "cask") casks.push(`cask "${s.val}"`);
+    else if (s.kind === "mas") mas.push(`mas "${masNames?.get(s.val) ?? s.val}", id: ${s.val}`);
+  }
+  const sections = [taps.sort(), brews.sort(), casks.sort(), mas.sort()].filter((s) => s.length > 0);
+  return ["# Managed by Roost — generated from your package selection.", "", ...sections.flatMap((s) => [...s, ""])].join("\n");
+}
+
+// Re-query `mas list` to map app id → display name (for Brewfile lines).
+async function masNameMap(ctx: ModuleContext): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const r = await ctx.exec.run("mas", ["list"]);
+  if (r.code !== 0) return map;
+  for (const line of r.stdout.split("\n")) {
+    const m = /^(\d+)\s+(.+?)\s+\(/.exec(line.trim());
+    if (m) map.set(m[1]!, m[2]!);
+  }
+  return map;
 }
 
 export interface BrewfileEntries {
@@ -76,34 +118,48 @@ export const packagesModule: SyncModule = {
   },
 
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
-    const r = await ctx.exec.run("brew", ["--version"]);
-    const note =
-      r.code === 0
-        ? "Homebrew + cask + mas software set"
-        : "Homebrew not found – install it first";
-    return [
-      {
-        id: BREWFILE_ID,
-        path: BREWFILE_PATH,
-        category: "packages",
-        recommendation: "track",
-        note,
-      },
-    ];
+    const v = await ctx.exec.run("brew", ["--version"]);
+    if (v.code !== 0) return [];
+    const out: Candidate[] = [];
+    const lines = async (cmd: string, args: string[]): Promise<string[]> => {
+      const r = await ctx.exec.run(cmd, args);
+      return r.code === 0 ? r.stdout.split("\n").map((l) => l.trim()).filter(Boolean) : [];
+    };
+    // Top-level formulae (not pulled in only as dependencies).
+    for (const name of await lines("brew", ["leaves"])) {
+      out.push({ id: `brew:${name}`, path: BREWFILE_PATH, category: "packages", recommendation: "track", note: "formula" });
+    }
+    for (const name of await lines("brew", ["list", "--cask", "-1"])) {
+      out.push({ id: `cask:${name}`, path: BREWFILE_PATH, category: "packages", recommendation: "track", note: "cask" });
+    }
+    for (const name of await lines("brew", ["tap"])) {
+      out.push({ id: `tap:${name}`, path: BREWFILE_PATH, category: "packages", recommendation: "track", note: "tap" });
+    }
+    // mas: "<id> <Name> (<version>)" → id with the name surfaced in `note`.
+    for (const line of await lines("mas", ["list"])) {
+      const m = /^(\d+)\s+(.+?)\s+\(/.exec(line);
+      if (m) out.push({ id: `mas:${m[1]}`, path: BREWFILE_PATH, category: "packages", recommendation: "track", note: `mas · ${m[2]}` });
+    }
+    return out;
   },
 
   async capture(ctx: ModuleContext, sel: Selection): Promise<ChangeSet> {
-    const selected = (sel.modules["packages"] ?? []).includes(BREWFILE_ID);
-    if (!selected) {
+    const ids = sel.modules["packages"] ?? [];
+    const perPkg = ids.filter((id) => id !== BREWFILE_ID && id.includes(":"));
+
+    // Per-package selection (ADR-0009): write a Brewfile with ONLY the chosen ones.
+    if (perPkg.length > 0) {
+      const masNames = perPkg.some((id) => id.startsWith("mas:")) ? await masNameMap(ctx) : undefined;
+      fs.mkdirSync(path.dirname(brewfilePath(ctx.repoDir)), { recursive: true });
+      fs.writeFileSync(brewfilePath(ctx.repoDir), `${brewfileText(perPkg, masNames)}\n`, "utf8");
+      return { module: "packages", written: [BREWFILE_PATH], encrypted: [] };
+    }
+
+    // Back-compat: legacy whole-Brewfile sentinel → dump everything.
+    if (!ids.includes(BREWFILE_ID)) {
       return { module: "packages", written: [], encrypted: [] };
     }
-    const r = await ctx.exec.run("brew", [
-      "bundle",
-      "dump",
-      "--force",
-      "--file",
-      brewfilePath(ctx.repoDir),
-    ]);
+    const r = await ctx.exec.run("brew", ["bundle", "dump", "--force", "--file", brewfilePath(ctx.repoDir)]);
     if (r.code !== 0) {
       throw new Error(`brew bundle dump failed (code ${r.code}): ${r.stderr}`);
     }
@@ -124,8 +180,9 @@ export const packagesModule: SyncModule = {
   },
 
   async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {
-    // Unmanaged → cheap, no brew call (cold-path fix).
-    const selected = (sel.modules["packages"] ?? []).includes(BREWFILE_ID);
+    // Unmanaged → cheap, no brew call (cold-path fix). Any package selection
+    // (legacy sentinel or per-package ids) means the Brewfile is managed.
+    const selected = (sel.modules["packages"] ?? []).length > 0;
     if (!selected) {
       return { module: "packages", items: [] };
     }
@@ -153,7 +210,13 @@ export const packagesModule: SyncModule = {
   },
 
   async unmanage(ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
-    const selected = (sel.modules["packages"] ?? []).includes(BREWFILE_ID);
+    const ids = sel.modules["packages"] ?? [];
+    // Per-package removal: nothing to delete here — the Brewfile is regenerated
+    // from the remaining selection on the next capture. No-op (not an error).
+    if (ids.length > 0 && !ids.includes(BREWFILE_ID)) {
+      return { module: "packages", applied: [], backedUp: [], skipped: ids };
+    }
+    const selected = ids.includes(BREWFILE_ID);
     if (!selected) {
       return { module: "packages", applied: [], backedUp: [], skipped: [] };
     }

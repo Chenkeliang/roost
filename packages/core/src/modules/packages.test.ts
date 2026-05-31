@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
-import { packagesModule, parseBrewfile } from "./packages.js";
+import { packagesModule, parseBrewfile, brewfileText } from "./packages.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -42,32 +42,47 @@ function makeCtx(
 // ── discover ──────────────────────────────────────────────────────────────────
 
 describe("packagesModule.discover", () => {
-  it("returns a single Brewfile candidate with correct shape", async () => {
-    const { exec } = makeFakeExec([{ code: 0, stdout: "Homebrew 4.x", stderr: "" }]);
+  it("enumerates installed formulae/casks/taps/mas as per-package candidates (ADR-0009)", async () => {
+    // order: brew --version, brew leaves, brew list --cask, brew tap, mas list
+    const { exec } = makeFakeExec([
+      { code: 0, stdout: "Homebrew 4.x" },
+      { code: 0, stdout: "git\nfd\n" },
+      { code: 0, stdout: "firefox\n" },
+      { code: 0, stdout: "homebrew/services\n" },
+      { code: 0, stdout: "1295203466 Xcode (16.0)\n" },
+    ]);
     const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo" });
-    const candidates = await packagesModule.discover(ctx);
-    expect(candidates).toHaveLength(1);
-    const c = candidates[0]!;
-    expect(c.id).toBe("Brewfile");
-    expect(c.path).toBe("roost/Brewfile");
-    expect(c.category).toBe("packages");
-    expect(c.recommendation).toBe("track");
+    const ids = (await packagesModule.discover(ctx)).map((c) => c.id);
+    expect(ids).toContain("brew:git");
+    expect(ids).toContain("brew:fd");
+    expect(ids).toContain("cask:firefox");
+    expect(ids).toContain("tap:homebrew/services");
+    expect(ids).toContain("mas:1295203466");
   });
 
-  it("note is a non-empty string", async () => {
-    const { exec } = makeFakeExec([{ code: 0 }]);
-    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo" });
-    const candidates = await packagesModule.discover(ctx);
-    expect(typeof candidates[0]!.note).toBe("string");
-    expect(candidates[0]!.note!.length).toBeGreaterThan(0);
-  });
-
-  it("still returns the candidate when brew is absent (code non-zero)", async () => {
+  it("returns [] when brew is absent", async () => {
     const { exec } = makeFakeExec([{ code: 127, stdout: "", stderr: "brew: command not found" }]);
     const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo" });
-    const candidates = await packagesModule.discover(ctx);
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]!.id).toBe("Brewfile");
+    expect(await packagesModule.discover(ctx)).toEqual([]);
+  });
+});
+
+describe("brewfileText", () => {
+  it("renders sorted tap/brew/cask/mas sections from ids", () => {
+    const out = brewfileText(
+      ["brew:git", "cask:firefox", "tap:homebrew/services", "mas:123", "brew:age"],
+      new Map([["123", "Xcode"]]),
+    );
+    expect(out).toContain('tap "homebrew/services"');
+    expect(out).toContain('brew "age"');
+    expect(out).toContain('brew "git"');
+    expect(out).toContain('cask "firefox"');
+    expect(out).toContain('mas "Xcode", id: 123');
+    expect(out.indexOf('brew "age"')).toBeLessThan(out.indexOf('brew "git"')); // sorted
+  });
+
+  it("falls back to the id as the mas name when unknown", () => {
+    expect(brewfileText(["mas:999"])).toContain('mas "999", id: 999');
   });
 });
 
@@ -111,6 +126,20 @@ describe("packagesModule.capture", () => {
     const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo" });
     const sel: Selection = { modules: { packages: ["Brewfile"] } };
     await expect(packagesModule.capture(ctx, sel)).rejects.toThrow();
+  });
+
+  it("per-package selection writes a FILTERED Brewfile (no brew bundle dump)", async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-pkg-"));
+    const { exec, calls } = makeFakeExec([]); // no mas → no mas list call
+    const ctx = makeCtx({ exec, repoDir });
+    const sel: Selection = { modules: { packages: ["brew:git", "cask:firefox"] } };
+    const result = await packagesModule.capture(ctx, sel);
+    expect(calls.find((c) => c.args.includes("dump"))).toBeUndefined(); // no full dump
+    const brewfile = fs.readFileSync(path.join(repoDir, "roost", "Brewfile"), "utf8");
+    expect(brewfile).toContain('brew "git"');
+    expect(brewfile).toContain('cask "firefox"');
+    expect(result.written).toEqual(["roost/Brewfile"]);
+    fs.rmSync(repoDir, { recursive: true, force: true });
   });
 });
 
