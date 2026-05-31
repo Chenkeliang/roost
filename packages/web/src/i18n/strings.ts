@@ -16,6 +16,8 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "common.stopManaging": { en: "Stop managing", zh: "停止管理" },
   "common.managed": { en: "Managed", zh: "已纳管" },
   "common.shownItems": { en: "shown", zh: "项" },
+  "common.captured": { en: "captured", zh: "已捕获" },
+  "common.pending": { en: "pending capture", zh: "待捕获" },
 
   // ── App shell: sidebar nav ──────────────────────────────────────────────
   "nav.overview": { en: "Overview", zh: "总览" },
@@ -114,8 +116,6 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     en: 'Click "Scan for dotfiles" to find config files on this Mac, then Add them.',
     zh: "点击「扫描 Dotfiles」找到此 Mac 上的配置文件,再添加它们。",
   },
-  "dotfiles.captured": { en: "captured", zh: "已捕获" },
-  "dotfiles.pending": { en: "pending capture", zh: "待捕获" },
 
   // ── App Config ───────────────────────────────────────────────────────────
   "appconfig.explainer": {

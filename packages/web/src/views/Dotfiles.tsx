@@ -174,7 +174,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
               <div key={p} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
                 <CategoryIcon category={cat} />
                 <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("dotfiles.captured") : t("dotfiles.pending")}</span>
+                <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("common.captured") : t("common.pending")}</span>
                 <button onClick={() => void remove(p)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${p}`}><X size={11} />{t("common.remove")}</button>
               </div>
             );

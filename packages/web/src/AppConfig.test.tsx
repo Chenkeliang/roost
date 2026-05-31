@@ -18,7 +18,7 @@ vi.mock("./api", () => ({
   }),
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { appconfig: ["domain:com.apple.finder"] } }),
   removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { appconfig: [] } }),
-  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { appconfig: [] } }),
+  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { appconfig: ["domain:com.apple.dock", "domain:com.googlecode.iterm2"] } }),
 }));
 
 describe("AppConfig", () => {

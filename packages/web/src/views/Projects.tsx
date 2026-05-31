@@ -121,8 +121,23 @@ export function Projects({ showHud }: ProjectsProps) {
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
-        {t("projects.explainer")} Managed: {loading ? "…" : managed} · scanning your disk is on-demand.
+        {t("projects.explainer")} {t("common.selected")}: {saved.size} · {t("common.managed")}: {loading ? "…" : managed}.
       </p>
+
+      {saved.size > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 8px" }}>{t("common.selected")} ({saved.size})</div>
+          <div style={card}>
+            {[...saved].sort().map((id) => (
+              <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                <GitBranch size={14} style={{ color: "var(--muted)" }} />
+                <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{id}</span>
+                <button onClick={() => void remove(id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${id}`}><X size={11} />{t("common.remove")}</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!available && (
         <div role="alert" style={{ padding: "10px 14px", background: "rgba(242,85,90,.1)", border: "1px solid var(--red)", borderRadius: "var(--rr)", color: "var(--red)", fontSize: 13, marginBottom: 14 }}>

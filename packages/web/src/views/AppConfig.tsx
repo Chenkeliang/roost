@@ -101,9 +101,10 @@ export function AppConfig({ showHud }: AppConfigProps) {
     }
   }, [checked, showHud]);
 
-  const shown = (managed ?? []).filter((d) => d.toLowerCase().includes(filter.toLowerCase()));
+  // Primary list = what you've SELECTED (selection.yaml), shown persistently.
+  const selectedList = [...selected].filter((id) => candidateDomain(id).toLowerCase().includes(filter.toLowerCase())).sort();
   const newCands = (cands ?? [])
-    .filter((c) => !(managed ?? []).includes(candidateDomain(c.id)))
+    .filter((c) => !selected.has(c.id))
     .filter((c) => candidateDomain(c.id).toLowerCase().includes(filter.toLowerCase()));
 
   if (loading) {
@@ -129,7 +130,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
-        {t("appconfig.explainer")} Managed: {managed?.length ?? 0} · scanning for more is on-demand.
+        {t("appconfig.explainer")} {t("common.selected")}: {selected.size} · {t("common.managed")}: {managed?.length ?? 0}.
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -148,20 +149,26 @@ export function AppConfig({ showHud }: AppConfigProps) {
         </button>
       </div>
 
-      {shown.length === 0 ? (
+      {selectedList.length === 0 ? (
         <EmptyState
           icon={<Sliders size={24} />}
-          title={managed && managed.length > 0 ? t("appconfig.emptyMatchTitle") : t("appconfig.emptyTitle")}
-          subtitle={managed && managed.length > 0 ? t("appconfig.emptyMatchSubtitle") : t("appconfig.emptySubtitle")}
+          title={selected.size > 0 ? t("appconfig.emptyMatchTitle") : t("appconfig.emptyTitle")}
+          subtitle={selected.size > 0 ? t("appconfig.emptyMatchSubtitle") : t("appconfig.emptySubtitle")}
         />
       ) : (
         <div style={card}>
-          {shown.map((d) => (
-            <div key={d} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
-              <AppWindow size={14} style={{ color: "var(--muted)" }} />
-              <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d}</span>
-            </div>
-          ))}
+          {selectedList.map((id) => {
+            const domain = candidateDomain(id);
+            const captured = (managed ?? []).includes(domain);
+            return (
+              <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                <AppWindow size={14} style={{ color: "var(--muted)" }} />
+                <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{domain}</span>
+                <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("common.captured") : t("common.pending")}</span>
+                <button onClick={() => void remove(id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${domain}`}><X size={11} />{t("common.remove")}</button>
+              </div>
+            );
+          })}
         </div>
       )}
 
