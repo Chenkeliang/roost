@@ -1,6 +1,6 @@
 # ADR-0007: 策展式 App 配置目录(已知应用配置位置发现)
 
-- **状态**: 提议(PROPOSED · 2026-05-31)。待审。
+- **状态**: 接受(ACCEPTED · 2026-05-31)。Q1–Q4 经审定(见末「决议」);v1 实现待排期,引导式还原拆 ADR-0008。
 - **日期**: 2026-05-31
 
 ## 背景
@@ -17,7 +17,17 @@
 
 本 ADR 解决"**引导发现**":让 Roost **主动列出**常见 App 的已知配置位置供勾选。
 
-## 决定(待审)
+## 调研:参照成熟开源项目(2026-05-31)
+
+- **Mackup**(`lra/mackup`,**609** 个 App 定义,**GPLv3**)是 macOS"应用→配置路径"的事实标准库。格式:`[application] name=…` + `[configuration_files]`(家目录相对路径列表)+ 可选 `[xdg_configuration_files]`。
+- **验证 Roost 设计**:Mackup 用 **symlink plist**,在 **macOS Sonoma+ 会毁掉用户偏好**(其 README 明确警告)。Roost 的 chezmoi 拷贝 + `defaults export/import`(§10)正是规避此坑的更安全方案 —— 本设计选择得到佐证。
+- **分工(直接影响 catalog 范围)**:Mackup 把 plist 与文件混在一个 app 里(如 iTerm2 = `Library/Preferences/com.googlecode.iterm2.plist`)。在 Roost:**plist 类走既有 `appconfig`(defaults 导出),文件类走本 catalog**。catalog **只收文件式配置**,plist 域路由到 appconfig,不重复。
+- **多版本**:Mackup 对 DataGrip **逐版本枚举**(`DataGrip2017.3`…`JetBrains/DataGrip2023.2`),存在哪个备哪个,还原回同名版本路径。印证 v1「列全 + 存在性检测 + 还原原路径 + 警示」是业界标准;Roost 用 **glob**(`JetBrains/*/options`)比逐版本枚举更省维护。
+- **法律**:Mackup 为 GPLv3,**禁止把其 `.cfg` 文件抄进本 MIT 仓库**。但"某 App 配置在哪个路径"是**事实**(不受版权保护)。故 Roost **自行编写** `app-config-catalog.yaml`,以 Mackup 等为**参照而非拷贝**,并在文件头注明来源参考。
+
+来源:[lra/mackup](https://github.com/lra/mackup) · [Mackup .cfg 格式/applications](https://github.com/lra/mackup/tree/master/src/mackup/applications) · [Mackup PyPI](https://pypi.org/project/mackup/)。
+
+## 决定
 
 新增**一份可覆盖的策展数据文件**(策展数据,不是逻辑硬编码 —— 符合 I8),描述"应用 → 已知配置路径(glob)":
 
@@ -75,9 +85,20 @@ apps:
 - **B. 在 core/dotfiles 代码里硬编码应用列表**:违反 I8(零硬编码、策展数据应为可覆盖数据文件)——**否决**。
 - **C. 本 ADR:可覆盖策展数据文件**——既引导又不硬编码,用户可扩展。**选定(待审)**。
 
-## 待确认问题(审阅时定)
+## 决议(审定 2026-05-31)
 
-1. 默认 catalog 首批纳入哪些应用?(建议:JetBrains options/keymaps、VS Code User/settings+keybindings+snippets。其余留给用户覆盖。)
-2. catalog 默认位置随包发布 + 仓库覆盖,合并策略是"用户追加/覆盖同名 app"还是"完全替换"?(建议:按 `name` 合并,用户条目优先。)
-3. 高风险项(DataGrip 数据库配置)是否默认**排除**、仅在用户显式加入时提示加密?(建议:默认列出但标 `encrypt` 推荐 + 文档警示。)
-4. 还原映射(多版本/指定目录,见上节)是否拆为独立的 ADR-0008、单独排期?v1 是否接受"还原走原路径 + 警示"?(建议:是,拆分;v1 先警示。)
+1. **首批 App(文件式,参照 Mackup 取经)**:
+   - **VS Code / Cursor**:`Library/Application Support/{Code,Cursor}/User/{settings.json,keybindings.json,snippets}`(路径不带版本,干净往返)。
+   - **JetBrains 全家桶**:`Library/Application Support/JetBrains/*/options`、`.../*/keymaps`(glob 覆盖各版本/各 IDE;只收 options/keymaps,排除缓存/索引)。
+   - **文件式终端**:Alacritty / Kitty / WezTerm / Ghostty 的配置文件。
+   - plist 类(iTerm2 等)**不进 catalog**,路由到既有 `appconfig`。其余留用户在 `roost/app-config-catalog.yaml` 覆盖/扩展。
+2. **合并策略:按 `name` 合并,用户条目优先**(用户可覆盖默认 app 的 paths、或新增 app)。✅
+3. **高风险项(DataGrip 等可能含 DB 凭据)**:默认**列出**,但候选标 `encrypt` 推荐 + 文件头/UI 警示;capture 仍过 Secret Scanner 硬门。✅
+4. **引导式还原(多版本/指定目录)拆为 ADR-0008,单独排期;本 ADR 的 v1 = 发现/catalog + 主机多版本勾选,还原走原路径 + 版本不匹配警示。** ✅
+
+## v1 实现范围(本 ADR)
+
+- `app-config-catalog.yaml`(随包默认 + `roost/` 覆盖,按 name 合并),只含**通用文件式** App(零个人/公司路径,I8)。
+- `dotfiles.discover()` 读 catalog → glob 展开 → 存在性过滤 → 产出候选(`note: "app config (<App>)"`,高风险标 `encrypt`)。
+- 三类测试(单元/dry-run/幂等);文件头注明"参照 Mackup 等,非拷贝;GPLv3 文件未被引入"。
+- **不含**:从机检测、指定还原目录、版本重映射(→ ADR-0008)。
