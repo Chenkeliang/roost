@@ -222,6 +222,18 @@ describe("dotfilesModule.discover", () => {
     const zshrc = candidates.find((c) => c.path.endsWith(".zshrc"));
     expect(zshrc!.id).toBe(zshrc!.path);
   });
+
+  it("surfaces app-config catalog paths (e.g. JetBrains options) with encrypt + note (ADR-0007)", async () => {
+    const opts = path.join(tmpHome, "Library/Application Support/JetBrains/DataGrip2026.1/options");
+    fs.mkdirSync(opts, { recursive: true });
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome }); // repoDir default → no override → default catalog
+    const candidates = await dotfilesModule.discover(ctx);
+    const jb = candidates.find((c) => c.path === opts);
+    expect(jb).toBeDefined();
+    expect(jb!.recommendation).toBe("encrypt");
+    expect(jb!.note).toBe("app config (JetBrains)");
+  });
 });
 
 // ── capture ───────────────────────────────────────────────────────────────────

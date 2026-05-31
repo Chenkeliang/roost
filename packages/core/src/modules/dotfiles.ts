@@ -15,6 +15,7 @@ import type {
 import { createChezmoi } from "../adapters/chezmoi.js";
 import { isNoise, scanDir } from "../discovery/scan.js";
 import { scanForSecrets } from "../secrets/scanner.js";
+import { loadAppConfigCatalog, expandCatalogPath } from "../app-config-catalog.js";
 
 export interface CaptureScanResult {
   secretFiles: string[];
@@ -207,6 +208,26 @@ export const dotfilesModule: SyncModule = {
           sizeBytes: entry.sizeBytes,
           recommendation: rec,
         });
+      }
+    }
+
+    // Curated app-config locations (ADR-0007): file-based app config that isn't
+    // a $HOME dotfile (e.g. VS Code, JetBrains options). Globs expand to existing
+    // paths only; skip any already surfaced above.
+    const seen = new Set(candidates.map((c) => c.id));
+    for (const app of loadAppConfigCatalog(ctx.repoDir)) {
+      for (const pattern of app.paths) {
+        for (const abs of expandCatalogPath(ctx.home, pattern)) {
+          if (seen.has(abs) || isRoostManaged(abs)) continue;
+          seen.add(abs);
+          candidates.push({
+            id: abs,
+            path: abs,
+            category: deriveCategory(abs),
+            recommendation: app.encryptRecommended ? "encrypt" : "track",
+            note: `app config (${app.name})`,
+          });
+        }
       }
     }
 

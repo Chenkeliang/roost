@@ -49,6 +49,12 @@ export {
   ENV_SCHEMA_VERSION,
 } from "./env-data.js";
 export {
+  DEFAULT_APP_CONFIG_CATALOG,
+  loadAppConfigCatalog,
+  expandCatalogPath,
+} from "./app-config-catalog.js";
+export type { CatalogApp } from "./app-config-catalog.js";
+export {
   defaultAgeKeyPath,
   envSecretsDir,
   envSecretPath,
