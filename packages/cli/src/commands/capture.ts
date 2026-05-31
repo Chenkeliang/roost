@@ -5,9 +5,9 @@ import {
   captureAll,
   gateSecrets,
   loadSelection,
-  commitRepo,
   isSensitivePath,
 } from "@roost/core";
+import { finalizeCapture } from "../captureFlow.js";
 
 export interface CaptureDeps {
   repoDir: string;
@@ -33,7 +33,7 @@ export async function runCapture(deps: CaptureDeps): Promise<ChangeSet[]> {
 
   const changeSets = await captureAll(reg, ctx, sel);
 
-  await commitRepo(ctx.exec, repoDir, "roost: capture");
+  await finalizeCapture(ctx.exec, repoDir, ctx.home);
 
   return changeSets;
 }

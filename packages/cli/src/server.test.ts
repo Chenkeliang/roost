@@ -15,8 +15,22 @@ import type {
   Candidate,
   ApplyPlan,
 } from "@roost/shared";
-import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry } from "@roost/core";
+import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec } from "@roost/core";
 import { buildServer } from "./server.js";
+import { ensureGitRepo } from "./gitRepo.js";
+
+// A real-exec ctx so git commits actually run (for capture finalization tests).
+function makeRealCtx(repoDir: string, dryRun = false): ModuleContext {
+  return {
+    repoDir,
+    home: os.homedir(),
+    profile: "base",
+    dryRun,
+    exec: createExec(),
+    log: { info: () => {}, warn: () => {}, error: () => {} },
+    t: (k: string) => k,
+  };
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -1075,6 +1089,32 @@ describe("buildServer", () => {
     const body = res.json() as { index: Record<string, { managed: number; available: boolean }> };
     expect(body.index.projects).toBeDefined();
     expect(typeof body.index.projects!.managed).toBe("number");
+    await server.close();
+  });
+
+  it("POST /api/capture writes machine state + commits, and GET /api/machines lists the host", async () => {
+    // Seed a real git repo with an empty selection so captureAll has nothing to do.
+    fs.writeFileSync(path.join(tmpDir, "README"), "hi", "utf8");
+    saveSelection(tmpDir, emptySelection());
+    await ensureGitRepo(createExec(), tmpDir);
+
+    const reg = defaultRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeRealCtx(tmpDir, d) });
+
+    const cap = await server.inject({ method: "POST", url: "/api/capture" });
+    expect(cap.statusCode).toBe(200);
+
+    const host = os.hostname();
+    expect(fs.existsSync(path.join(tmpDir, "state", `${host}.json`))).toBe(true);
+
+    const log = await createExec().run("git", ["-C", tmpDir, "log", "--pretty=%s"]);
+    expect(log.stdout).toContain("roost: capture");
+
+    const machines = await server.inject({ method: "GET", url: "/api/machines" });
+    expect(machines.statusCode).toBe(200);
+    const body = machines.json() as { hosts: string[]; states: Record<string, unknown> };
+    expect(body.hosts).toContain(host);
+
     await server.close();
   });
 });

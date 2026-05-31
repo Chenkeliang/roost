@@ -32,6 +32,7 @@ import {
   createChezmoi,
 } from "@roost/core";
 import { createTtlCache } from "./cache.js";
+import { finalizeCapture } from "./captureFlow.js";
 
 export interface ServerDeps {
   repoDir: string;
@@ -198,7 +199,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     try {
       cache.invalidateAll();
       const sel = loadSelection(repoDir);
-      const changes = await captureAll(registry, makeCtx(false), sel);
+      const ctx = makeCtx(false);
+      const changes = await captureAll(registry, ctx, sel);
+      await finalizeCapture(ctx.exec, repoDir, ctx.home);
       return reply.send({ changes });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
