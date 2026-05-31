@@ -295,7 +295,7 @@ keyCmd
   .command("rotate")
   .description("Re-encrypt all .age files in the repo to a new age recipient")
   .requiredOption("--new-recipient <age1...>", "New age recipient public key")
-  .option("--old-key <path>", "Path to the existing age private key", path.join(os.homedir(), ".config", "age", "key.txt"))
+  .option("--old-key <path>", "Path to the existing age private key", defaultAgeKeyPath(os.homedir()))
   .option("--repo <dir>", "Path to the config repo directory")
   .action(async (opts: { newRecipient: string; oldKey: string; repo?: string }) => {
     const { repoDir, ctx } = buildCtx();

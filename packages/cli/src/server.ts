@@ -27,6 +27,8 @@ import {
   defaultAgeKeyPath,
   recipientFromKey,
   encryptEnvSecret,
+  ensureAgeKey,
+  rotateToNewKey,
   indexAll,
   testRemote,
   parseBrewfile,
@@ -451,6 +453,62 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── Age key lifecycle ────────────────────────────────────────────────────────
+  // The age private key is the recovery material for ALL encrypted data — it is
+  // never returned by the API; only its public recipient is.
+  server.get("/api/key", async (_req, reply) => {
+    try {
+      const ctx = makeCtx(true);
+      const keyPath = defaultAgeKeyPath(ctx.home);
+      const recipient = await recipientFromKey(ctx.exec, keyPath);
+      let encryptedFiles = 0;
+      try {
+        encryptedFiles = fs.globSync("**/*.age", { cwd: repoDir }).length;
+      } catch {
+        /* glob unsupported / repo missing — report 0 */
+      }
+      return reply.send({ exists: recipient !== null, recipient, keyPath, encryptedFiles });
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  server.post("/api/key/generate", async (_req, reply) => {
+    try {
+      cache.invalidateAll();
+      const ctx = makeCtx(false);
+      const keyPath = defaultAgeKeyPath(ctx.home);
+      const res = await ensureAgeKey(ctx.exec, { keyPath });
+      const recipient = await recipientFromKey(ctx.exec, keyPath);
+      return reply.send({ created: res.created, source: res.source, recipient, keyPath });
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // Replace the key with a fresh one and re-encrypt every existing .age to it.
+  // Aborts the swap (keeps the old key) if any file fails — never orphans data.
+  server.post("/api/key/rotate", async (_req, reply) => {
+    try {
+      cache.invalidateAll();
+      const ctx = makeCtx(false);
+      const keyPath = defaultAgeKeyPath(ctx.home);
+      if (!fs.existsSync(keyPath)) {
+        return reply.status(400).send({ error: "no existing key to rotate — generate one first" });
+      }
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const result = await rotateToNewKey(ctx.exec, {
+        repoDir,
+        keyPath,
+        newKeyTmpPath: path.join(os.tmpdir(), `roost-newkey-${stamp}`),
+        backupPath: `${keyPath}.bak-${stamp}`,
+      });
+      return reply.send(result);
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
     }
   });
 

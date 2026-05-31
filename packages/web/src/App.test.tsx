@@ -24,6 +24,9 @@ vi.mock("./api", () => ({
   }),
   gitPush: vi.fn().mockResolvedValue({ ok: true, output: "" }),
   gitPull: vi.fn().mockResolvedValue({ ok: true, output: "" }),
+  getKey: vi.fn().mockResolvedValue({ exists: false, recipient: null, keyPath: "/x", encryptedFiles: 0 }),
+  generateKey: vi.fn().mockResolvedValue({ created: true, source: "generated", recipient: "age1x", keyPath: "/x" }),
+  rotateKey: vi.fn().mockResolvedValue({ recipient: "age1x", rotated: [], failed: [], swapped: true }),
 }));
 
 describe("App", () => {

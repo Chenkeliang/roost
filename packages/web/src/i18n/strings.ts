@@ -203,4 +203,18 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "settings.git.inSync": { en: "in sync", zh: "已同步" },
   "settings.git.pushed": { en: "Pushed", zh: "已推送" },
   "settings.git.pulled": { en: "Pulled", zh: "已拉取" },
+  "settings.key.heading": { en: "Age key (encryption)", zh: "Age 密钥(加密)" },
+  "settings.key.recipient": { en: "Recipient", zh: "公钥" },
+  "settings.key.none": { en: "no key yet", zh: "尚无密钥" },
+  "settings.key.encryptedFiles": { en: "encrypted files", zh: "个加密文件" },
+  "settings.key.generate": { en: "Generate key", zh: "生成密钥" },
+  "settings.key.rotate": { en: "Rotate / replace key", zh: "更换密钥" },
+  "settings.key.rotateConfirm": {
+    en: "Rotate the age key? A new key is generated and ALL encrypted files are re-encrypted to it. The old key is backed up. You must back up the NEW key — it is the only way to decrypt your data. Continue?",
+    zh: "更换 age 密钥?将生成新钥并把所有加密文件重新加密到它,旧钥会被备份。你必须备份新钥——它是解密数据的唯一凭据。继续?",
+  },
+  "settings.key.backupWarning": {
+    en: "The age private key is the ONLY way to decrypt your data. Back it up offline (e.g. a password manager). Lose it and every encrypted file is unrecoverable.",
+    zh: "age 私钥是解密你数据的唯一凭据。请离线备份(如密码管理器)。丢失后所有加密文件将无法恢复。",
+  },
 };

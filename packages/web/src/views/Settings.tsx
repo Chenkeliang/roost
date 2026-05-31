@@ -9,7 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getHealth, getModules, getGitStatus, gitPush, gitPull, type ModulesResponse, type GitStatus } from "../api";
+import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
 
 export function Settings() {
   const { t } = useT();
@@ -20,20 +20,59 @@ export function Settings() {
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitBusy, setGitBusy] = useState<"push" | "pull" | null>(null);
   const [gitResult, setGitResult] = useState<{ kind: "push" | "pull"; ok: boolean; output: string } | null>(null);
+  const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null);
+  const [keyBusy, setKeyBusy] = useState<"generate" | "rotate" | null>(null);
+  const [keyResult, setKeyResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    Promise.allSettled([getHealth(), getModules(), getGitStatus()])
-      .then(([health, mods, git]) => {
+    Promise.allSettled([getHealth(), getModules(), getGitStatus(), getKey()])
+      .then(([health, mods, git, key]) => {
         if (health.status === "fulfilled") {
           setRepoDir(health.value.repoDir ?? null);
           setAgeKey(health.value.ageKey ?? null);
         }
         if (mods.status === "fulfilled") setModules(mods.value);
         if (git.status === "fulfilled") setGitStatus(git.value);
+        if (key.status === "fulfilled") setKeyStatus(key.value);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleGenerateKey() {
+    setKeyBusy("generate");
+    setKeyResult(null);
+    try {
+      const r = await generateKey();
+      setKeyResult({ ok: true, text: r.created ? `Generated. Recipient: ${r.recipient}` : "Key already present." });
+      const s = await getKey().catch(() => null);
+      if (s) { setKeyStatus(s); setAgeKey(s.exists); }
+    } catch (e) {
+      setKeyResult({ ok: false, text: e instanceof Error ? e.message : "Generate failed" });
+    } finally {
+      setKeyBusy(null);
+    }
+  }
+
+  async function handleRotateKey() {
+    if (!window.confirm(t("settings.key.rotateConfirm"))) return;
+    setKeyBusy("rotate");
+    setKeyResult(null);
+    try {
+      const r = await rotateKey();
+      setKeyResult(
+        r.swapped
+          ? { ok: true, text: `Rotated ${r.rotated.length} file(s). New recipient: ${r.recipient}. Old key backed up — RE-BACK UP the new key.` }
+          : { ok: false, text: `Aborted — ${r.failed.length} file(s) failed to re-encrypt; the key was left unchanged.` },
+      );
+      const s = await getKey().catch(() => null);
+      if (s) setKeyStatus(s);
+    } catch (e) {
+      setKeyResult({ ok: false, text: e instanceof Error ? e.message : "Rotate failed" });
+    } finally {
+      setKeyBusy(null);
+    }
+  }
 
   async function handleGitPush() {
     setGitBusy("push");
@@ -253,6 +292,59 @@ export function Settings() {
             {gitResult.ok
               ? gitResult.kind === "push" ? t("settings.git.pushed") : t("settings.git.pulled")
               : gitResult.output || "Failed"}
+          </div>
+        )}
+      </div>
+
+      {/* ── Age key (encryption) ── */}
+      <div style={sectionLabel}>{t("settings.key.heading")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={row}>
+          <Key size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
+          <span style={{ color: "var(--muted)", minWidth: 80 }}>{t("settings.key.recipient")}</span>
+          {loading ? (
+            <Skeleton width={260} height={13} />
+          ) : keyStatus?.recipient ? (
+            <span className="mono" style={{ color: "var(--text)", fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {keyStatus.recipient}
+            </span>
+          ) : (
+            <span style={{ color: "var(--muted)", fontSize: 12 }}>{t("settings.key.none")}</span>
+          )}
+          {keyStatus && (
+            <span style={{ color: "var(--muted)", fontSize: 12, marginLeft: "auto" }}>
+              {keyStatus.encryptedFiles} {t("settings.key.encryptedFiles")}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          {!keyStatus?.exists ? (
+            <button
+              onClick={() => { void handleGenerateKey(); }}
+              disabled={keyBusy !== null}
+              style={{ padding: "7px 16px", background: "var(--accent)", color: "#0b0b0d", border: 0, borderRadius: "var(--rr)", fontSize: 13, fontWeight: 560, cursor: keyBusy ? "default" : "pointer", opacity: keyBusy ? 0.6 : 1 }}
+            >
+              {keyBusy === "generate" ? "…" : t("settings.key.generate")}
+            </button>
+          ) : (
+            <button
+              onClick={() => { void handleRotateKey(); }}
+              disabled={keyBusy !== null}
+              style={{ padding: "7px 16px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rr)", fontSize: 13, cursor: keyBusy ? "default" : "pointer", opacity: keyBusy ? 0.6 : 1 }}
+            >
+              {keyBusy === "rotate" ? "…" : t("settings.key.rotate")}
+            </button>
+          )}
+        </div>
+
+        <div style={{ fontSize: 12, color: "var(--amber)", padding: "2px 2px", lineHeight: 1.5 }}>
+          ⚠️ {t("settings.key.backupWarning")}
+        </div>
+
+        {keyResult && (
+          <div style={{ fontSize: 12, color: keyResult.ok ? "var(--green)" : "var(--destructive)", padding: "4px 2px", wordBreak: "break-all" }}>
+            {keyResult.text}
           </div>
         )}
       </div>

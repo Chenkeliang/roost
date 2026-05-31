@@ -161,6 +161,21 @@ export function getEnv(): Promise<EnvData> {
   return apiFetch<EnvData>("/api/env");
 }
 
+// ── Age key lifecycle (the private key never crosses the wire; only recipient) ──
+export interface KeyStatus { exists: boolean; recipient: string | null; keyPath: string; encryptedFiles: number; }
+export interface KeyGenerateResult { created: boolean; source: string; recipient: string | null; keyPath: string; }
+export interface KeyRotateResult { recipient: string; rotated: string[]; failed: { path: string; reason: string }[]; swapped: boolean; backupPath?: string; }
+
+export function getKey(): Promise<KeyStatus> {
+  return apiFetch<KeyStatus>("/api/key");
+}
+export function generateKey(): Promise<KeyGenerateResult> {
+  return apiFetch<KeyGenerateResult>("/api/key/generate", { method: "POST" });
+}
+export function rotateKey(): Promise<KeyRotateResult> {
+  return apiFetch<KeyRotateResult>("/api/key/rotate", { method: "POST" });
+}
+
 // Server PUT /api/env accepts a full EnvData; a secret env item carrying a non-empty
 // `value` is treated as NEW plaintext to encrypt server-side (never echoed back).
 export function putEnv(data: EnvData): Promise<EnvData> {

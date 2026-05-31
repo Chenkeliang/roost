@@ -100,8 +100,8 @@ export {
 export type { Importer, ImportResult } from "./import/index.js";
 export { auditRepo } from "./secrets/audit.js";
 export type { AuditReport, AuditFinding } from "./secrets/audit.js";
-export { rotateAgeKey } from "./secrets/rotate.js";
-export type { RotateResult } from "./secrets/rotate.js";
+export { rotateAgeKey, rotateToNewKey } from "./secrets/rotate.js";
+export type { RotateResult, RotateToNewKeyResult } from "./secrets/rotate.js";
 export {
   ROOST_API_VERSION,
   validatePlugin,

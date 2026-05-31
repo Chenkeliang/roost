@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Exec } from "@roost/shared";
 import { isNoise } from "../discovery/scan.js";
+import { recipientFromKey } from "../env-crypto.js";
 
 // Walk repoDir recursively, yielding absolute paths of files ending in .age.
 // Skips .git, node_modules, and any path isNoise() classifies as noise.
@@ -94,4 +95,59 @@ export async function rotateAgeKey(
   }
 
   return { rotated, failed };
+}
+
+export interface RotateToNewKeyResult {
+  recipient: string;
+  rotated: string[];
+  failed: { path: string; reason: string }[];
+  swapped: boolean;
+  backupPath?: string;
+}
+
+/**
+ * Replace the active age key with a freshly generated one AND re-encrypt every
+ * existing `.age` file in the repo to it. Safe ordering:
+ *   1. generate the new key at `newKeyTmpPath`, derive its recipient
+ *   2. re-encrypt all repo .age (old key decrypts → new recipient encrypts)
+ *   3. ONLY if every file rotated, back up the old key and swap the new one in
+ * If any file fails to rotate, nothing is swapped (old key stays active, new
+ * key discarded) so encrypted data is never orphaned. Key material is never logged.
+ */
+export async function rotateToNewKey(
+  exec: Exec,
+  opts: { repoDir: string; keyPath: string; newKeyTmpPath: string; backupPath: string },
+): Promise<RotateToNewKeyResult> {
+  const { repoDir, keyPath, newKeyTmpPath, backupPath } = opts;
+
+  fs.mkdirSync(path.dirname(newKeyTmpPath), { recursive: true });
+  const gen = await exec.run("age-keygen", ["-o", newKeyTmpPath]);
+  if (gen.code !== 0) throw new Error(gen.stderr || `age-keygen exited with code ${gen.code}`);
+
+  const recipient = await recipientFromKey(exec, newKeyTmpPath);
+  if (recipient === null) {
+    try { fs.unlinkSync(newKeyTmpPath); } catch { /* ignore */ }
+    throw new Error("could not derive recipient from the new age key");
+  }
+
+  const { rotated, failed } = await rotateAgeKey(exec, {
+    repoDir,
+    oldKeyPath: keyPath,
+    newRecipient: recipient,
+  });
+
+  if (failed.length > 0) {
+    // Abort the swap so already-encrypted files (still on the old key) stay readable.
+    try { fs.unlinkSync(newKeyTmpPath); } catch { /* ignore */ }
+    return { recipient, rotated, failed, swapped: false };
+  }
+
+  if (fs.existsSync(keyPath)) {
+    fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+    fs.renameSync(keyPath, backupPath);
+  }
+  fs.mkdirSync(path.dirname(keyPath), { recursive: true });
+  fs.renameSync(newKeyTmpPath, keyPath);
+  fs.chmodSync(keyPath, 0o600);
+  return { recipient, rotated, failed, swapped: true, backupPath };
 }

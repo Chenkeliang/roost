@@ -292,3 +292,72 @@ describe("rotateAgeKey", () => {
     expect(allArgs).not.toContain(nmFile);
   });
 });
+
+// ── rotateToNewKey (generate + re-encrypt + swap) ────────────────────────────
+
+import { rotateToNewKey } from "./rotate.js";
+
+// Fake exec: age-keygen -o writes a key file; age-keygen -y prints a recipient;
+// age -d/-r write their -o dest (so renames succeed). Controlled per call.
+function makeKeyRotateExec(opts?: { encFails?: boolean }) {
+  return makeFakeExec((cmd, args) => {
+    if (cmd === "age-keygen" && args[0] === "-o") {
+      const dest = args[1]!;
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, "AGE-SECRET-KEY-1FAKEKEYMATERIAL", "utf8");
+      return { code: 0, stdout: "", stderr: "" };
+    }
+    if (cmd === "age-keygen" && args[0] === "-y") {
+      return { code: 0, stdout: "age1newrecipientpublickeyfake\n", stderr: "" };
+    }
+    if (cmd === "age") {
+      if (opts?.encFails && args.includes("-r")) return { code: 1, stdout: "", stderr: "encrypt boom" };
+      const oIdx = args.indexOf("-o");
+      const dest = args[oIdx + 1];
+      if (dest) { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, "x", "utf8"); }
+      return { code: 0, stdout: "", stderr: "" };
+    }
+    return { code: 0, stdout: "", stderr: "" };
+  });
+}
+
+describe("rotateToNewKey", () => {
+  it("generates a new key, re-encrypts all .age, backs up old key, and swaps", async () => {
+    const repoDir = path.join(tmpDir, "repo");
+    fs.mkdirSync(path.join(repoDir, "roost", "env-secrets"), { recursive: true });
+    fs.writeFileSync(path.join(repoDir, "roost", "env-secrets", "A.age"), "old-cipher");
+    const keyPath = path.join(tmpDir, "keys.txt");
+    fs.writeFileSync(keyPath, "AGE-SECRET-KEY-OLD");
+    const { exec } = makeKeyRotateExec();
+    const r = await rotateToNewKey(exec, {
+      repoDir,
+      keyPath,
+      newKeyTmpPath: path.join(tmpDir, "new-key.tmp"),
+      backupPath: path.join(tmpDir, "keys.txt.bak"),
+    });
+    expect(r.swapped).toBe(true);
+    expect(r.recipient).toBe("age1newrecipientpublickeyfake");
+    expect(r.rotated.length).toBe(1);
+    expect(fs.existsSync(path.join(tmpDir, "keys.txt.bak"))).toBe(true); // old key backed up
+    expect(fs.readFileSync(keyPath, "utf8")).toContain("FAKEKEYMATERIAL"); // new key in place
+  });
+
+  it("does NOT swap the key if any .age fails to re-encrypt (old data stays readable)", async () => {
+    const repoDir = path.join(tmpDir, "repo");
+    fs.mkdirSync(path.join(repoDir, "roost", "env-secrets"), { recursive: true });
+    fs.writeFileSync(path.join(repoDir, "roost", "env-secrets", "A.age"), "old-cipher");
+    const keyPath = path.join(tmpDir, "keys.txt");
+    fs.writeFileSync(keyPath, "AGE-SECRET-KEY-OLD");
+    const { exec } = makeKeyRotateExec({ encFails: true });
+    const r = await rotateToNewKey(exec, {
+      repoDir,
+      keyPath,
+      newKeyTmpPath: path.join(tmpDir, "new-key.tmp"),
+      backupPath: path.join(tmpDir, "keys.txt.bak"),
+    });
+    expect(r.swapped).toBe(false);
+    expect(r.failed.length).toBe(1);
+    expect(fs.readFileSync(keyPath, "utf8")).toBe("AGE-SECRET-KEY-OLD"); // old key untouched
+    expect(fs.existsSync(path.join(tmpDir, "new-key.tmp"))).toBe(false); // new key discarded
+  });
+});

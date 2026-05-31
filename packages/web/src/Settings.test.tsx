@@ -21,6 +21,9 @@ vi.mock("./api", () => ({
   }),
   gitPush: vi.fn().mockResolvedValue({ ok: true, output: "Everything up-to-date" }),
   gitPull: vi.fn().mockResolvedValue({ ok: true, output: "Already up to date." }),
+  getKey: vi.fn().mockResolvedValue({ exists: true, recipient: "age1examplerecipient", keyPath: "/Users/testuser/.config/sops/age/keys.txt", encryptedFiles: 0 }),
+  generateKey: vi.fn().mockResolvedValue({ created: true, source: "generated", recipient: "age1examplerecipient", keyPath: "/x" }),
+  rotateKey: vi.fn().mockResolvedValue({ recipient: "age1new", rotated: [], failed: [], swapped: true }),
 }));
 
 describe("Settings", () => {
