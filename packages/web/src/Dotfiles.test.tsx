@@ -11,7 +11,7 @@ vi.mock("./api", () => ({
   }),
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: ["~/.vimrc"] } }),
   removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: [] } }),
-  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: [] } }),
+  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: ["~/.zshrc", "~/.gitconfig"] } }),
 }));
 
 describe("Dotfiles", () => {

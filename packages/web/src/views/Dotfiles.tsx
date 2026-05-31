@@ -85,8 +85,11 @@ export function Dotfiles({ showHud }: DotfilesProps) {
     }
   }, [showHud]);
 
-  const shown = (managed ?? []).filter((p) => p.toLowerCase().includes(filter.toLowerCase()));
-  const newCands = (cands ?? []).filter((c) => !(managed ?? []).includes(c.id));
+  // Primary list = what you've SELECTED (selection.yaml), shown persistently
+  // whether or not it's been captured yet. The Discovered section below is for
+  // adding new ones.
+  const selectedList = [...selected].filter((p) => p.toLowerCase().includes(filter.toLowerCase())).sort();
+  const newCands = (cands ?? []).filter((c) => !selected.has(c.id));
 
   const toggleCheck = useCallback((id: string) => {
     setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -139,7 +142,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
-        {t("dotfiles.explainer")} Managed: {managed?.length ?? 0} · scanning for more is on-demand.
+        {t("dotfiles.explainer")} {t("common.selected")}: {selected.size} · {t("common.managed")}: {managed?.length ?? 0}.
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -158,17 +161,19 @@ export function Dotfiles({ showHud }: DotfilesProps) {
         </button>
       </div>
 
-      {shown.length === 0 ? (
-        <EmptyState icon={<File size={24} />} title={managed && managed.length > 0 ? t("dotfiles.emptyMatchTitle") : t("dotfiles.emptyTitle")} subtitle={managed && managed.length > 0 ? t("dotfiles.emptyMatchSubtitle") : t("dotfiles.emptySubtitle")} />
+      {selectedList.length === 0 ? (
+        <EmptyState icon={<File size={24} />} title={selected.size > 0 ? t("dotfiles.emptyMatchTitle") : t("dotfiles.emptyTitle")} subtitle={selected.size > 0 ? t("dotfiles.emptyMatchSubtitle") : t("dotfiles.emptySubtitle")} />
       ) : (
         <div style={card}>
-          {shown.map((p) => {
+          {selectedList.map((p) => {
             const cat = categorize(p);
+            const captured = (managed ?? []).some((m) => p.endsWith(m) || m.endsWith(p));
             return (
               <div key={p} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
                 <CategoryIcon category={cat} />
                 <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                <span style={{ color: "var(--muted)", fontSize: 11 }}>{cat}</span>
+                <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("dotfiles.captured") : t("dotfiles.pending")}</span>
+                <button onClick={() => void remove(p)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${p}`}><X size={11} />{t("common.remove")}</button>
               </div>
             );
           })}

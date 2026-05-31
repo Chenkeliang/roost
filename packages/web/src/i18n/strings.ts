@@ -109,11 +109,13 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   },
   "dotfiles.emptyMatchTitle": { en: "Nothing here", zh: "暂无内容" },
   "dotfiles.emptyMatchSubtitle": { en: "No dotfiles match this filter.", zh: "没有 dotfiles 匹配此筛选。" },
-  "dotfiles.emptyTitle": { en: "No dotfiles tracked yet", zh: "尚未跟踪任何 dotfiles" },
+  "dotfiles.emptyTitle": { en: "No dotfiles selected yet", zh: "尚未选择任何 dotfiles" },
   "dotfiles.emptySubtitle": {
-    en: 'Click "Scan for dotfiles" to find config files on this Mac.',
-    zh: "点击「扫描 Dotfiles」以查找此 Mac 上的配置文件。",
+    en: 'Click "Scan for dotfiles" to find config files on this Mac, then Add them.',
+    zh: "点击「扫描 Dotfiles」找到此 Mac 上的配置文件,再添加它们。",
   },
+  "dotfiles.captured": { en: "captured", zh: "已捕获" },
+  "dotfiles.pending": { en: "pending capture", zh: "待捕获" },
 
   // ── App Config ───────────────────────────────────────────────────────────
   "appconfig.explainer": {
