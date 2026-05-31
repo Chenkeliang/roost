@@ -9,6 +9,8 @@ import {
   LockKey,
   MagnifyingGlass,
   PencilSimple,
+  Lightning,
+  Copy,
 } from "@phosphor-icons/react";
 import type {
   EnvData,
@@ -22,7 +24,7 @@ import type {
 import type { HudMessage } from "../components/Hud";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getEnv, putEnv, getDiscover } from "../api";
+import { getEnv, putEnv, getDiscover, applyEnv } from "../api";
 
 interface AliasesEnvProps {
   showHud?: (msg: HudMessage) => void;
@@ -613,6 +615,8 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [reloadCmd, setReloadCmd] = useState<string | null>(null);
   const [importCandidates, setImportCandidates] = useState<Candidate[] | null>(null);
 
   const [query, setQuery] = useState("");
@@ -656,6 +660,26 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
       setSaving(false);
     }
   }, [data, showHud]);
+
+  // Regenerate the live env.sh so toggles/edits take effect on this machine.
+  // Saves first if there are unsaved changes, then applies.
+  const applyToMachine = useCallback(async () => {
+    setApplying(true);
+    try {
+      if (data && JSON.stringify(data) !== JSON.stringify(serverData)) {
+        const saved = await putEnv(data);
+        setData(saved);
+        setServerData(saved);
+      }
+      const res = await applyEnv();
+      setReloadCmd(res.reload);
+      showHud?.({ text: "Applied to this machine", type: "success" });
+    } catch (e) {
+      showHud?.({ text: e instanceof Error ? e.message : "Apply failed", type: "error" });
+    } finally {
+      setApplying(false);
+    }
+  }, [data, serverData, showHud]);
 
   const openImport = useCallback(async () => {
     try {
@@ -1021,8 +1045,66 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             <FloppyDisk size={13} weight="fill" />
             {saving ? t("env.saving") : t("env.save")}
           </button>
+          <button
+            onClick={() => void applyToMachine()}
+            disabled={applying}
+            title="Regenerate ~/.config/roost/env.sh so changes take effect"
+            style={{
+              ...iconButton("var(--text)"),
+              border: "1px solid var(--border)",
+              padding: "6px 11px",
+              cursor: applying ? "default" : "pointer",
+              opacity: applying ? 0.7 : 1,
+            }}
+          >
+            <Lightning size={13} weight="fill" />
+            {applying ? t("env.applying") : t("env.applyToMachine")}
+          </button>
         </div>
       </div>
+
+      {reloadCmd && (
+        <div
+          role="status"
+          style={{
+            margin: "12px 0",
+            padding: "12px 14px",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--rr)",
+            background: "var(--raise)",
+            fontSize: 12.5,
+          }}
+        >
+          <div style={{ color: "var(--muted)", marginBottom: 8 }}>
+            {t("env.appliedHint")}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <code
+              style={{
+                flex: 1,
+                fontFamily: "var(--mono)",
+                fontSize: 12,
+                color: "var(--text)",
+                background: "var(--surface)",
+                border: "1px solid var(--border-soft)",
+                borderRadius: 6,
+                padding: "7px 10px",
+                overflowX: "auto",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {reloadCmd}
+            </code>
+            <button
+              onClick={() => void navigator.clipboard?.writeText(reloadCmd)}
+              style={{ ...iconButton("var(--text)"), padding: "6px 10px" }}
+            >
+              <Copy size={13} />
+              {t("env.copy")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {importCandidates !== null && (
         <ImportPicker

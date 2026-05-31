@@ -5,7 +5,7 @@ import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getIndex, getDiscoverModule, testProjectRemote, addSelection } from "../api";
+import { getIndex, getDiscoverModule, testProjectRemote, addSelection, getSelection } from "../api";
 
 interface ProjectsProps { showHud?: (m: HudMessage) => void; }
 type TestState = Record<string, "ok" | "fail" | "testing">;
@@ -22,16 +22,18 @@ export function Projects({ showHud }: ProjectsProps) {
   const [scanning, setScanning] = useState(false);
   const [host, setHost] = useState<string>("all");
   const [tested, setTested] = useState<TestState>({});
+  const [saved, setSaved] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
       try {
-        const { index } = await getIndex();
+        const [{ index }, sel] = await Promise.all([getIndex(), getSelection()]);
         const p = index.projects;
         setManaged(p?.managed ?? 0);
         setAvailable(p?.available ?? true);
         setReason(p?.reason);
+        setSaved(new Set(sel.modules.projects ?? []));
       } finally {
         setLoading(false);
       }
@@ -66,6 +68,7 @@ export function Projects({ showHud }: ProjectsProps) {
     try {
       await addSelection("projects", c.id);
       setManaged((m) => (m ?? 0) + 1);
+      setSaved((s) => new Set(s).add(c.id));
       showHud?.({ text: `Saved ${c.path}`, type: "success" });
     } catch (e) {
       showHud?.({ text: e instanceof Error ? e.message : "Save failed", type: "error" });
@@ -120,7 +123,11 @@ export function Projects({ showHud }: ProjectsProps) {
               {tested[c.id] === "ok" && <CheckCircle size={14} weight="fill" style={{ color: "var(--green)" }} />}
               {tested[c.id] === "fail" && <XCircle size={14} weight="fill" style={{ color: "var(--red)" }} />}
               <button onClick={() => void test(c)} disabled={!c.remote || tested[c.id] === "testing"} style={ic} aria-label={`test ${c.path}`}>Test</button>
-              <button onClick={() => void save(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><FloppyDisk size={11} />Save</button>
+              {saved.has(c.id) ? (
+                <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} saved`}><CheckCircle size={11} weight="fill" />{t("projects.saved")}</span>
+              ) : (
+                <button onClick={() => void save(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><FloppyDisk size={11} />Save</button>
+              )}
             </div>
           ))}
         </div>

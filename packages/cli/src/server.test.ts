@@ -15,7 +15,7 @@ import type {
   Candidate,
   ApplyPlan,
 } from "@roost/shared";
-import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec } from "@roost/core";
+import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData } from "@roost/core";
 import { buildServer } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
@@ -122,6 +122,39 @@ describe("buildServer", () => {
     await expect(server.ready()).resolves.toBeDefined();
     await server.close();
     fs.rmSync(webAbs, { recursive: true, force: true });
+  });
+
+  it("POST /api/env/apply regenerates env.sh and returns a reload command for the current shell", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-home-"));
+    saveEnvData(tmpDir, {
+      schemaVersion: 2,
+      aliases: [
+        { kind: "alias", name: "gps", value: "git push", enabled: true },
+        { kind: "alias", name: "gp", value: "git pull", enabled: false },
+      ],
+      env: [],
+      path: [],
+      functions: [],
+    });
+    const reg = defaultRegistry();
+    const ctx = (dryRun: boolean): ModuleContext => ({
+      repoDir: tmpDir, home, profile: "base", dryRun, exec: createExec(),
+      log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
+    });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: ctx });
+    const res = await server.inject({ method: "POST", url: "/api/env/apply" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { applied: string[]; reload: string };
+    // The live env.sh was regenerated: enabled alias present, disabled one gone.
+    const sh = fs.readFileSync(path.join(home, ".config", "roost", "env.sh"), "utf8");
+    expect(sh).toContain("alias gps='git push'");
+    expect(sh).not.toContain("alias gp=");
+    // The reload command resets the CURRENT shell (unalias all managed names, re-source).
+    expect(body.reload).toContain("unalias gps gp");
+    expect(body.reload).toContain("source");
+    expect(body.reload).toContain("env.sh");
+    await server.close();
+    fs.rmSync(home, { recursive: true, force: true });
   });
 
   it("GET /api/modules → 200 lists registered module names", async () => {

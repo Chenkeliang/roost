@@ -49,6 +49,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "projects.scan": { en: "Scan for git projects", zh: "扫描 Git 项目" },
   "projects.scanning": { en: "Scanning…", zh: "扫描中…" },
   "projects.noScanTitle": { en: "No scan yet", zh: "尚未扫描" },
+  "projects.saved": { en: "Saved", zh: "已保存" },
   "projects.noScanSubtitle": {
     en: 'Click "Scan for git projects" to find repositories on this Mac.',
     zh: "点击「扫描 Git 项目」以查找此 Mac 上的仓库。",
@@ -125,6 +126,13 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "env.save": { en: "Save", zh: "保存" },
   "env.saving": { en: "Saving…", zh: "保存中…" },
   "env.importFromShell": { en: "Import from your shell", zh: "从你的 shell 导入" },
+  "env.applyToMachine": { en: "Apply to this machine", zh: "应用到本机" },
+  "env.applying": { en: "Applying…", zh: "应用中…" },
+  "env.appliedHint": {
+    en: "Saved & regenerated env.sh. New terminals are already set. To update THIS terminal without reopening it, run:",
+    zh: "已保存并重新生成 env.sh。新开的终端已生效。要让当前这个终端不重开也生效，运行：",
+  },
+  "env.copy": { en: "Copy", zh: "复制" },
   "env.emptyManaged": {
     en: "Nothing managed yet. Add an item or import from your shell.",
     zh: "尚未管理任何内容。添加一项或从你的 shell 导入。",

@@ -171,6 +171,15 @@ export function putEnv(data: EnvData): Promise<EnvData> {
   });
 }
 
+// Server POST /api/env/apply regenerates the live env.sh from env.yaml and
+// returns a one-paste command to sync the CURRENT shell (a web app cannot reach
+// into an already-open shell, so new shells pick it up automatically).
+export interface EnvApplyResponse { applied: string[]; reload: string; }
+
+export function applyEnv(): Promise<EnvApplyResponse> {
+  return apiFetch<EnvApplyResponse>("/api/env/apply", { method: "POST" });
+}
+
 // Server GET /api/index returns { index: Record<string, ModuleIndex> }
 export interface IndexResponse { index: Record<string, ModuleIndex>; }
 

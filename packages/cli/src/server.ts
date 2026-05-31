@@ -23,6 +23,7 @@ import {
   loadEnvData,
   saveEnvData,
   validateEnvData,
+  envShPath,
   defaultAgeKeyPath,
   recipientFromKey,
   encryptEnvSecret,
@@ -447,6 +448,33 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
       // Echo back with secrets redacted (never return plaintext).
       return reply.send(persisted);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── POST /api/env/apply ──────────────────────────────────────────────────────
+  // Regenerate the live ~/.config/roost/env.sh from the saved env.yaml (secrets
+  // resolved) so dashboard edits actually take effect on THIS machine. A web app
+  // cannot reach into an already-open shell, so we also return a one-paste
+  // command that resets the CURRENT shell (unalias all managed alias names, then
+  // re-source) — new shells pick it up automatically.
+  server.post("/api/env/apply", async (_req, reply) => {
+    try {
+      cache.invalidateAll();
+      const env = registry.get("env");
+      if (!env) return reply.status(500).send({ error: "env module not registered" });
+      const ctx = makeCtx(false);
+      const result = await env.apply(ctx, { module: "env", actions: [] });
+      const data = loadEnvData(repoDir);
+      const livePath = envShPath(ctx.home);
+      const aliasNames = data.aliases.map((a) => a.name);
+      const reload =
+        aliasNames.length > 0
+          ? `unalias ${aliasNames.join(" ")} 2>/dev/null; source ${livePath}`
+          : `source ${livePath}`;
+      return reply.send({ applied: result.applied, reload });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });
