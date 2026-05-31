@@ -89,7 +89,9 @@ export function Dotfiles({ showHud }: DotfilesProps) {
   // whether or not it's been captured yet. The Discovered section below is for
   // adding new ones.
   const selectedList = [...selected].filter((p) => p.toLowerCase().includes(filter.toLowerCase())).sort();
-  const newCands = (cands ?? []).filter((c) => !selected.has(c.id));
+  const newCands = (cands ?? [])
+    .filter((c) => !selected.has(c.id))
+    .filter((c) => c.path.toLowerCase().includes(filter.toLowerCase()));
 
   const toggleCheck = useCallback((id: string) => {
     setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
