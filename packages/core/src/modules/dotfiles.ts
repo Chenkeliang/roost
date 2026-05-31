@@ -16,6 +16,7 @@ import { createChezmoi } from "../adapters/chezmoi.js";
 import { isNoise, scanDir } from "../discovery/scan.js";
 import { scanForSecrets } from "../secrets/scanner.js";
 import { loadAppConfigCatalog, expandCatalogPath } from "../app-config-catalog.js";
+import { ensureChezmoiAgeConfig } from "../chezmoi-config.js";
 
 export interface CaptureScanResult {
   secretFiles: string[];
@@ -241,8 +242,20 @@ export const dotfilesModule: SyncModule = {
     const encrypted: string[] = [];
     const blocked: string[] = [];
 
+    // Encrypt intent comes from two sources: the path heuristic (.ssh/.aws/…) and
+    // the curated catalog's encryptRecommended apps (e.g. JetBrains) — expanded to
+    // the concrete paths on this machine. (ADR-0007)
+    const encryptByCatalog = new Set(
+      loadAppConfigCatalog(ctx.repoDir)
+        .filter((a) => a.encryptRecommended)
+        .flatMap((a) => a.paths)
+        .flatMap((p) => expandCatalogPath(ctx.home, p)),
+    );
+    // chezmoi --encrypt needs an age recipient configured; ensure it lazily, once.
+    let ageReady: boolean | null = null;
+
     for (const id of ids) {
-      const sensitive = isSensitivePath(id);
+      const wantsEncrypt = isSensitivePath(id) || encryptByCatalog.has(id);
       const scan = scanPathForSecrets(id);
 
       // H3: never slurp an oversized path (e.g. a whole app-support dir with caches).
@@ -255,24 +268,37 @@ export const dotfilesModule: SyncModule = {
         continue;
       }
 
-      // H1: block plaintext secrets. Sensitive paths are encrypted (safe); any
-      // other path with secret-looking content is skipped, not silently committed.
-      if (!sensitive && scan.secretFiles.length > 0) {
+      if (wantsEncrypt) {
+        // Configure chezmoi's age recipient from the existing key (once).
+        if (ageReady === null) {
+          ageReady = (await ensureChezmoiAgeConfig(ctx.exec, { home: ctx.home, repoDir: ctx.repoDir })).ready;
+        }
+        if (!ageReady) {
+          ctx.log.warn(
+            `dotfiles capture: "${id}" should be encrypted but no age key exists — ` +
+              `generate one (Settings → Generate key / \`age-keygen\`) first. Skipped.`,
+          );
+          blocked.push(id);
+          continue;
+        }
+        await chezmoi.add(id, { encrypt: true });
+        encrypted.push(id);
+        continue;
+      }
+
+      // H1: block plaintext secrets on a non-encrypted path — never silently commit.
+      if (scan.secretFiles.length > 0) {
         ctx.log.warn(
           `dotfiles capture: "${id}" contains potential secrets in ` +
-            `${scan.secretFiles.length} file(s) — skipped. Encrypt it (sensitive) or ` +
+            `${scan.secretFiles.length} file(s) — skipped. Mark it for encryption or ` +
             `exclude that file, and rotate any exposed credentials.`,
         );
         blocked.push(id);
         continue;
       }
 
-      await chezmoi.add(id, { encrypt: sensitive });
-      if (sensitive) {
-        encrypted.push(id);
-      } else {
-        written.push(id);
-      }
+      await chezmoi.add(id, { encrypt: false });
+      written.push(id);
     }
 
     return { module: "dotfiles", written, encrypted, blocked };

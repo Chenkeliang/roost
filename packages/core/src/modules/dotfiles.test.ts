@@ -256,20 +256,37 @@ describe("dotfilesModule.capture", () => {
     expect(result.encrypted).toHaveLength(0);
   });
 
-  it("calls chezmoi add with --encrypt for sensitive id", async () => {
+  it("calls chezmoi add with --encrypt for a sensitive id when an age key exists", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-enc-home-"));
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-enc-repo-"));
+    // age key must exist for recipientFromKey to run; age-keygen -y returns recipient
+    fs.mkdirSync(path.join(home, ".config", "sops", "age"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".config", "sops", "age", "keys.txt"), "AGE-SECRET-KEY-X");
     const { exec, calls } = makeFakeExec([
-      { code: 0, stdout: "", stderr: "" }, // chezmoi add .ssh
+      { code: 0, stdout: "age1recipientkey", stderr: "" }, // age-keygen -y (recipientFromKey)
+      { code: 0, stdout: "", stderr: "" }, // chezmoi add --encrypt
     ]);
-    const ctx = makeCtx({ exec, home: os.homedir() });
+    const ctx = makeCtx({ exec, home, repoDir });
     const sel: Selection = { modules: { dotfiles: ["/home/user/.ssh"] } };
     const result = await dotfilesModule.capture(ctx, sel);
-    const addCall = calls.find(
-      (c) => c.cmd === "chezmoi" && c.args.includes("add") && c.args.includes("/home/user/.ssh"),
-    );
-    expect(addCall).toBeDefined();
+    const addCall = calls.find((c) => c.cmd === "chezmoi" && c.args.includes("add"));
     expect(addCall!.args).toContain("--encrypt");
     expect(result.encrypted).toContain("/home/user/.ssh");
-    expect(result.written).toHaveLength(0);
+    // chezmoi age config was written from the key
+    expect(fs.existsSync(path.join(home, ".config", "chezmoi", "chezmoi.toml"))).toBe(true);
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  it("blocks an encrypt-wanted item when NO age key exists (no chezmoi add)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-nokey-home-"));
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home }); // no key file → recipientFromKey returns null
+    const result = await dotfilesModule.capture(ctx, { modules: { dotfiles: ["/home/user/.ssh"] } });
+    expect(result.blocked).toContain("/home/user/.ssh");
+    expect(result.encrypted).toHaveLength(0);
+    expect(calls.find((c) => c.cmd === "chezmoi" && c.args.includes("add"))).toBeUndefined();
+    fs.rmSync(home, { recursive: true, force: true });
   });
 
   it("handles empty selection gracefully", async () => {

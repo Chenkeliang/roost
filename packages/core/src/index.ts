@@ -54,6 +54,7 @@ export {
   expandCatalogPath,
 } from "./app-config-catalog.js";
 export type { CatalogApp } from "./app-config-catalog.js";
+export { ensureChezmoiAgeConfig } from "./chezmoi-config.js";
 export {
   defaultAgeKeyPath,
   envSecretsDir,
