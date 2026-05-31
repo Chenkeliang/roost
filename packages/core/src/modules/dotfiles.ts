@@ -77,13 +77,17 @@ const SENSITIVE_EXACT_BASENAMES = new Set([".npmrc", ".git-credentials", ".netrc
 const SENSITIVE_CONFIG_FILES = new Set(["env.sh"]);
 
 /**
- * True for anything under the Roost-managed `~/.config/roost/` directory
- * (e.g. the generated `env.sh` and `env-secrets/`). The `env` module owns these,
- * so `dotfiles` must never discover or scan them to avoid double-management.
+ * True for tool-internal config that dotfiles must never manage:
+ *  - `~/.config/roost/` — the env module owns it (generated env.sh, env-secrets).
+ *  - `~/.config/chezmoi/` — chezmoi's OWN config; `chezmoi add` refuses it
+ *    ("cannot add chezmoi's config file"), so offering/capturing it just errors.
  */
 export function isRoostManaged(absPath: string): boolean {
-  const normalized = absPath.replace(/\\/g, "/");
-  return normalized.endsWith("/.config/roost") || normalized.includes("/.config/roost/");
+  const n = absPath.replace(/\\/g, "/");
+  for (const dir of ["/.config/roost", "/.config/chezmoi"]) {
+    if (n.endsWith(dir) || n.includes(`${dir}/`)) return true;
+  }
+  return false;
 }
 
 export function isSensitivePath(absPath: string): boolean {
@@ -255,6 +259,11 @@ export const dotfilesModule: SyncModule = {
     let ageReady: boolean | null = null;
 
     for (const id of ids) {
+      // Never try to manage tool-internal config (roost's / chezmoi's own).
+      if (isRoostManaged(id)) {
+        blocked.push(id);
+        continue;
+      }
       const wantsEncrypt = isSensitivePath(id) || encryptByCatalog.has(id);
       const scan = scanPathForSecrets(id);
 
