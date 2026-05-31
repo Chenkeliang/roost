@@ -20,6 +20,31 @@ Roost has a clear direction of flow:
 Loading is **one-directional**: it brings the config repo's state onto the
 current machine. There is no two-way merge; the repo is authoritative.
 
+### Capture on ONE machine only (the primary)
+
+Roost is **single-primary** today. Capture on the primary; only `load` on
+followers. Do **not** `capture` on a follower:
+
+- Roost **can** show you what differs on a follower — `roost status` / `roost diff`
+  and the Drift page report drift (for dotfiles via `chezmoi diff`, etc.). So if 9
+  files match and 1 changed locally, you'll see that one.
+- But capturing on a follower commits a **divergent** history. Pushing it back is
+  rejected (non-fast-forward), and Roost only pulls with `git pull --ff-only` — it
+  will **not** auto-merge. You'd have to resolve the divergence by hand in plain git.
+- There is no per-item "capture just this one file" and no conflict resolution —
+  capture re-snapshots the whole selection; git records only what changed, but the
+  divergence remains.
+
+If you tweak something on a follower and want to keep it, make the change on the
+**primary** and let followers `load` it. True multi-machine (bidirectional edits,
+per-machine profiles, conflict handling) is future work (ADR-0005).
+
+### When a follower's local file differs from the repo
+
+`load` is **dry-run by default** — it shows the diff first. On `--apply`, the repo
+wins (it overwrites local); the generated `env.sh` is backed up first, and dotfiles
+are applied via `chezmoi apply` (preview the diff with `load` before `--apply`).
+
 ## `selection.yaml` is the single source of truth
 
 What Roost manages is not implicit — it's written down. `selection.yaml` records
