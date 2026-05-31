@@ -257,3 +257,37 @@ describe("assertNoPlaintextSecrets", () => {
     ).not.toThrow();
   });
 });
+
+// ── app-config credential formats (XML <password>, JDBC URL) ─────────────────
+// JetBrains/DataGrip and similar store DB creds in XML and JDBC URLs, which the
+// key=value rules miss. (ADR-0007 H2)
+
+describe("xml password element rule", () => {
+  it("detects <password>value</password>", () => {
+    const content = '<data-source><password>longsecretvalue12345</password></data-source>';
+    expect(hasSecret(content)).toBe(true);
+    expect(rulesOf(content)).toContain("xml-password");
+  });
+
+  it("detects <Password>...</Password> case-insensitively with attrs", () => {
+    expect(rulesOf('<entry key="Password">s3cretValue12345</entry>')).toContain("xml-password");
+  });
+
+  it("does not raw-leak the secret in the sample", () => {
+    const content = "<password>longsecretvalue12345</password>";
+    const f = scanForSecrets(content).find((x) => x.rule === "xml-password");
+    expect(noRawSecret(f!, "longsecretvalue12345")).toBe(true);
+  });
+});
+
+describe("jdbc url credential rule", () => {
+  it("detects jdbc://user:pass@host", () => {
+    const content = 'url="jdbc:mysql://dbuser:S3cretP4ss@db.prod:3306/app"';
+    expect(hasSecret(content)).toBe(true);
+    expect(rulesOf(content)).toContain("jdbc-url-credential");
+  });
+
+  it("does not fire for a jdbc url without credentials", () => {
+    expect(rulesOf('jdbc:postgresql://localhost:5432/app')).not.toContain("jdbc-url-credential");
+  });
+});

@@ -32,6 +32,17 @@ const RULES: Rule[] = [
     pattern:
       /(?:api[_-]?key|secret|token|passwd|password)\s*[:=]\s*['"]?[A-Za-z0-9/+_=\-]{16,}/i,
   },
+  {
+    // App config (e.g. JetBrains/DataGrip) stores creds in XML: <password>…</password>
+    // or <... key="Password">…</...>. Require a non-trivial value to avoid noise.
+    name: "xml-password",
+    pattern: /(?:<password>|key="password">)\s*([^<\s]{8,})/i,
+  },
+  {
+    // JDBC connection URLs embedding credentials: jdbc:<driver>://user:pass@host
+    name: "jdbc-url-credential",
+    pattern: /jdbc:[a-z0-9]+:\/\/([^\s:/@"']+:[^\s:/@"']+)@/i,
+  },
 ];
 
 export function scanForSecrets(content: string): SecretFinding[] {
@@ -39,9 +50,12 @@ export function scanForSecrets(content: string): SecretFinding[] {
   for (const rule of RULES) {
     const match = rule.pattern.exec(content);
     if (match !== null) {
+      // If the rule captures the sensitive part in group 1, mask it before
+      // building the sample so the secret value never appears in logs/output.
+      const raw = match[1] ? match[0].replace(match[1], "***") : match[0];
       findings.push({
         rule: rule.name,
-        redactedSample: redact(match[0]),
+        redactedSample: redact(raw),
       });
     }
   }

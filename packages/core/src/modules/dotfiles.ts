@@ -14,6 +14,59 @@ import type {
 } from "@roost/shared";
 import { createChezmoi } from "../adapters/chezmoi.js";
 import { isNoise, scanDir } from "../discovery/scan.js";
+import { scanForSecrets } from "../secrets/scanner.js";
+
+export interface CaptureScanResult {
+  secretFiles: string[];
+  tooLarge: boolean;
+  files: number;
+  bytes: number;
+}
+
+// Capture-time guard for a selected path (file or dir). Bounded recursive walk
+// that (1) counts files/bytes so we never slurp a huge dir (e.g. a whole app
+// support dir with caches), and (2) scans text files for plaintext secrets —
+// dotfiles capture previously trusted only a path heuristic, which is unsafe now
+// that arbitrary app-config paths can be added. (ADR-0007 H1/H3)
+// Defensive: unreadable/missing paths yield no findings so capture still proceeds
+// (chezmoi surfaces any real error).
+export function scanPathForSecrets(
+  absPath: string,
+  opts?: { maxFiles?: number; maxBytes?: number; maxScanFileBytes?: number },
+): CaptureScanResult {
+  const maxFiles = opts?.maxFiles ?? 2000;
+  const maxBytes = opts?.maxBytes ?? 100 * 1024 * 1024;
+  const maxScanFileBytes = opts?.maxScanFileBytes ?? 2 * 1024 * 1024;
+  const res: CaptureScanResult = { secretFiles: [], tooLarge: false, files: 0, bytes: 0 };
+
+  const stack: string[] = [absPath];
+  while (stack.length > 0) {
+    const cur = stack.pop()!;
+    let st: fs.Stats;
+    try { st = fs.statSync(cur); } catch { continue; }
+    if (st.isDirectory()) {
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(cur, { withFileTypes: true }); } catch { continue; }
+      for (const e of entries) stack.push(path.join(cur, e.name));
+      continue;
+    }
+    if (!st.isFile()) continue;
+    res.files++;
+    res.bytes += st.size;
+    if (res.files > maxFiles || res.bytes > maxBytes) {
+      res.tooLarge = true;
+      return res;
+    }
+    if (st.size <= maxScanFileBytes) {
+      try {
+        if (scanForSecrets(fs.readFileSync(cur, "utf8")).length > 0) res.secretFiles.push(cur);
+      } catch {
+        /* unreadable / binary — skip */
+      }
+    }
+  }
+  return res;
+}
 
 // ── isSensitivePath ───────────────────────────────────────────────────────────
 
@@ -165,9 +218,34 @@ export const dotfilesModule: SyncModule = {
     const ids = sel.modules["dotfiles"] ?? [];
     const written: string[] = [];
     const encrypted: string[] = [];
+    const blocked: string[] = [];
 
     for (const id of ids) {
       const sensitive = isSensitivePath(id);
+      const scan = scanPathForSecrets(id);
+
+      // H3: never slurp an oversized path (e.g. a whole app-support dir with caches).
+      if (scan.tooLarge) {
+        ctx.log.warn(
+          `dotfiles capture: "${id}" is too large (${scan.files} files / ` +
+            `${Math.round(scan.bytes / 1_000_000)}MB) — add a more specific subpath. Skipped.`,
+        );
+        blocked.push(id);
+        continue;
+      }
+
+      // H1: block plaintext secrets. Sensitive paths are encrypted (safe); any
+      // other path with secret-looking content is skipped, not silently committed.
+      if (!sensitive && scan.secretFiles.length > 0) {
+        ctx.log.warn(
+          `dotfiles capture: "${id}" contains potential secrets in ` +
+            `${scan.secretFiles.length} file(s) — skipped. Encrypt it (sensitive) or ` +
+            `exclude that file, and rotate any exposed credentials.`,
+        );
+        blocked.push(id);
+        continue;
+      }
+
       await chezmoi.add(id, { encrypt: sensitive });
       if (sensitive) {
         encrypted.push(id);
@@ -176,7 +254,7 @@ export const dotfilesModule: SyncModule = {
       }
     }
 
-    return { module: "dotfiles", written, encrypted };
+    return { module: "dotfiles", written, encrypted, blocked };
   },
 
   async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {

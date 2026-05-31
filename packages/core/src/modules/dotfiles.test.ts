@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection } from "@roost/shared";
-import { classifyDotfile, isSensitivePath, dotfilesModule } from "./dotfiles.js";
+import { classifyDotfile, isSensitivePath, dotfilesModule, scanPathForSecrets } from "./dotfiles.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -268,6 +268,62 @@ describe("dotfilesModule.capture", () => {
     expect(result.module).toBe("dotfiles");
     expect(result.written).toHaveLength(0);
     expect(result.encrypted).toHaveLength(0);
+  });
+
+  // ── H1: content secret scan blocks plaintext secrets (ADR-0007) ─────────────
+
+  it("blocks a non-sensitive path whose content has a plaintext secret (no chezmoi add)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-"));
+    const file = path.join(dir, "config.xml");
+    fs.writeFileSync(file, "<data-source><password>longsecretvalue12345</password></data-source>");
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const result = await dotfilesModule.capture(ctx, { modules: { dotfiles: [file] } });
+    expect(result.blocked).toContain(file);
+    expect(result.written).not.toContain(file);
+    expect(calls.find((c) => c.args.includes("add") && c.args.includes(file))).toBeUndefined();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("captures a real clean file normally", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-"));
+    const file = path.join(dir, ".vimrc");
+    fs.writeFileSync(file, "set number\nsyntax on\n");
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const result = await dotfilesModule.capture(ctx, { modules: { dotfiles: [file] } });
+    expect(result.written).toContain(file);
+    expect(result.blocked ?? []).not.toContain(file);
+    expect(calls.find((c) => c.args.includes("add") && c.args.includes(file))).toBeDefined();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+// ── scanPathForSecrets (H1/H3 guard) ────────────────────────────────────────
+
+describe("scanPathForSecrets", () => {
+  let dir: string;
+  beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-scan-")); });
+  afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+  it("missing path → no findings, not too large (capture still proceeds)", () => {
+    const r = scanPathForSecrets(path.join(dir, "does-not-exist"));
+    expect(r.secretFiles).toHaveLength(0);
+    expect(r.tooLarge).toBe(false);
+  });
+
+  it("finds secrets in files under a directory", () => {
+    fs.mkdirSync(path.join(dir, "options"));
+    fs.writeFileSync(path.join(dir, "options", "clean.xml"), "<x>hi</x>");
+    fs.writeFileSync(path.join(dir, "options", "db.xml"), "url=\"jdbc:mysql://u:S3cretP4ss@h/db\"");
+    const r = scanPathForSecrets(dir);
+    expect(r.secretFiles.some((f) => f.endsWith("db.xml"))).toBe(true);
+  });
+
+  it("H3: flags a directory exceeding the file-count guard", () => {
+    for (let i = 0; i < 5; i++) fs.writeFileSync(path.join(dir, `f${i}`), "x");
+    const r = scanPathForSecrets(dir, { maxFiles: 2 });
+    expect(r.tooLarge).toBe(true);
   });
 });
 
