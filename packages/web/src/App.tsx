@@ -195,7 +195,9 @@ export function App() {
             top: 0,
             background: "var(--surface)",
             borderRight: "1px solid var(--border-soft)",
-            padding: "16px 12px",
+            // Bottom padding clears the fixed 44px ActionBar footer so the
+            // sidebar's bottom row (language switcher, Docs) is never buried.
+            padding: "16px 12px 56px",
             gap: 4,
           }}
         >
