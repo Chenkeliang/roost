@@ -24,6 +24,7 @@ import { runKeyRotate } from "./commands/keyRotate.js";
 import { runKeyBackup, remindOfflineBackup } from "./commands/keyBackup.js";
 import { runPlugins } from "./commands/plugins.js";
 import { runServe } from "./server.js";
+import { runGui, isInsideAppBundle } from "./gui.js";
 
 const program = new Command();
 program.name("roost").description("Back up and migrate your Mac setup").version("0.0.0");
@@ -376,4 +377,21 @@ program
     });
   });
 
-program.parseAsync();
+program
+  .command("gui")
+  .description("Launch the dashboard in your browser (used by Roost.app)")
+  .option("--repo <dir>", "Path to the config repo directory")
+  .option("--web <dir>", "Path to the web build directory")
+  .action(async (opts: { repo?: string; web?: string }) => {
+    const { repoDir } = buildCtx();
+    await runGui({ repoDir: opts.repo ?? repoDir, webDir: opts.web });
+  });
+
+// Double-clicking the .app launches the binary with no extra args and no terminal.
+// Detect that case and enter GUI mode instead of printing help.
+if (process.argv.length <= 2 && isInsideAppBundle(process.execPath)) {
+  const { repoDir } = buildCtx();
+  runGui({ repoDir });
+} else {
+  program.parseAsync();
+}
