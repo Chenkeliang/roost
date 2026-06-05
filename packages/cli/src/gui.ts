@@ -50,6 +50,9 @@ export async function runGui(opts: {
   let server: ReturnType<typeof buildServer>;
   const quit = () => {
     write("quit requested");
+    // A browser keep-alive connection can stop server.close() from resolving;
+    // force exit after a short grace period so Quit always works.
+    setTimeout(() => process.exit(0), 1000);
     void server.close().finally(() => process.exit(0));
   };
 
