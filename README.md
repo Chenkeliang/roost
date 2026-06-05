@@ -19,6 +19,17 @@ Roost is an open-source macOS configuration backup & migration tool. On your mai
 ## Status
 Active development. The CLI (P0 foundation + P1 MVP) and the local web dashboard work today: `init` / `select` / `capture` / `load` plus a content-first dashboard for dotfiles, packages, projects, app config, and aliases/env. Next up is real multi-machine sync (P2) and a signed desktop app (P3). See `docs/ROADMAP.md` for the phases and `docs/superpowers/specs/` for the locked design.
 
+## Download the macOS app
+Grab `Roost-<version>-macos-<arch>.zip` from [Releases](../../releases), unzip, and move `Roost.app` to `/Applications`.
+
+**First launch** (the app is not yet Apple-signed): right-click `Roost.app` → **Open** → click **Open** in the dialog. Or run once:
+```bash
+xattr -dr com.apple.quarantine /Applications/Roost.app
+```
+Roost opens the dashboard in your default browser. Quit it from the dashboard's **Settings → Quit Roost**.
+
+**Build it yourself:** `pnpm build:app` (produces arm64 + x64 zips in `dist-app/`).
+
 ## Quick start (dev)
 ```bash
 pnpm install
