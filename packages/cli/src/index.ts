@@ -391,7 +391,8 @@ program
 // Detect that case and enter GUI mode instead of printing help.
 if (process.argv.length <= 2 && isInsideAppBundle(process.execPath)) {
   const { repoDir } = buildCtx();
-  runGui({ repoDir });
+  // No terminal in a .app launch — swallow nothing silently; exit non-zero on failure.
+  runGui({ repoDir }).catch(() => process.exit(1));
 } else {
   program.parseAsync();
 }

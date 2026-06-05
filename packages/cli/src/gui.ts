@@ -67,7 +67,14 @@ export async function runGui(opts: {
   });
 
   // port 0 -> kernel assigns a free port (no hard-coded 4317 clash).
-  await server.listen({ host: "127.0.0.1", port: 0 });
+  // A .app is launched with no terminal, so a startup failure must be logged
+  // (not just thrown into the void) or it's undiagnosable for the user.
+  try {
+    await server.listen({ host: "127.0.0.1", port: 0 });
+  } catch (err) {
+    write(`startup failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
+    process.exit(1);
+  }
   const addr = server.server.address();
   const port = typeof addr === "object" && addr ? addr.port : 0;
   const url = `http://127.0.0.1:${port}`;
