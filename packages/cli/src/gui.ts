@@ -47,7 +47,8 @@ export async function runGui(opts: {
   const webDir = opts.webDir ?? resolveWebDir(process.execPath);
   const registry = defaultRegistry();
 
-  let server: ReturnType<typeof buildServer>;
+  // `quit` reads `server` only when invoked (via the /api/quit route or a signal),
+  // by which time the `const server` below is initialized — so no TDZ issue.
   const quit = () => {
     write("quit requested");
     // A browser keep-alive connection can stop server.close() from resolving;
@@ -56,7 +57,7 @@ export async function runGui(opts: {
     void server.close().finally(() => process.exit(0));
   };
 
-  server = buildServer({
+  const server = buildServer({
     repoDir: opts.repoDir,
     registry,
     makeCtx,
