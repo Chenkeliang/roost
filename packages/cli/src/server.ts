@@ -43,10 +43,12 @@ export interface ServerDeps {
   registry: ModuleRegistry;
   makeCtx: (dryRun: boolean) => ModuleContext;
   webDir?: string;
+  appMode?: boolean;
+  onQuit?: () => void;
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
-  const { repoDir, registry, makeCtx, webDir } = deps;
+  const { repoDir, registry, makeCtx, webDir, appMode = false, onQuit } = deps;
 
   const server = Fastify({ logger: false });
 
@@ -59,7 +61,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const home = makeCtx(true).home;
     const ageKeyPath = path.join(home, ".config", "sops", "age", "keys.txt");
     const ageKey = fs.existsSync(ageKeyPath);
-    return reply.send({ ok: true, name: os.hostname(), repoDir, ageKey });
+    return reply.send({ ok: true, name: os.hostname(), repoDir, ageKey, appMode });
   });
 
   // ── /api/modules ─────────────────────────────────────────────────────────────
@@ -365,6 +367,14 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const ok = result.code === 0;
     const output = `${result.stdout}\n${result.stderr}`.trim();
     return reply.send({ ok, output });
+  });
+
+  // ── /api/quit ────────────────────────────────────────────────────────────────
+  // GUI-launched process has no terminal/Dock quit; the dashboard calls this to exit.
+  server.post("/api/quit", async (_req, reply) => {
+    reply.send({ ok: true });
+    if (onQuit) setTimeout(onQuit, 50); // let the response flush first
+    return reply;
   });
 
   // ── GET /api/timeline ────────────────────────────────────────────────────────

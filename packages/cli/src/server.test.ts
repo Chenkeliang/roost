@@ -1164,3 +1164,48 @@ describe("buildServer", () => {
     await server.close();
   });
 });
+
+describe("quit + appMode", () => {
+  it("POST /api/quit calls onQuit and returns ok", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-quit-"));
+    let quit = false;
+    const server = buildServer({
+      repoDir: tmp,
+      registry: defaultRegistry(),
+      makeCtx: (dry) => makeCtx(tmp, dry),
+      onQuit: () => { quit = true; },
+    });
+    const res = await server.inject({ method: "POST", url: "/api/quit" });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true });
+    // onQuit fires after a small delay so the response can flush
+    await new Promise((r) => setTimeout(r, 120));
+    expect(quit).toBe(true);
+    await server.close();
+  });
+
+  it("GET /api/health reports appMode=false by default", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-health-"));
+    const server = buildServer({
+      repoDir: tmp,
+      registry: defaultRegistry(),
+      makeCtx: (dry) => makeCtx(tmp, dry),
+    });
+    const res = await server.inject({ method: "GET", url: "/api/health" });
+    expect(JSON.parse(res.body).appMode).toBe(false);
+    await server.close();
+  });
+
+  it("GET /api/health reports appMode=true when set", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-health2-"));
+    const server = buildServer({
+      repoDir: tmp,
+      registry: defaultRegistry(),
+      makeCtx: (dry) => makeCtx(tmp, dry),
+      appMode: true,
+    });
+    const res = await server.inject({ method: "GET", url: "/api/health" });
+    expect(JSON.parse(res.body).appMode).toBe(true);
+    await server.close();
+  });
+});
