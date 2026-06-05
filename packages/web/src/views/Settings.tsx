@@ -9,13 +9,14 @@ import {
 } from "@phosphor-icons/react";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
+import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, quitApp, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
 
 export function Settings() {
   const { t } = useT();
   const [modules, setModules] = useState<ModulesResponse | null>(null);
   const [repoDir, setRepoDir] = useState<string | null>(null);
   const [ageKey, setAgeKey] = useState<boolean | null>(null);
+  const [appMode, setAppMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitBusy, setGitBusy] = useState<"push" | "pull" | null>(null);
@@ -31,6 +32,7 @@ export function Settings() {
         if (health.status === "fulfilled") {
           setRepoDir(health.value.repoDir ?? null);
           setAgeKey(health.value.ageKey ?? null);
+          setAppMode(health.value.appMode ?? false);
         }
         if (mods.status === "fulfilled") setModules(mods.value);
         if (git.status === "fulfilled") setGitStatus(git.value);
@@ -387,6 +389,32 @@ export function Settings() {
           </a>
         ))}
       </div>
+
+      {/* ── Quit (app mode only) ── */}
+      {appMode && (
+        <>
+          <div style={sectionLabel}>{t("settings.quit.title")}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ color: "var(--muted)", fontSize: 12 }}>{t("settings.quit.desc")}</div>
+            <div>
+              <button
+                onClick={() => { void quitApp(); }}
+                aria-label="Quit Roost"
+                style={{
+                  padding: "7px 16px",
+                  background: "var(--surface)",
+                  border: "1px solid var(--border-soft)",
+                  borderRadius: "var(--rr)",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {t("settings.quit.button")}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

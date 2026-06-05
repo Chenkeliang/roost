@@ -21,6 +21,7 @@ export interface HealthResponse {
   name: string;
   repoDir?: string;
   ageKey?: boolean;
+  appMode?: boolean;
 }
 
 export interface ModulesResponse {
@@ -281,4 +282,8 @@ export function gitPush(): Promise<GitOpResult> {
 
 export function gitPull(): Promise<GitOpResult> {
   return apiFetch<GitOpResult>("/api/git/pull", { method: "POST" });
+}
+
+export function quitApp(): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/api/quit", { method: "POST" });
 }

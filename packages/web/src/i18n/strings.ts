@@ -237,4 +237,10 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     en: "The age private key is the ONLY way to decrypt your data. Back it up offline (e.g. a password manager). Lose it and every encrypted file is unrecoverable.",
     zh: "age 私钥是解密你数据的唯一凭据。请离线备份(如密码管理器)。丢失后所有加密文件将无法恢复。",
   },
+  "settings.quit.title": { en: "Quit Roost", zh: "退出 Roost" },
+  "settings.quit.desc": {
+    en: "Stop the local Roost app and its server.",
+    zh: "停止本地 Roost 应用及其服务。",
+  },
+  "settings.quit.button": { en: "Quit Roost", zh: "退出 Roost" },
 };
