@@ -9,3 +9,6 @@ coverage/
 *.age
 keys.txt
 *.tsbuildinfo
+
+# Visual-companion brainstorm mockups (local, ephemeral)
+.superpowers/
