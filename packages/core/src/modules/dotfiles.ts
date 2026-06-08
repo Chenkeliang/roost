@@ -18,6 +18,7 @@ import { isNoise, scanDir } from "../discovery/scan.js";
 import { scanForSecrets } from "../secrets/scanner.js";
 import { loadAppConfigCatalog, expandCatalogPath } from "../app-config-catalog.js";
 import { ensureChezmoiAgeConfig } from "../chezmoi-config.js";
+import { loadRoostSettings } from "../settings.js";
 
 export interface CaptureScanResult {
   secretFiles: string[];
@@ -262,6 +263,8 @@ export const dotfilesModule: SyncModule = {
     const markedEncrypt = new Set(sel.modules["dotfiles-encrypt"] ?? []);
     // chezmoi --encrypt needs an age recipient configured; ensure it lazily, once.
     let ageReady: boolean | null = null;
+    // Capture size guard cap (configurable via roost/settings.yaml). (Task 5)
+    const maxBytes = loadRoostSettings(ctx.repoDir).maxCaptureMB * 1024 * 1024;
 
     for (const id of ids) {
       // Never try to manage tool-internal config (roost's / chezmoi's own).
@@ -271,7 +274,7 @@ export const dotfilesModule: SyncModule = {
         continue;
       }
       const wantsEncrypt = isSensitivePath(id) || encryptByCatalog.has(id) || markedEncrypt.has(id);
-      const scan = scanPathForSecrets(id);
+      const scan = scanPathForSecrets(id, { maxBytes });
 
       // H3: never slurp an oversized path (e.g. a whole app-support dir with caches).
       if (scan.tooLarge) {

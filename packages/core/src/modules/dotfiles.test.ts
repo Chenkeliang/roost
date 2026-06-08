@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection } from "@roost/shared";
 import { classifyDotfile, isSensitivePath, dotfilesModule, scanPathForSecrets } from "./dotfiles.js";
+import { saveRoostSettings } from "../settings.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -358,6 +359,20 @@ describe("dotfilesModule.capture", () => {
     expect(result.blocked ?? []).not.toContain(file);
     expect(calls.find((c) => c.args.includes("add") && c.args.includes(file))).toBeDefined();
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("honors maxCaptureMB from settings (tiny cap blocks an otherwise-fine dotfile)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-home-"));
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-repo-"));
+    const f = path.join(home, ".biggish");
+    fs.writeFileSync(f, "x".repeat(5000)); // 5KB
+    saveRoostSettings(repo, { maxCaptureMB: 0 }); // 0MB cap → any non-empty content is "too large"
+    const { exec } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home, repoDir: repo });
+    const cs = await dotfilesModule.capture(ctx, { modules: { dotfiles: [f] } });
+    expect((cs.blockedDetail ?? []).find((b) => b.id === f)?.reason).toBe("too-large");
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(repo, { recursive: true, force: true });
   });
 });
 

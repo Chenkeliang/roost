@@ -132,3 +132,5 @@ export type {
   SkillMethod,
 } from "./skills-config.js";
 export { skillsModule, resolveSkillConflict } from "./modules/skills.js";
+export { DEFAULT_ROOST_SETTINGS, loadRoostSettings, saveRoostSettings } from "./settings.js";
+export type { RoostSettings } from "./settings.js";
