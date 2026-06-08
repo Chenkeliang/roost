@@ -10,6 +10,8 @@ import {
   readState,
   listStateHosts,
   commitRepo,
+  readBaseline,
+  writeBaseline,
 } from "./state.js";
 import type { MachineState } from "./state.js";
 
@@ -187,5 +189,45 @@ describe("commitRepo", () => {
       { code: 1, stdout: "", stderr: "error: pathspec does not match" },
     ]);
     await expect(commitRepo(exec, "/my/repo", "fail")).rejects.toThrow();
+  });
+});
+
+describe("MachineState v2 baseline", () => {
+  let tmp: string;
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-state-"));
+  });
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("STATE_SCHEMA_VERSION is 2", () => {
+    expect(STATE_SCHEMA_VERSION).toBe(2);
+  });
+
+  it("reads a v1 state file tolerantly (new fields default)", () => {
+    const dir = stateDir(tmp);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "old.json"),
+      JSON.stringify({ host: "old", schemaVersion: 1, capturedAt: null, modules: {} }),
+      "utf8",
+    );
+    const s = readState(tmp, "old");
+    expect(s).not.toBeNull();
+    expect(s!.lastSyncedCommit).toBeUndefined();
+    expect(readBaseline(s!, "dotfiles")).toEqual({});
+  });
+
+  it("writeBaseline + readBaseline round-trips per module", () => {
+    const s: MachineState = {
+      host: "h",
+      schemaVersion: STATE_SCHEMA_VERSION,
+      capturedAt: null,
+      modules: {},
+    };
+    const next = writeBaseline(s, "env", { EDITOR: "hash1", PAGER: "hash2" });
+    expect(readBaseline(next, "env")).toEqual({ EDITOR: "hash1", PAGER: "hash2" });
+    expect(readBaseline(next, "dotfiles")).toEqual({}); // untouched module
   });
 });

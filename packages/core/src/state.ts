@@ -2,12 +2,19 @@ import * as fs from "fs";
 import * as path from "path";
 import type { Exec } from "@roost/shared";
 
-export const STATE_SCHEMA_VERSION = 1;
+export const STATE_SCHEMA_VERSION = 2;
+
+// Per-module baseline bag: { itemId -> contentHash } at last successful sync.
+export type ModuleBaseline = Record<string, string>;
 
 export interface MachineState {
   host: string;
   schemaVersion: number;
   capturedAt: string | null;
+  // v2 (ADR-0018) — all optional so v1 files read cleanly:
+  lastSeen?: string;
+  lastSyncedCommit?: string;
+  // modules holds, per module name, an object that MAY carry { baseline }.
   modules: Record<string, unknown>;
 }
 
@@ -78,4 +85,29 @@ export async function commitRepo(
     if (combined.includes("nothing to commit")) return;
     throw new Error(`git commit failed (code ${r.code}): ${r.stderr}`);
   }
+}
+
+// Read a module's baseline bag from a MachineState, tolerating missing/legacy shapes.
+export function readBaseline(state: MachineState, moduleName: string): ModuleBaseline {
+  const entry = state.modules[moduleName];
+  if (entry && typeof entry === "object" && "baseline" in entry) {
+    const b = (entry as { baseline?: unknown }).baseline;
+    if (b && typeof b === "object") return { ...(b as ModuleBaseline) };
+  }
+  return {};
+}
+
+// Return a NEW MachineState with the given module's baseline replaced (immutable).
+export function writeBaseline(
+  state: MachineState,
+  moduleName: string,
+  baseline: ModuleBaseline,
+): MachineState {
+  const prevEntry = state.modules[moduleName];
+  const prevObj =
+    prevEntry && typeof prevEntry === "object" ? (prevEntry as Record<string, unknown>) : {};
+  return {
+    ...state,
+    modules: { ...state.modules, [moduleName]: { ...prevObj, baseline } },
+  };
 }
