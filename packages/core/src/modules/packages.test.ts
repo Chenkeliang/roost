@@ -244,6 +244,28 @@ describe("packagesModule.diff", () => {
     const out = await packagesModule.diff(ctx, sel);
     expect(out).toBe("");
   });
+
+  it("classifies flagged packages as outdated vs missing", async () => {
+    const checkOut = [
+      "brew bundle can't satisfy your Brewfile's dependencies.",
+      "→ Formula chezmoi needs to be installed or updated.",
+      "→ Formula git needs to be installed or updated.",
+      "→ Formula somemissing needs to be installed or updated.",
+      "Satisfy missing dependencies with `brew bundle install`.",
+    ].join("\n");
+    const exec: Exec = {
+      async run(_cmd: string, args: string[]): Promise<ExecResult> {
+        if (args.includes("check")) return { code: 1, stdout: checkOut, stderr: "" };
+        if (args[0] === "outdated") return { code: 0, stdout: "chezmoi\ngit\nimagemagick\n", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo" });
+    const out = await packagesModule.diff(ctx, { modules: {} });
+    expect(out).toMatch(/chezmoi — outdated/);
+    expect(out).toMatch(/git — outdated/);
+    expect(out).toMatch(/somemissing — missing/);
+  });
 });
 
 // ── unmanage ──────────────────────────────────────────────────────────────────

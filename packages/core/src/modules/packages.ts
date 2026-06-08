@@ -206,7 +206,23 @@ export const packagesModule: SyncModule = {
       "--file",
       brewfilePath(ctx.repoDir),
     ]);
-    return r.code === 0 ? "" : r.stdout;
+    if (r.code === 0) return "";
+    // `brew bundle check` can't distinguish "missing" from "outdated" — both
+    // print "needs to be installed or updated". Cross-reference `brew outdated`
+    // to label each flagged package.
+    const flagged = [...r.stdout.matchAll(/→ (?:Formula|Cask) (\S+) needs/g)].map((m) => m[1]!);
+    if (flagged.length === 0) return r.stdout; // unexpected format → show raw
+    const outdatedRes = await ctx.exec.run("brew", ["outdated"]);
+    const outdated = new Set(
+      outdatedRes.stdout.split("\n").map((s) => s.trim()).filter(Boolean),
+    );
+    return flagged
+      .map((name) =>
+        outdated.has(name)
+          ? `${name} — outdated (update available)`
+          : `${name} — missing (not installed)`,
+      )
+      .join("\n");
   },
 
   async unmanage(ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
