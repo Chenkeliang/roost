@@ -256,4 +256,6 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     en: "Your existing folder will be moved to ~/.roost-backups (recoverable) and replaced with a link to the canonical source. Continue?",
     zh: "你的现有目录将被移动到 ~/.roost-backups(可找回),并替换为指向规范源的软链。继续？",
   },
+  "skills.resolve.confirmAction": { en: "Move & take over", zh: "移动并接管" },
+  "skills.resolve.cancel": { en: "Cancel", zh: "取消" },
 };

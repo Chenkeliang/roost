@@ -42,6 +42,8 @@ export function Skills() {
   const [scanning, setScanning] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<{ skill: string; target: string } | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   const load = useCallback(async () => {
     const v = await getSkills();
@@ -98,12 +100,12 @@ export function Skills() {
     } finally { setBusy(false); }
   }, [view, refetch]);
 
-  const onResolve = useCallback(async (name: string, targetId: string) => {
-    if (!window.confirm(t("skills.resolve.confirm"))) return;
-    setBusy(true);
-    try { await resolveSkillConflict(name, targetId); await refetch(); }
-    finally { setBusy(false); }
-  }, [t, refetch]);
+  const confirmResolve = useCallback(async () => {
+    if (!pending) return;
+    setResolving(true);
+    try { await resolveSkillConflict(pending.skill, pending.target); await refetch(); }
+    finally { setResolving(false); setPending(null); }
+  }, [pending, refetch]);
 
   const onApplyLinks = useCallback(async () => {
     setBusy(true);
@@ -233,7 +235,7 @@ export function Skills() {
                                 aria-label={t("skills.resolve.action")}
                                 title={t("skills.conflict")}
                                 disabled={busy}
-                                onClick={() => void onResolve(row.name, tg.id)}
+                                onClick={() => setPending({ skill: row.name, target: tg.id })}
                                 style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "2px 8px" }}
                               >
                                 <Warning size={11} weight="fill" />{t("skills.resolve.action")}
@@ -299,6 +301,30 @@ export function Skills() {
             </div>
           </div>
         )
+      )}
+
+      {pending && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }}
+        >
+          <div style={{ ...card, maxWidth: 420, width: "100%", padding: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <Warning size={16} weight="fill" style={{ color: "var(--accent)" }} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{t("skills.resolve.action")}</span>
+            </div>
+            <p style={{ margin: "0 0 16px", fontSize: 13, lineHeight: 1.5, color: "var(--muted)" }}>{t("skills.resolve.confirm")}</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setPending(null)} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 13 }}>
+                {t("skills.resolve.cancel")}
+              </button>
+              <button onClick={() => void confirmResolve()} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 13, color: "#fff", background: "var(--accent)", borderColor: "var(--accent)" }}>
+                {t("skills.resolve.confirmAction")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
