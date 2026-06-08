@@ -1,3 +1,0 @@
-#!/bin/sh
-echo "roost-server stub: replace with compiled @roost/cli binary before distribution" >&2
-exit 1
