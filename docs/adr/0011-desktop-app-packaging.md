@@ -1,6 +1,8 @@
 # ADR-0011: Desktop .app packaging & distribution
 
-- **Status**: ACCEPTED · 2026-06-05
+> Superseded by ADR-0013 — the SEA binary is now the Tauri sidecar engine, not a browser launcher.
+
+- **Status**: Superseded by ADR-0013 · 2026-06-08 (was ACCEPTED)
 - **Date**: 2026-06-05
 
 ## Context
