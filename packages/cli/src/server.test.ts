@@ -1285,6 +1285,54 @@ describe("skills api", () => {
   });
 });
 
+describe("skills resolve api", () => {
+  it("POST /api/skills/resolve backs up a real dir and links", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-resolve-"));
+    fs.mkdirSync(path.join(tmp, "skills", "foo"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, "skills", "foo", "SKILL.md"), "# canonical");
+    fs.mkdirSync(path.join(tmp, "roost"), { recursive: true });
+    const stamp = Date.now();
+    const uniqRoot = `.roost-test-${stamp}`;
+    const uniq = `${uniqRoot}/skills`;
+    fs.writeFileSync(path.join(tmp, "roost", "skills-catalog.yaml"),
+      `targets:\n  - { id: claude, path: ${uniq}, label: Claude }\n`);
+    fs.writeFileSync(path.join(tmp, "roost", "skills.yaml"),
+      `sourceDir: ${path.join(os.homedir(), ".roost-test-src-" + stamp)}\nmethod: symlink\ntargets: [claude]\nskills: { foo: {} }\n`);
+    const dest = path.join(os.homedir(), uniq, "foo");
+    fs.mkdirSync(dest, { recursive: true });
+    fs.writeFileSync(path.join(dest, "SKILL.md"), "# USER own");
+    try {
+      const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+      const res = await server.inject({ method: "POST", url: "/api/skills/resolve", payload: { skill: "foo", target: "claude" } });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.ok).toBe(true);
+      expect(fs.lstatSync(dest).isSymbolicLink()).toBe(true);
+      expect(fs.existsSync(body.backedUp)).toBe(true);
+      await server.close();
+    } finally {
+      fs.rmSync(path.join(os.homedir(), uniqRoot), { recursive: true, force: true });
+      fs.rmSync(path.join(os.homedir(), ".roost-test-src-" + stamp), { recursive: true, force: true });
+    }
+  });
+
+  it("POST /api/skills/resolve returns 400 on a non-conflict", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-resolve2-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/resolve", payload: { skill: "nope", target: "claude" } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+
+  it("POST /api/skills/resolve returns 400 when fields missing", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-resolve3-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/resolve", payload: { skill: "foo" } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+});
+
 describe("cors", () => {
   it("allows the Tauri webview origin", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cors-"));

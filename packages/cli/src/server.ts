@@ -40,6 +40,7 @@ import {
   loadSkillsTargets,
   effectiveSkill,
   loadSkillLinks,
+  resolveSkillConflict,
 } from "@roost/core";
 import type { SkillTarget, SkillsConfig, SkillLink } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -700,6 +701,23 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const res = await mod.apply(makeCtx(false), { module: "skills", actions: [] });
       cache.invalidateAll();
       return reply.send(res);
+    },
+  );
+
+  // ── POST /api/skills/resolve ─────────────────────────────────────────────────
+  // Back up a real (non-Roost) dir occupying a target, then link/copy ours in.
+  server.post<{ Body: { skill?: string; target?: string } }>(
+    "/api/skills/resolve",
+    async (req, reply) => {
+      const b = req.body ?? {};
+      if (!b.skill || !b.target) return reply.status(400).send({ error: "skill + target required" });
+      try {
+        const { backedUp, linked } = await resolveSkillConflict(makeCtx(false), b.skill, b.target);
+        cache.invalidateAll();
+        return reply.send({ ok: true, backedUp, linked });
+      } catch (e) {
+        return reply.status(400).send({ error: e instanceof Error ? e.message : String(e) });
+      }
     },
   );
 
