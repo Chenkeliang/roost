@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Roost desktop capabilities",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "roost-server",
+          "sidecar": true,
+          "args": ["serve", "--port", "4317"]
+        }
+      ]
+    }
+  ]
+}
