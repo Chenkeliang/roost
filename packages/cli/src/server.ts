@@ -34,6 +34,11 @@ import {
   parseBrewfile,
   brewfileText,
   createChezmoi,
+  loadSkillsConfig,
+  saveSkillsConfig,
+  loadSkillsTargets,
+  effectiveSkill,
+  loadSkillLinks,
 } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 import { finalizeCapture } from "./captureFlow.js";
@@ -570,6 +575,106 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.status(500).send({ error: msg });
     }
   });
+
+  // ── /api/skills ──────────────────────────────────────────────────────────────
+  server.get("/api/skills", async (_req, reply) => {
+    try {
+      const cfg = loadSkillsConfig(repoDir);
+      const targets = loadSkillsTargets(repoDir);
+      const dir = path.join(repoDir, "skills");
+      let managed: string[] = [];
+      try {
+        managed = fs
+          .readdirSync(dir, { withFileTypes: true })
+          .filter((e) => e.isDirectory())
+          .map((e) => e.name);
+      } catch {
+        managed = [];
+      }
+      const links = loadSkillLinks(repoDir);
+      const skills = managed.map((name) => ({
+        name,
+        effective: effectiveSkill(cfg, name),
+        links: links.filter((l) => l.skill === name),
+      }));
+      return reply.send({ config: cfg, targets, skills });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── GET /api/skills/discover ─────────────────────────────────────────────────
+  server.get("/api/skills/discover", async (_req, reply) => {
+    const mod = registry.get("skills");
+    if (!mod) return reply.status(404).send({ error: "skills module missing" });
+    return reply.send({ candidates: await mod.discover(makeCtx(true)) });
+  });
+
+  // ── POST /api/skills/capture ─────────────────────────────────────────────────
+  server.post<{ Body: { names?: string[] } }>("/api/skills/capture", async (req, reply) => {
+    const names = req.body?.names ?? [];
+    const mod = registry.get("skills");
+    if (!mod) return reply.status(404).send({ error: "skills module missing" });
+    const cs = await mod.capture(makeCtx(false), { modules: { skills: names } });
+    cache.invalidateAll();
+    return reply.send(cs);
+  });
+
+  // ── POST /api/skills/toggle ──────────────────────────────────────────────────
+  server.post<{ Body: { skill?: string; target?: string; enabled?: boolean } }>(
+    "/api/skills/toggle",
+    async (req, reply) => {
+      const b = req.body ?? {};
+      if (!b.skill || typeof b.enabled !== "boolean") {
+        return reply.status(400).send({ error: "skill + enabled required" });
+      }
+      const cfg = loadSkillsConfig(repoDir);
+      const e = cfg.skills[b.skill] ?? {};
+      if (b.target) {
+        const set = new Set(e.targets ?? cfg.targets);
+        if (b.enabled) set.add(b.target);
+        else set.delete(b.target);
+        e.targets = [...set];
+      } else {
+        e.enabled = b.enabled;
+      }
+      cfg.skills[b.skill] = e;
+      saveSkillsConfig(repoDir, cfg);
+      cache.invalidateAll();
+      return reply.send({ ok: true, config: cfg });
+    },
+  );
+
+  // ── POST /api/skills/link ────────────────────────────────────────────────────
+  // Reconcile links/copies on this machine; optionally update method/targets first.
+  server.post<{ Body: { copy?: boolean; targets?: string[] } }>(
+    "/api/skills/link",
+    async (req, reply) => {
+      const b = req.body ?? {};
+      if (b.copy || b.targets) {
+        const cfg = loadSkillsConfig(repoDir);
+        if (b.copy) cfg.method = "copy";
+        if (b.targets) cfg.targets = b.targets;
+        saveSkillsConfig(repoDir, cfg);
+      }
+      const mod = registry.get("skills");
+      if (!mod) return reply.status(404).send({ error: "skills module missing" });
+      const res = await mod.apply(makeCtx(false), { module: "skills", actions: [] });
+      cache.invalidateAll();
+      return reply.send(res);
+    },
+  );
+
+  // ── POST /api/skills/config ──────────────────────────────────────────────────
+  server.post<{ Body: ReturnType<typeof loadSkillsConfig> }>(
+    "/api/skills/config",
+    async (req, reply) => {
+      saveSkillsConfig(repoDir, req.body);
+      cache.invalidateAll();
+      return reply.send({ ok: true });
+    },
+  );
 
   // ── static / SPA ─────────────────────────────────────────────────────────────
   if (webDir && fs.existsSync(webDir)) {

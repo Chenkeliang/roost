@@ -1209,3 +1209,48 @@ describe("quit + appMode", () => {
     await server.close();
   });
 });
+
+describe("skills api", () => {
+  it("GET /api/skills returns config + targets + managed skills", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-skapi-"));
+    fs.mkdirSync(path.join(tmp, "skills", "foo"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, "skills", "foo", "SKILL.md"), "# foo");
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "GET", url: "/api/skills" });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.config.method).toBe("symlink");
+    expect(Array.isArray(body.targets)).toBe(true);
+    expect(body.skills.find((s: { name: string }) => s.name === "foo")).toBeTruthy();
+    await server.close();
+  });
+
+  it("POST /api/skills/toggle persists per-skill enabled=false", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-sktog-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/toggle", payload: { skill: "foo", enabled: false } });
+    expect(res.statusCode).toBe(200);
+    const yaml = fs.readFileSync(path.join(tmp, "roost", "skills.yaml"), "utf8");
+    expect(yaml).toMatch(/foo/);
+    expect(yaml).toMatch(/enabled: false/);
+    await server.close();
+  });
+
+  it("POST /api/skills/toggle with target edits per-skill targets", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-sktgt-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/toggle", payload: { skill: "foo", target: "codex", enabled: false } });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.config.skills.foo.targets).not.toContain("codex");
+    await server.close();
+  });
+
+  it("POST /api/skills/toggle rejects missing fields", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-skbad-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/toggle", payload: { skill: "foo" } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+});
