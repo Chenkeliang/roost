@@ -62,10 +62,19 @@ function buildApp(arch) {
   const icon = path.join(ROOT, "scripts", "AppIcon.icns");
   if (fs.existsSync(icon)) fs.copyFileSync(icon, path.join(res, "AppIcon.icns"));
 
+  // Strip extended attributes BEFORE signing so the bundle has no xattrs/resource
+  // forks. Without this, `ditto -c -k` encodes them as AppleDouble (._*) entries,
+  // which plain `unzip` materializes as junk files inside the bundle — corrupting
+  // the code signature ("a sealed resource is missing or invalid") so the app
+  // won't launch (-1712). The code signature itself lives in the Mach-O + the
+  // _CodeSignature/ dir (real files), not in xattrs, so clearing xattrs is safe.
+  sh("xattr", ["-cr", appDir]);
   sh("codesign", ["--force", "--deep", "--sign", "-", appDir]);
   const zip = path.join(OUT, `Roost-${VERSION}-macos-${arch}.zip`);
   fs.rmSync(zip, { force: true });
-  sh("ditto", ["-c", "-k", "--keepParent", appDir, zip]);
+  // --norsrc --noextattr: never write AppleDouble, so plain `unzip` yields a
+  // clean, launchable bundle (not just `ditto -x -k`).
+  sh("ditto", ["-c", "-k", "--norsrc", "--noextattr", "--keepParent", appDir, zip]);
   console.log("built", zip);
   return appDir;
 }
