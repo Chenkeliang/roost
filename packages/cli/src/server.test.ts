@@ -1284,3 +1284,39 @@ describe("skills api", () => {
     }
   });
 });
+
+describe("cors", () => {
+  it("allows the Tauri webview origin", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cors-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "GET", url: "/api/health", headers: { origin: "tauri://localhost" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["access-control-allow-origin"]).toBe("tauri://localhost");
+    await server.close();
+  });
+
+  it("allows loopback dev origins (vite)", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cors2-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "GET", url: "/api/health", headers: { origin: "http://localhost:5173" } });
+    expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    await server.close();
+  });
+
+  it("does NOT allow an arbitrary external website", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cors3-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "GET", url: "/api/health", headers: { origin: "https://evil.example.com" } });
+    // @fastify/cors omits the ACAO header when origin is disallowed → browser blocks it
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    await server.close();
+  });
+
+  it("allows non-CORS requests (no Origin header, e.g. curl/same-origin)", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cors4-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "GET", url: "/api/health" });
+    expect(res.statusCode).toBe(200);
+    await server.close();
+  });
+});

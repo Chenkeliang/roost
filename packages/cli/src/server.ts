@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import Fastify from "fastify";
+import cors from "@fastify/cors";
 import type { FastifyInstance } from "fastify";
 import type { ModuleContext, EnvData } from "@roost/shared";
 import type { ModuleRegistry } from "@roost/core";
@@ -83,6 +84,21 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const { repoDir, registry, makeCtx, webDir } = deps;
 
   const server = Fastify({ logger: false });
+
+  // CORS: the Tauri desktop webview (origin tauri://localhost) calls this API
+  // cross-origin. Allow Tauri + loopback dev origins ONLY — NOT arbitrary
+  // websites, since these endpoints are unauthenticated and mutate local state.
+  void server.register(cors, {
+    origin(origin, cb) {
+      // Non-CORS requests (curl, same-origin) send no Origin → allow.
+      if (!origin) return cb(null, true);
+      const ok =
+        origin === "tauri://localhost" ||
+        /^https?:\/\/tauri\.localhost$/.test(origin) ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      cb(null, ok);
+    },
+  });
 
   // Short-TTL response cache for the expensive read fan-outs (status/discover).
   // Slow once, then instant for ~25s; wiped on any state-changing mutation below.
