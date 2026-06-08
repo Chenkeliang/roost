@@ -287,3 +287,61 @@ export function gitPull(): Promise<GitOpResult> {
 export function quitApp(): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>("/api/quit", { method: "POST" });
 }
+
+// ── Skills ─────────────────────────────────────────────────────────────────────
+export type SkillMethod = "symlink" | "copy";
+export interface SkillTarget { id: string; path: string; label: string; }
+export interface EffectiveSkill { enabled: boolean; targets: string[]; method: SkillMethod; }
+export interface SkillLink { skill: string; target: string; path: string; kind: SkillMethod; }
+export interface SkillsConfig {
+  sourceDir: string;
+  method: SkillMethod;
+  targets: string[];
+  skills: Record<string, { enabled?: boolean; targets?: string[]; method?: SkillMethod }>;
+}
+export interface SkillRow { name: string; effective: EffectiveSkill; links: SkillLink[]; }
+export interface SkillsView { config: SkillsConfig; targets: SkillTarget[]; skills: SkillRow[]; }
+
+export function getSkills(): Promise<SkillsView> {
+  return apiFetch<SkillsView>("/api/skills");
+}
+
+export function discoverSkills(): Promise<{ candidates: { id: string; note?: string }[] }> {
+  return apiFetch<{ candidates: { id: string; note?: string }[] }>("/api/skills/discover");
+}
+
+export function captureSkills(names: string[]): Promise<{ written: string[]; blocked?: string[] }> {
+  return apiFetch<{ written: string[]; blocked?: string[] }>("/api/skills/capture", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ names }),
+  });
+}
+
+export function toggleSkill(
+  skill: string,
+  enabled: boolean,
+  target?: string,
+): Promise<{ ok: boolean; config: SkillsConfig }> {
+  return apiFetch<{ ok: boolean; config: SkillsConfig }>("/api/skills/toggle", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ skill, enabled, target }),
+  });
+}
+
+export function linkSkills(opts?: { copy?: boolean; targets?: string[] }): Promise<{ applied: string[]; skipped: string[] }> {
+  return apiFetch<{ applied: string[]; skipped: string[] }>("/api/skills/link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
+}
+
+export function saveSkillsConfig(config: SkillsConfig): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/api/skills/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+}

@@ -243,4 +243,18 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     zh: "停止本地 Roost 应用及其服务。",
   },
   "settings.quit.button": { en: "Quit Roost", zh: "退出 Roost" },
+
+  // ── Skills ───────────────────────────────────────────────────────────────
+  "skills.title": { en: "Skills", zh: "Skills" },
+  "skills.tab.discovered": { en: "Discovered", zh: "发现" },
+  "skills.tab.managed": { en: "Managed", zh: "已管理" },
+  "skills.method.symlink": { en: "Symlink", zh: "软链" },
+  "skills.method.copy": { en: "Copy", zh: "拷贝" },
+  "skills.enabled": { en: "Enabled", zh: "启用" },
+  "skills.conflict": { en: "Conflict", zh: "冲突" },
+  "skills.dangling": { en: "Broken link", zh: "断链" },
+  "skills.link": { en: "Apply links", zh: "应用软链" },
+  "skills.capture": { en: "Back up selected", zh: "备份所选" },
+  "skills.sourceDir": { en: "Canonical source", zh: "规范源目录" },
+  "skills.remove": { en: "Remove", zh: "移除" },
 };
