@@ -3,7 +3,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { ModuleContext, Selection } from "@roost/shared";
-import { skillsModule, hashSkillDir } from "./skills.js";
+import { skillsModule, hashSkillDir, resolveSkillConflict } from "./skills.js";
+import { loadSkillLinks } from "../skills-config.js";
 
 let home: string, repo: string;
 function ctx(): ModuleContext {
@@ -210,5 +211,54 @@ describe("skills delete-safety", () => {
     saveSkillsConfig(repo, { ...base, skills: { foo: { enabled: false } } });
     await skillsModule.apply({ ...ctx() }, { module: "skills", actions: [] } as never);
     expect(fs.existsSync(path.join(home, ".claude/skills/foo"))).toBe(false);
+  });
+});
+
+describe("resolveSkillConflict (back up & take over)", () => {
+  function setupConflict(method: "symlink" | "copy" = "symlink") {
+    mkSkill(path.join(repo, "skills"), "foo", "# canonical foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), method, targets: ["claude"], skills: { foo: {} } });
+    mkSkill(path.join(home, ".claude/skills"), "foo", "# USER's own foo");
+    return path.join(home, ".claude/skills/foo");
+  }
+
+  it("moves the real dir to backups and symlinks the canonical source", async () => {
+    const dest = setupConflict("symlink");
+    const res = await resolveSkillConflict({ ...ctx() }, "foo", "claude");
+    expect(fs.existsSync(res.backedUp)).toBe(true);
+    expect(fs.readFileSync(path.join(res.backedUp, "SKILL.md"), "utf8")).toBe("# USER's own foo");
+    expect(fs.lstatSync(dest).isSymbolicLink()).toBe(true);
+    expect(fs.realpathSync(dest)).toBe(fs.realpathSync(path.join(home, ".agents/skills/foo")));
+    expect(loadSkillLinks(repo).some((l) => l.skill === "foo" && l.target === "claude")).toBe(true);
+  });
+
+  it("with method=copy takes over as a real copy (not a symlink)", async () => {
+    const dest = setupConflict("copy");
+    await resolveSkillConflict({ ...ctx() }, "foo", "claude");
+    expect(fs.lstatSync(dest).isSymbolicLink()).toBe(false);
+    expect(fs.existsSync(path.join(dest, "SKILL.md"))).toBe(true);
+  });
+
+  it("refuses when target is already a symlink (not a conflict)", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    mkSkill(path.join(home, ".agents/skills"), "foo", "# foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), targets: ["claude"], skills: { foo: {} } });
+    fs.mkdirSync(path.join(home, ".claude/skills"), { recursive: true });
+    fs.symlinkSync(path.join(home, ".agents/skills/foo"), path.join(home, ".claude/skills/foo"));
+    await expect(resolveSkillConflict({ ...ctx() }, "foo", "claude")).rejects.toThrow();
+  });
+
+  it("refuses when target is absent (nothing to resolve)", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), targets: ["claude"], skills: { foo: {} } });
+    await expect(resolveSkillConflict({ ...ctx() }, "foo", "claude")).rejects.toThrow();
+  });
+
+  it("dry-run makes no changes", async () => {
+    const dest = setupConflict("symlink");
+    const res = await resolveSkillConflict({ ...ctx(), dryRun: true }, "foo", "claude");
+    expect(fs.existsSync(res.backedUp)).toBe(false);
+    expect(fs.lstatSync(dest).isSymbolicLink()).toBe(false);
+    expect(fs.readFileSync(path.join(dest, "SKILL.md"), "utf8")).toBe("# USER's own foo");
   });
 });

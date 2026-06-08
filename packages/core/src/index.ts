@@ -131,4 +131,4 @@ export type {
   SkillLink,
   SkillMethod,
 } from "./skills-config.js";
-export { skillsModule } from "./modules/skills.js";
+export { skillsModule, resolveSkillConflict } from "./modules/skills.js";

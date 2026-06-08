@@ -267,3 +267,60 @@ export const skillsModule: SyncModule = {
     return out;
   },
 };
+
+// Resolve a conflict by "back up & take over": MOVE the user's real dir at the
+// target to ~/.roost-backups, then link/copy the canonical source into place.
+// Guarded to act only on a genuine conflict (a real dir Roost doesn't own).
+export async function resolveSkillConflict(
+  ctx: ModuleContext,
+  skill: string,
+  targetId: string,
+): Promise<{ backedUp: string; linked: string }> {
+  const cfg = loadSkillsConfig(ctx.repoDir);
+  const target = loadSkillsTargets(ctx.repoDir).find((t) => t.id === targetId);
+  if (!target) throw new Error(`unknown target: ${targetId}`);
+  const dest = path.join(ctx.home, target.path, skill);
+
+  let st: ReturnType<typeof fs.lstatSync>;
+  try {
+    st = fs.lstatSync(dest);
+  } catch {
+    throw new Error(`no conflict at ${dest}: nothing there`);
+  }
+  if (st.isSymbolicLink()) throw new Error(`no conflict: ${dest} is already a symlink`);
+  if (!st.isDirectory()) throw new Error(`no conflict: ${dest} is not a directory`);
+  const links = loadSkillLinks(ctx.repoDir);
+  if (links.some((l) => l.skill === skill && l.target === targetId && l.path === dest)) {
+    throw new Error(`no conflict: ${dest} is Roost-managed`);
+  }
+
+  const eff = effectiveSkill(cfg, skill);
+  const sourceRoot = expandHome(ctx.home, cfg.sourceDir);
+  const src = path.join(sourceRoot, skill);
+  const backupPath = path.join(ctx.home, ".roost-backups", "skills", String(Date.now()), targetId, skill);
+  if (ctx.dryRun) return { backedUp: backupPath, linked: dest };
+
+  fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+  try {
+    fs.renameSync(dest, backupPath);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "EXDEV") {
+      fs.cpSync(dest, backupPath, { recursive: true });
+      fs.rmSync(dest, { recursive: true, force: true });
+    } else {
+      throw e;
+    }
+  }
+  fs.mkdirSync(sourceRoot, { recursive: true });
+  if (!fs.existsSync(src)) {
+    const repoSkill = path.join(repoSkillsDir(ctx), skill);
+    if (fs.existsSync(repoSkill)) fs.cpSync(repoSkill, src, { recursive: true });
+  }
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  if (eff.method === "copy") fs.cpSync(src, dest, { recursive: true });
+  else fs.symlinkSync(src, dest);
+  links.push({ skill, target: targetId, path: dest, kind: eff.method });
+  saveSkillLinks(ctx.repoDir, links);
+
+  return { backedUp: backupPath, linked: dest };
+}
