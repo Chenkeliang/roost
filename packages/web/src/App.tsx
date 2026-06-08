@@ -44,7 +44,7 @@ const TAIL_NAV: NavItem[] = [
 
 const DOCS_URL = "https://github.com/Chenkeliang/roost/tree/main/website";
 
-// Inline coral logo mark (two devices + transfer arc)
+// Inline coral logo mark (minimal single-line tree — matches the app icon)
 function RoostMark() {
   return (
     <svg
@@ -53,14 +53,19 @@ function RoostMark() {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.5"
       strokeLinecap="round"
+      strokeLinejoin="round"
       style={{ color: "var(--accent)", flexShrink: 0 }}
       aria-hidden="true"
     >
-      <rect x="2.5" y="6" width="9" height="6.5" rx="1.3" />
-      <rect x="13" y="11.5" width="8.5" height="6" rx="1.3" />
-      <path d="M11.5 9.2c4 0 .5 5 5.5 5" strokeDasharray="1 2" />
+      <path d="M12 16.6 L12 7.7" />
+      <path d="M12 13 C 10.4 12.4 9.4 11.2 8.9 9.4" />
+      <path d="M12 13 C 13.6 12.4 14.6 11.2 15.1 9.4" />
+      <path d="M12 10.7 C 11 10.1 10.2 9.1 9.9 7.9" />
+      <path d="M12 10.7 C 13 10.1 13.8 9.1 14.1 7.9" />
+      <path d="M12 8.6 C 11.4 7.8 11.1 7.1 11 6.4" />
+      <path d="M12 8.6 C 12.6 7.8 12.9 7.1 13 6.4" />
     </svg>
   );
 }

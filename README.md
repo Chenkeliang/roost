@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="packages/web/src-tauri/icons/128x128@2x.png" width="88" height="88" alt="Roost" />
+</p>
+
 # Roost
 
 > Settle into any Mac. Back up your config on your main machine, load it onto another — you choose exactly what.
