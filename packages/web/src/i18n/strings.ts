@@ -229,6 +229,10 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "settings.git.inSync": { en: "in sync", zh: "已同步" },
   "settings.git.pushed": { en: "Pushed", zh: "已推送" },
   "settings.git.pulled": { en: "Pulled", zh: "已拉取" },
+  "settings.git.authHint": {
+    en: "In-app push couldn't use your git credentials. Run this in a terminal:",
+    zh: "应用内推送拿不到你的 git 凭证。请在终端运行:",
+  },
   "settings.key.heading": { en: "Age key (encryption)", zh: "Age 密钥(加密)" },
   "settings.key.recipient": { en: "Recipient", zh: "公钥" },
   "settings.key.none": { en: "no key yet", zh: "尚无密钥" },

@@ -16,7 +16,7 @@ import type {
   ApplyPlan,
 } from "@roost/shared";
 import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData } from "@roost/core";
-import { buildServer, computeConflicts } from "./server.js";
+import { buildServer, computeConflicts, classifyGitError } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
 // A real-exec ctx so git commits actually run (for capture finalization tests).
@@ -1393,5 +1393,18 @@ describe("cors", () => {
     const res = await server.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);
     await server.close();
+  });
+});
+
+describe("classifyGitError", () => {
+  it("flags auth failures", () => {
+    expect(classifyGitError("fatal: could not read Username for 'https://github.com'")).toBe("auth");
+    expect(classifyGitError("Authentication failed for 'https://...'")).toBe("auth");
+    expect(classifyGitError("remote: Permission denied")).toBe("auth");
+    expect(classifyGitError("terminal prompts disabled")).toBe("auth");
+  });
+  it("returns undefined for non-auth output", () => {
+    expect(classifyGitError("Everything up-to-date")).toBeUndefined();
+    expect(classifyGitError("")).toBeUndefined();
   });
 });

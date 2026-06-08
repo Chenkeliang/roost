@@ -76,6 +76,17 @@ export function computeConflicts(
   return conflicts;
 }
 
+// Classify git push/pull failure output: "auth" when the failure is a missing
+// or rejected credential (so the UI can offer a run-it-in-a-terminal fallback),
+// undefined otherwise.
+export function classifyGitError(output: string): "auth" | undefined {
+  return /authentication failed|could not read (username|password)|permission denied|terminal prompts disabled|fatal: could not read|invalid username or password|support for password authentication was removed/i.test(
+    output,
+  )
+    ? "auth"
+    : undefined;
+}
+
 export interface ServerDeps {
   repoDir: string;
   registry: ModuleRegistry;
@@ -404,10 +415,15 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   server.post("/api/git/push", async (_req, reply) => {
     cache.invalidateAll();
     const exec = makeCtx(false).exec;
-    const result = await exec.run("git", ["-C", repoDir, "push"]);
+    // Fail fast instead of hanging on an interactive credential prompt the web
+    // UI can't answer; a missing credential surfaces as a classifiable error.
+    const result = await exec.run("git", ["-C", repoDir, "push"], {
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    });
     const ok = result.code === 0;
     const output = `${result.stdout}\n${result.stderr}`.trim();
-    return reply.send({ ok, output });
+    const hint = ok ? undefined : classifyGitError(output);
+    return reply.send({ ok, output, hint });
   });
 
   // ── POST /api/git/pull ────────────────────────────────────────────────────────

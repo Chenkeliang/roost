@@ -269,6 +269,7 @@ export interface GitStatus {
 export interface GitOpResult {
   ok: boolean;
   output: string;
+  hint?: "auth";
 }
 
 export function getGitStatus(): Promise<GitStatus> {

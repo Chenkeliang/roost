@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { Settings } from "./views/Settings";
 
@@ -81,6 +81,22 @@ describe("Settings", () => {
     await waitFor(() => {
       expect(screen.getByText("Push")).toBeTruthy();
       expect(screen.getByText("Pull")).toBeTruthy();
+    });
+  });
+
+  it("surfaces the full push output and an auth fallback hint on failure", async () => {
+    const { gitPush } = await import("./api");
+    vi.mocked(gitPush).mockResolvedValueOnce({
+      ok: false,
+      output: "fatal: could not read Username",
+      hint: "auth",
+    });
+    await act(async () => { render(<Settings />); });
+    const pushBtn = await screen.findByText("Push");
+    await act(async () => { fireEvent.click(pushBtn); });
+    await waitFor(() => {
+      expect(screen.getByText("fatal: could not read Username")).toBeTruthy();
+      expect(screen.getByText(/couldn't use your git credentials/i)).toBeTruthy();
     });
   });
 

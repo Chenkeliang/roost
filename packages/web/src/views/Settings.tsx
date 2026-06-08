@@ -20,7 +20,7 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitBusy, setGitBusy] = useState<"push" | "pull" | null>(null);
-  const [gitResult, setGitResult] = useState<{ kind: "push" | "pull"; ok: boolean; output: string } | null>(null);
+  const [gitResult, setGitResult] = useState<{ kind: "push" | "pull"; ok: boolean; output: string; hint?: "auth" } | null>(null);
   const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null);
   const [keyBusy, setKeyBusy] = useState<"generate" | "rotate" | null>(null);
   const [keyResult, setKeyResult] = useState<{ ok: boolean; text: string } | null>(null);
@@ -88,7 +88,7 @@ export function Settings() {
     setGitResult(null);
     try {
       const res = await gitPush();
-      setGitResult({ kind: "push", ok: res.ok, output: res.output });
+      setGitResult({ kind: "push", ok: res.ok, output: res.output, hint: res.hint });
       if (res.ok) {
         const s = await getGitStatus().catch(() => null);
         if (s) setGitStatus(s);
@@ -103,7 +103,7 @@ export function Settings() {
     setGitResult(null);
     try {
       const res = await gitPull();
-      setGitResult({ kind: "pull", ok: res.ok, output: res.output });
+      setGitResult({ kind: "pull", ok: res.ok, output: res.output, hint: res.hint });
       if (res.ok) {
         const s = await getGitStatus().catch(() => null);
         if (s) setGitStatus(s);
@@ -295,14 +295,61 @@ export function Settings() {
           </button>
         </div>
 
-        {/* Inline result */}
-        {gitResult && (
-          <div style={{ fontSize: 12, color: gitResult.ok ? "var(--green)" : "var(--destructive)", padding: "4px 2px" }}>
-            {gitResult.ok
-              ? gitResult.kind === "push" ? t("settings.git.pushed") : t("settings.git.pulled")
-              : gitResult.output || "Failed"}
+        {/* Result: small green line on success; prominent bordered block on failure */}
+        {gitResult && (gitResult.ok ? (
+          <div style={{ fontSize: 12, color: "var(--green)", padding: "4px 2px" }}>
+            {gitResult.kind === "push" ? t("settings.git.pushed") : t("settings.git.pulled")}
           </div>
-        )}
+        ) : (
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--destructive)",
+              borderRadius: "var(--rr)",
+              padding: "10px 12px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <pre
+              className="mono"
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: "var(--destructive)",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                userSelect: "text",
+                maxHeight: 160,
+                overflow: "auto",
+              }}
+            >
+              {gitResult.output || "Failed"}
+            </pre>
+            {gitResult.hint === "auth" && (
+              <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.5 }}>
+                {t("settings.git.authHint")}
+                <code
+                  className="mono"
+                  style={{
+                    display: "block",
+                    marginTop: 6,
+                    padding: "6px 8px",
+                    background: "var(--bg)",
+                    border: "1px solid var(--border-soft)",
+                    borderRadius: "var(--rr)",
+                    fontSize: 12,
+                    userSelect: "text",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {repoDir ? `cd ${repoDir} && git push` : "git push"}
+                </code>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* ── Age key (encryption) ── */}
