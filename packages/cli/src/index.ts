@@ -25,6 +25,8 @@ import { runKeyBackup, remindOfflineBackup } from "./commands/keyBackup.js";
 import { runPlugins } from "./commands/plugins.js";
 import { runServe } from "./server.js";
 import { runGui, isInsideAppBundle } from "./gui.js";
+import { runSkillsLink, runSkillsUnlink, runSkillsToggle } from "./commands/skills.js";
+import type { ModuleContext } from "@roost/shared";
 
 const program = new Command();
 program.name("roost").description("Back up and migrate your Mac setup").version("0.0.0");
@@ -61,6 +63,11 @@ function buildCtx(opts: { dryRun?: boolean } = {}) {
       t: createT(process.env["ROOST_LOCALE"] ?? "en"),
     },
   };
+}
+
+// Full ModuleContext for the skills group (which calls a module directly, not via runX helpers).
+function makeModuleCtx(dryRun: boolean): ModuleContext {
+  return buildCtx({ dryRun }).ctx;
 }
 
 // Resolve a GitHub PAT: prefer GITHUB_TOKEN env (non-interactive), else a masked
@@ -385,6 +392,38 @@ program
   .action(async (opts: { repo?: string; web?: string }) => {
     const { repoDir } = buildCtx();
     await runGui({ repoDir: opts.repo ?? repoDir, webDir: opts.web });
+  });
+
+// ── skills <sub-command group> ────────────────────────────────────────────────
+
+const skillsCmd = program.command("skills").description("Manage cross-IDE skills distribution");
+skillsCmd
+  .command("link")
+  .description("Materialize + link/copy skills into enabled IDE targets")
+  .option("--copy", "Use copy instead of symlink")
+  .option("--target <id...>", "Only these IDE targets")
+  .action(async (o: { copy?: boolean; target?: string[] }) => {
+    await runSkillsLink(makeModuleCtx(false), { copy: o.copy, targets: o.target });
+  });
+skillsCmd
+  .command("unlink")
+  .description("Remove Roost-created skill links")
+  .action(async () => {
+    await runSkillsUnlink(makeModuleCtx(false));
+  });
+skillsCmd
+  .command("enable <skill>")
+  .description("Enable a skill (optionally only for one IDE target)")
+  .option("--target <id>", "Only this IDE target")
+  .action((skill: string, o: { target?: string }) => {
+    runSkillsToggle(makeModuleCtx(false), skill, true, o.target);
+  });
+skillsCmd
+  .command("disable <skill>")
+  .description("Disable a skill (optionally only for one IDE target)")
+  .option("--target <id>", "Only this IDE target")
+  .action((skill: string, o: { target?: string }) => {
+    runSkillsToggle(makeModuleCtx(false), skill, false, o.target);
   });
 
 // Double-clicking the .app launches the binary with no extra args and no terminal.
