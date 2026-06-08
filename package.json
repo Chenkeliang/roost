@@ -15,7 +15,10 @@
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "tauri": "pnpm --filter @roost/web exec tauri",
+    "build:sidecar": "pnpm -r build && node scripts/build-sidecar.mjs",
+    "build:desktop": "pnpm build:sidecar && pnpm --filter @roost/web exec tauri build"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
