@@ -34,6 +34,7 @@ import {
   testRemote,
   parseBrewfile,
   brewfileText,
+  packageStates,
   createChezmoi,
   loadSkillsConfig,
   saveSkillsConfig,
@@ -220,6 +221,23 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       }
     } catch (err) {
       return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // ── GET /api/packages/states ─────────────────────────────────────────────────
+  // Per-package state (installed/outdated/missing) for the selected ids, by cross-
+  // referencing `brew list` + `brew outdated`. Skips the legacy "Brewfile" sentinel.
+  server.get("/api/packages/states", async (_req, reply) => {
+    try {
+      const states = await cache.getOrCompute("packages:states", () => {
+        const sel = loadSelection(repoDir);
+        const ids = (sel.modules["packages"] ?? []).filter((id) => id !== "Brewfile" && id.includes(":"));
+        return packageStates(makeCtx(true), ids);
+      });
+      return reply.send({ states });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
     }
   });
 

@@ -1089,6 +1089,25 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/packages/states → 200 { states } keyed by selected per-package ids (skips Brewfile sentinel)", async () => {
+    let sel = emptySelection();
+    sel = addItem(sel, "packages", "brew:git");
+    sel = addItem(sel, "packages", "cask:firefox");
+    sel = addItem(sel, "packages", "Brewfile"); // legacy sentinel — must be skipped
+    saveSelection(tmpDir, sel);
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/packages/states" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { states: Record<string, string> };
+    expect(typeof body.states).toBe("object");
+    expect(Object.keys(body.states).sort()).toEqual(["brew:git", "cask:firefox"]);
+    // makeFakeExec returns empty stdout → not present in `brew list` → missing.
+    expect(body.states["brew:git"]).toBe("missing");
+    expect(body.states["cask:firefox"]).toBe("missing");
+    await server.close();
+  });
+
   it("GET /api/dotfiles → 200 { available: boolean; managed: string[] }", async () => {
     const reg = new ModuleRegistry();
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });

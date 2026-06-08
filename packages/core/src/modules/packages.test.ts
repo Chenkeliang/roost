@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
-import { packagesModule, parseBrewfile, brewfileText } from "./packages.js";
+import { packagesModule, parseBrewfile, brewfileText, packageStates } from "./packages.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -423,6 +423,52 @@ describe("parseBrewfile", () => {
   it("returns empty arrays for empty/comment-only input", () => {
     const result = parseBrewfile("# just a comment\n\n");
     expect(result).toEqual({ taps: [], formulae: [], casks: [], mas: [] });
+  });
+});
+
+// ── packageStates ───────────────────────────────────────────────────────────────
+
+describe("packageStates", () => {
+  it("classifies installed / outdated / missing", async () => {
+    const exec = {
+      async run(_cmd: string, args: string[]) {
+        if (args[0] === "list" && args.includes("--formula")) return { code: 0, stdout: "age\ngit\nchezmoi\njq\n", stderr: "" };
+        if (args[0] === "list" && args.includes("--cask")) return { code: 0, stdout: "raycast\n", stderr: "" };
+        if (args[0] === "outdated" && args.includes("--formula")) return { code: 0, stdout: "git\nchezmoi\n", stderr: "" };
+        if (args[0] === "outdated" && args.includes("--cask")) return { code: 0, stdout: "", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec: exec as unknown as Exec, repoDir: "/x" });
+    const states = await packageStates(ctx, ["brew:age", "brew:git", "brew:chezmoi", "cask:raycast", "brew:nope"]);
+    expect(states["brew:age"]).toBe("installed");
+    expect(states["brew:git"]).toBe("outdated");
+    expect(states["brew:chezmoi"]).toBe("outdated");
+    expect(states["cask:raycast"]).toBe("installed");
+    expect(states["brew:nope"]).toBe("missing");
+  });
+
+  it("strips version suffixes from `brew outdated` lines (e.g. 'git (2.47.1) < 2.50')", async () => {
+    const exec = {
+      async run(_cmd: string, args: string[]) {
+        if (args[0] === "list" && args.includes("--formula")) return { code: 0, stdout: "git\nage\n", stderr: "" };
+        if (args[0] === "list" && args.includes("--cask")) return { code: 0, stdout: "", stderr: "" };
+        if (args[0] === "outdated" && args.includes("--formula")) return { code: 0, stdout: "git (2.47.1) < 2.50\n", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec: exec as unknown as Exec, repoDir: "/x" });
+    const states = await packageStates(ctx, ["brew:git", "brew:age"]);
+    expect(states["brew:git"]).toBe("outdated");
+    expect(states["brew:age"]).toBe("installed");
+  });
+
+  it("treats tap and mas ids as installed (no reliable outdated signal)", async () => {
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, repoDir: "/x" });
+    const states = await packageStates(ctx, ["tap:homebrew/services", "mas:497799835"]);
+    expect(states["tap:homebrew/services"]).toBe("installed");
+    expect(states["mas:497799835"]).toBe("installed");
   });
 });
 

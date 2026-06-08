@@ -94,6 +94,47 @@ export function parseBrewfile(text: string): BrewfileEntries {
   return entries;
 }
 
+export type PackageState = "installed" | "outdated" | "missing";
+
+/**
+ * Classify each per-package id as installed / outdated / missing by cross-
+ * referencing `brew list` (presence) with `brew outdated` (update available).
+ * `brew outdated` lines may carry version info (e.g. "git (2.47.1) < 2.50"), so
+ * we key on the first whitespace-delimited token. tap/mas have no reliable
+ * outdated signal here, so they're reported as "installed" when selected.
+ */
+export async function packageStates(ctx: ModuleContext, ids: string[]): Promise<Record<string, PackageState>> {
+  const names = async (cmd: string, args: string[]): Promise<Set<string>> => {
+    const r = await ctx.exec.run(cmd, args);
+    return new Set(
+      r.stdout
+        .split("\n")
+        .map((s) => s.trim().split(/\s/)[0] ?? "")
+        .filter(Boolean),
+    );
+  };
+  const [formulae, casks, outdatedF, outdatedC] = await Promise.all([
+    names("brew", ["list", "--formula", "-1"]),
+    names("brew", ["list", "--cask", "-1"]),
+    names("brew", ["outdated", "--formula"]),
+    names("brew", ["outdated", "--cask"]),
+  ]);
+  const out: Record<string, PackageState> = {};
+  for (const id of ids) {
+    const s = splitId(id);
+    if (!s) continue;
+    if (s.kind === "brew") {
+      out[id] = !formulae.has(s.val) ? "missing" : outdatedF.has(s.val) ? "outdated" : "installed";
+    } else if (s.kind === "cask") {
+      out[id] = !casks.has(s.val) ? "missing" : outdatedC.has(s.val) ? "outdated" : "installed";
+    } else {
+      // tap / mas: no reliable outdated signal — treat as installed (in selection).
+      out[id] = "installed";
+    }
+  }
+  return out;
+}
+
 export const packagesModule: SyncModule = {
   name: "packages",
 
