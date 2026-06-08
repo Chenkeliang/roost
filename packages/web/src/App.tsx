@@ -15,8 +15,9 @@ import { Projects } from "./views/Projects";
 import { Packages } from "./views/Packages";
 import { Dotfiles } from "./views/Dotfiles";
 import { AppConfig } from "./views/AppConfig";
+import { Skills } from "./views/Skills";
 
-type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "env" | "drift" | "timeline" | "settings";
+type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "skills" | "env" | "drift" | "timeline" | "settings";
 
 type NavItem = { id: Tab; labelKey: string };
 
@@ -29,6 +30,7 @@ const MODULE_NAV: NavItem[] = [
   { id: "packages", labelKey: "nav.packages" },
   { id: "projects", labelKey: "nav.projects" },
   { id: "appconfig", labelKey: "nav.appconfig" },
+  { id: "skills", labelKey: "skills.title" },
   { id: "env", labelKey: "nav.env" },
 ];
 
@@ -318,6 +320,7 @@ export function App() {
           {activeTab === "packages" && <Packages showHud={showHud} />}
           {activeTab === "dotfiles" && <Dotfiles showHud={showHud} />}
           {activeTab === "appconfig" && <AppConfig showHud={showHud} />}
+          {activeTab === "skills" && <Skills />}
           {activeTab === "env" && <AliasesEnv showHud={showHud} />}
           {activeTab === "drift" && <Drift />}
           {activeTab === "timeline" && <Timeline />}
