@@ -9,8 +9,6 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "build:app": "pnpm -r build && node scripts/build-app.mjs",
-    "smoke:app": "node scripts/smoke-app.mjs dist-app/arch-arm64/Roost.app",
     "test": "vitest run",
     "test:web": "pnpm --filter @roost/web test",
     "test:all": "pnpm test && pnpm --filter @roost/web test",

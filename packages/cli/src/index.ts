@@ -24,7 +24,6 @@ import { runKeyRotate } from "./commands/keyRotate.js";
 import { runKeyBackup, remindOfflineBackup } from "./commands/keyBackup.js";
 import { runPlugins } from "./commands/plugins.js";
 import { runServe } from "./server.js";
-import { runGui, isInsideAppBundle } from "./gui.js";
 import { runSkillsLink, runSkillsUnlink, runSkillsToggle } from "./commands/skills.js";
 import type { ModuleContext } from "@roost/shared";
 
@@ -384,16 +383,6 @@ program
     });
   });
 
-program
-  .command("gui")
-  .description("Launch the dashboard in your browser (used by Roost.app)")
-  .option("--repo <dir>", "Path to the config repo directory")
-  .option("--web <dir>", "Path to the web build directory")
-  .action(async (opts: { repo?: string; web?: string }) => {
-    const { repoDir } = buildCtx();
-    await runGui({ repoDir: opts.repo ?? repoDir, webDir: opts.web });
-  });
-
 // ── skills <sub-command group> ────────────────────────────────────────────────
 
 const skillsCmd = program.command("skills").description("Manage cross-IDE skills distribution");
@@ -426,12 +415,4 @@ skillsCmd
     runSkillsToggle(makeModuleCtx(false), skill, false, o.target);
   });
 
-// Double-clicking the .app launches the binary with no extra args and no terminal.
-// Detect that case and enter GUI mode instead of printing help.
-if (process.argv.length <= 2 && isInsideAppBundle(process.execPath)) {
-  const { repoDir } = buildCtx();
-  // No terminal in a .app launch — swallow nothing silently; exit non-zero on failure.
-  runGui({ repoDir }).catch(() => process.exit(1));
-} else {
-  program.parseAsync();
-}
+program.parseAsync();
