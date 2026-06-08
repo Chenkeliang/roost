@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { Overview } from "./views/Overview";
+import * as api from "./api";
 
 // Mock with realistic server shapes matching server.ts actual responses
 vi.mock("./api", () => ({
@@ -30,6 +31,8 @@ vi.mock("./api", () => ({
   postLoad: vi.fn().mockResolvedValue({
     results: [{ module: "dotfiles", applied: ["~/.zshrc"], backedUp: [], skipped: [] }],
   }),
+  addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
+  removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
 }));
 
 describe("Overview", () => {
@@ -82,6 +85,33 @@ describe("Overview", () => {
     expect(screen.queryByText("Mac mini")).not.toBeInTheDocument();
     // Honest empty state for the absent second machine.
     expect(screen.getByText(/No other machine yet/i)).toBeInTheDocument();
+  });
+
+  it("renders a too-large blocked item with a Remove action (not encrypt-retry) that calls removeSelection", async () => {
+    vi.mocked(api.postCapture).mockResolvedValueOnce({
+      changes: [
+        {
+          module: "dotfiles",
+          written: [],
+          encrypted: [],
+          blocked: ["/x"],
+          blockedDetail: [{ id: "/x", reason: "too-large", detail: "160MB" }],
+        },
+      ],
+    });
+    await act(async () => { render(<Overview showHud={noop} />); });
+    const captureBtn = await screen.findByRole("button", { name: /Capture/i });
+    await act(async () => { fireEvent.click(captureBtn); });
+
+    const removeBtn = await screen.findByRole("button", { name: /Remove|移除/i });
+    expect(removeBtn).toBeTruthy();
+    // A too-large item must NOT offer encrypt-retry.
+    expect(screen.queryByRole("button", { name: /Encrypt & retry|加密并重试/i })).toBeNull();
+
+    await act(async () => { fireEvent.click(removeBtn); });
+    await waitFor(() => {
+      expect(api.removeSelection).toHaveBeenCalledWith("dotfiles", "/x");
+    });
   });
 
   it("does not render with old shape: result.changes (must use result.results)", async () => {

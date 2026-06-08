@@ -14,9 +14,11 @@ import {
   postCapture,
   postLoad,
   addSelection,
+  removeSelection,
   type HealthResponse,
   type MachinesResponse,
   type StatusResponse,
+  type BlockedItem,
 } from "../api";
 
 interface OverviewProps {
@@ -91,6 +93,7 @@ export function Overview({ showHud }: OverviewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
+  const [blockedDetail, setBlockedDetail] = useState<BlockedItem[]>([]);
   const [retrying, setRetrying] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -122,6 +125,7 @@ export function Overview({ showHud }: OverviewProps) {
       const result = await postCapture();
       const blockedPaths = result.changes.flatMap((c) => c.blocked ?? []);
       setBlocked(blockedPaths);
+      setBlockedDetail(result.changes.flatMap((c) => c.blockedDetail ?? []));
       const written = result.changes.reduce((n, c) => n + c.written.length + c.encrypted.length, 0);
       showHud({
         text: blockedPaths.length > 0
@@ -146,6 +150,7 @@ export function Overview({ showHud }: OverviewProps) {
       const result = await postCapture();
       const stillBlocked = result.changes.flatMap((c) => c.blocked ?? []);
       setBlocked(stillBlocked);
+      setBlockedDetail(result.changes.flatMap((c) => c.blockedDetail ?? []));
       const enc = result.changes.reduce((n, c) => n + c.encrypted.length, 0);
       showHud({
         text: stillBlocked.length > 0
@@ -158,6 +163,19 @@ export function Overview({ showHud }: OverviewProps) {
       showHud({ text: e instanceof Error ? e.message : "Encrypt retry failed", type: "error" });
     } finally {
       setRetrying(false);
+    }
+  };
+
+  // A too-large item can't be encrypted away — the fix is to stop tracking it
+  // (or raise the limit in Settings). Drop it from the dotfiles selection.
+  const handleRemoveBlocked = async (id: string) => {
+    try {
+      await removeSelection("dotfiles", id);
+      setBlockedDetail((prev) => prev.filter((b) => b.id !== id));
+      setBlocked((prev) => prev.filter((p) => p !== id));
+      await fetchData();
+    } catch (e) {
+      showHud({ text: e instanceof Error ? e.message : "Remove failed", type: "error" });
     }
   };
 
@@ -335,8 +353,63 @@ export function Overview({ showHud }: OverviewProps) {
         </span>
       </div>
 
-      {/* Blocked-on-capture panel (ADR-0010): secret-bearing items skipped. */}
-      {blocked.length > 0 && (
+      {/* Blocked-on-capture panel: items skipped during capture, each with its
+          reason. secret → encrypt-retry (ADR-0010); too-large → remove. */}
+      {blockedDetail.length > 0 ? (
+        <section style={{ border: "1px solid var(--amber)", borderRadius: "var(--rc)", padding: "13px 14px", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <Lock size={14} style={{ color: "var(--amber)" }} />
+            <span style={{ fontSize: 13, fontWeight: 540, color: "var(--text)" }}>
+              {blockedDetail.length} {t("overview.blockedTitle")}
+            </span>
+            {blockedDetail.some((b) => b.reason === "secret") && (
+              <button
+                onClick={() => void handleEncryptRetry(blockedDetail.filter((b) => b.reason === "secret").map((b) => b.id))}
+                disabled={retrying}
+                style={{ marginLeft: "auto", appearance: "none", border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12, padding: "5px 11px", borderRadius: "var(--rr)", cursor: retrying ? "default" : "pointer" }}
+              >
+                <Lock size={12} weight="fill" style={{ marginRight: 5, verticalAlign: "-1px" }} />
+                {retrying ? t("overview.encrypting") : t("overview.encryptRetryAll")}
+              </button>
+            )}
+          </div>
+          {blockedDetail.map((item) => {
+            const reasonLabel =
+              item.reason === "secret" ? t("overview.blocked.secret")
+              : item.reason === "too-large" ? t("overview.blocked.tooLarge")
+              : item.reason === "managed" ? t("overview.blocked.managed")
+              : t("overview.blocked.error");
+            return (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border-soft)", fontSize: 12.5 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{item.id}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    {reasonLabel}{item.detail ? ` · ${item.detail}` : ""}
+                    {item.reason === "too-large" ? ` · ${t("overview.blocked.raiseLimit")}` : ""}
+                  </div>
+                </div>
+                {item.reason === "secret" && (
+                  <button
+                    onClick={() => void handleEncryptRetry([item.id])}
+                    disabled={retrying}
+                    style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 9px", borderRadius: 6, cursor: retrying ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                  >
+                    <Lock size={11} />{t("overview.encryptRetry")}
+                  </button>
+                )}
+                {item.reason === "too-large" && (
+                  <button
+                    onClick={() => void handleRemoveBlocked(item.id)}
+                    style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 9px", borderRadius: 6, cursor: "pointer" }}
+                  >
+                    {t("overview.blocked.remove")}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </section>
+      ) : blocked.length > 0 ? (
         <section style={{ border: "1px solid var(--amber)", borderRadius: "var(--rc)", padding: "13px 14px", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <Lock size={14} style={{ color: "var(--amber)" }} />
@@ -366,7 +439,7 @@ export function Overview({ showHud }: OverviewProps) {
             </div>
           ))}
         </section>
-      )}
+      ) : null}
 
       {/* Module Health */}
       <section

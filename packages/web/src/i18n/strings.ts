@@ -50,6 +50,12 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "overview.encryptRetry": { en: "Encrypt & retry", zh: "加密并重试" },
   "overview.encryptRetryAll": { en: "Encrypt & retry all", zh: "全部加密重试" },
   "overview.encrypting": { en: "Encrypting…", zh: "加密中…" },
+  "overview.blocked.secret": { en: "suspected secret", zh: "疑似密钥" },
+  "overview.blocked.tooLarge": { en: "too large — exceeds the capture size limit", zh: "太大,超过捕获上限" },
+  "overview.blocked.managed": { en: "already managed by Roost", zh: "已被 Roost 管理" },
+  "overview.blocked.error": { en: "error", zh: "错误" },
+  "overview.blocked.remove": { en: "Remove", zh: "移除" },
+  "overview.blocked.raiseLimit": { en: "Raise the limit in Settings", zh: "可在设置调高上限" },
   "overview.noStatus": {
     en: "No module status available. Is the Roost server running?",
     zh: "暂无模块状态。Roost 服务是否在运行？",

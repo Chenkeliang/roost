@@ -1,5 +1,5 @@
 // Typed fetch wrapper for Roost API endpoints
-import type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate, EnvData, ModuleIndex } from "@roost/shared";
+import type { ChangeSet, BlockedItem, BlockReason, ApplyResult, DriftReport, DriftItem, Candidate, EnvData, ModuleIndex } from "@roost/shared";
 
 // When running inside Tauri there is no Vite dev-proxy, so we must target the
 // engine's absolute URL.  In normal browser / Vite dev / jsdom test contexts
@@ -14,7 +14,7 @@ const API_BASE: string =
     : "");
 
 // Re-export shared types for component use
-export type { ChangeSet, ApplyResult, DriftReport, DriftItem, Candidate, EnvData, ModuleIndex };
+export type { ChangeSet, BlockedItem, BlockReason, ApplyResult, DriftReport, DriftItem, Candidate, EnvData, ModuleIndex };
 
 export interface HealthResponse {
   ok: boolean;
