@@ -23,7 +23,7 @@ describe("runInit", () => {
     expect(created).toContain(path.join(repoDir, ".chezmoi.toml.tmpl"));
   });
 
-  it("writes a .chezmoiignore that excludes Roost's own metadata (roost/ and state/)", async () => {
+  it("writes a .chezmoiignore that excludes Roost's own metadata (roost/, state/, skills/)", async () => {
     const { created } = await runInit({ repoDir });
     const ignorePath = path.join(repoDir, ".chezmoiignore");
     expect(created).toContain(ignorePath);
@@ -32,6 +32,8 @@ describe("runInit", () => {
     expect(body).toMatch(/^roost\/\*\*$/m);
     expect(body).toMatch(/^state$/m);
     expect(body).toMatch(/^state\/\*\*$/m);
+    expect(body).toMatch(/^skills$/m);
+    expect(body).toMatch(/^skills\/\*\*$/m);
   });
 
   it("creates the expected files on disk", async () => {
