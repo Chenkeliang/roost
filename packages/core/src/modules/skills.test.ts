@@ -107,7 +107,7 @@ describe("skills hardening", () => {
 });
 
 import { skillsModule as M } from "./skills.js";
-import { saveSkillsConfig, loadSkillLinks as loadLinks, DEFAULT_SKILLS_CONFIG } from "../skills-config.js";
+import { saveSkillsConfig, loadSkillLinks as loadLinks, DEFAULT_SKILLS_CONFIG, saveSkillLinks } from "../skills-config.js";
 
 function plan() { return { module: "skills", actions: [] as never[] }; }
 
@@ -260,5 +260,17 @@ describe("resolveSkillConflict (back up & take over)", () => {
     expect(fs.existsSync(res.backedUp)).toBe(false);
     expect(fs.lstatSync(dest).isSymbolicLink()).toBe(false);
     expect(fs.readFileSync(path.join(dest, "SKILL.md"), "utf8")).toBe("# USER's own foo");
+  });
+
+  it("refuses when the target is a real dir Roost already owns (recorded link)", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), method: "copy", targets: ["claude"], skills: { foo: {} } });
+    // a real dir at the target that IS recorded as a Roost-owned link (e.g. a prior copy-mode takeover)
+    const dest = path.join(home, ".claude/skills/foo");
+    mkSkill(path.join(home, ".claude/skills"), "foo", "# roost-managed copy");
+    saveSkillLinks(repo, [{ skill: "foo", target: "claude", path: dest, kind: "copy" }]);
+    await expect(resolveSkillConflict({ ...ctx() }, "foo", "claude")).rejects.toThrow();
+    // guard fired before any mutation: the dir is untouched, no backup created
+    expect(fs.readFileSync(path.join(dest, "SKILL.md"), "utf8")).toBe("# roost-managed copy");
   });
 });
