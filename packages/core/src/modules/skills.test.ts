@@ -61,6 +61,12 @@ describe("skills module read ops", () => {
     expect(fs.existsSync(path.join(repo, "skills", "leaky"))).toBe(false);
   });
 
+  it("capture reports blockedDetail reason 'secret' for a leaky skill", async () => {
+    mkSkill(path.join(home, ".agents", "skills"), "leaky", 'AKIAIOSFODNN7EXAMPLE aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+    const cs = await skillsModule.capture(ctx(), sel(["leaky"]));
+    expect((cs.blockedDetail ?? []).find((b) => b.id === "leaky")?.reason).toBe("secret");
+  });
+
   it("index reports managed count", async () => {
     mkSkill(path.join(repo, "skills"), "foo", "# foo");
     const idx = await skillsModule.index!(ctx());

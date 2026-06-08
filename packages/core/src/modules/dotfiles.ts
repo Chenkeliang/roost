@@ -11,6 +11,7 @@ import type {
   ApplyPlan,
   ApplyResult,
   Health,
+  BlockedItem,
 } from "@roost/shared";
 import { createChezmoi } from "../adapters/chezmoi.js";
 import { isNoise, scanDir } from "../discovery/scan.js";
@@ -245,6 +246,7 @@ export const dotfilesModule: SyncModule = {
     const written: string[] = [];
     const encrypted: string[] = [];
     const blocked: string[] = [];
+    const blockedDetail: BlockedItem[] = [];
 
     // Encrypt intent comes from two sources: the path heuristic (.ssh/.aws/…) and
     // the curated catalog's encryptRecommended apps (e.g. JetBrains) — expanded to
@@ -265,6 +267,7 @@ export const dotfilesModule: SyncModule = {
       // Never try to manage tool-internal config (roost's / chezmoi's own).
       if (isRoostManaged(id)) {
         blocked.push(id);
+        blockedDetail.push({ id, reason: "managed" });
         continue;
       }
       const wantsEncrypt = isSensitivePath(id) || encryptByCatalog.has(id) || markedEncrypt.has(id);
@@ -277,6 +280,11 @@ export const dotfilesModule: SyncModule = {
             `${Math.round(scan.bytes / 1_000_000)}MB) — add a more specific subpath. Skipped.`,
         );
         blocked.push(id);
+        blockedDetail.push({
+          id,
+          reason: "too-large",
+          detail: `${Math.round(scan.bytes / 1048576)}MB / ${scan.files} files`,
+        });
         continue;
       }
 
@@ -291,6 +299,7 @@ export const dotfilesModule: SyncModule = {
               `generate one (Settings → Generate key / \`age-keygen\`) first. Skipped.`,
           );
           blocked.push(id);
+          blockedDetail.push({ id, reason: "error", detail: "no age key" });
           continue;
         }
         await chezmoi.add(id, { encrypt: true });
@@ -306,6 +315,7 @@ export const dotfilesModule: SyncModule = {
             `exclude that file, and rotate any exposed credentials.`,
         );
         blocked.push(id);
+        blockedDetail.push({ id, reason: "secret", detail: `${scan.secretFiles.length} file(s)` });
         continue;
       }
 
@@ -313,7 +323,7 @@ export const dotfilesModule: SyncModule = {
       written.push(id);
     }
 
-    return { module: "dotfiles", written, encrypted, blocked };
+    return { module: "dotfiles", written, encrypted, blocked, blockedDetail };
   },
 
   async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {

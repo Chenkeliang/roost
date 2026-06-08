@@ -3,7 +3,7 @@ import * as path from "node:path";
 import * as crypto from "node:crypto";
 import type {
   SyncModule, ModuleContext, Candidate, Selection,
-  DriftReport, DriftItem, ChangeSet, ApplyPlan, ApplyResult, Health, ModuleIndex,
+  DriftReport, DriftItem, ChangeSet, ApplyPlan, ApplyResult, Health, ModuleIndex, BlockedItem,
 } from "@roost/shared";
 import { loadSkillsTargets } from "../skills-catalog.js";
 import { loadSkillsConfig, loadSkillLinks, saveSkillLinks, effectiveSkill } from "../skills-config.js";
@@ -127,17 +127,24 @@ export const skillsModule: SyncModule = {
     const names = sel.modules.skills ?? [];
     const written: string[] = [];
     const blocked: string[] = [];
+    const blockedDetail: BlockedItem[] = [];
     for (const name of names) {
       // find the first source root that has this skill
       const root = scanRoots(ctx).map((r) => path.join(r.dir, name)).find((p) => fs.existsSync(p));
-      if (!root) { blocked.push(name); continue; }
+      if (!root) { blocked.push(name); blockedDetail.push({ id: name, reason: "error", detail: "not found" }); continue; }
       const scan = scanPathForSecrets(root);
-      if (scan.tooLarge) { ctx.log.warn(`skills: ${name} too large to scan safely; blocked`); blocked.push(name); continue; }
+      if (scan.tooLarge) {
+        ctx.log.warn(`skills: ${name} too large to scan safely; blocked`);
+        blocked.push(name);
+        blockedDetail.push({ id: name, reason: "too-large", detail: `${Math.round(scan.bytes / 1048576)}MB / ${scan.files} files` });
+        continue;
+      }
       if (scan.secretFiles.length > 0) {
         ctx.log.warn(
           `skills capture: skill "${name}" contains potential secrets — skipped. Rotate any exposed credentials.`,
         );
         blocked.push(name);
+        blockedDetail.push({ id: name, reason: "secret", detail: `${scan.secretFiles.length} file(s)` });
         continue; // I6 hard gate
       }
       const dest = path.join(repoSkillsDir(ctx), name);
@@ -147,7 +154,7 @@ export const skillsModule: SyncModule = {
       }
       written.push(name);
     }
-    return { module: "skills", written, encrypted: [], blocked };
+    return { module: "skills", written, encrypted: [], blocked, blockedDetail };
   },
 
   async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {

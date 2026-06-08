@@ -335,6 +335,18 @@ describe("dotfilesModule.capture", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  it("capture reports blockedDetail reason for a secret-bearing dotfile", async () => {
+    // non-sensitive basename so it takes the content-scan path (not the encrypt path)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-"));
+    const file = path.join(dir, ".myrc");
+    fs.writeFileSync(file, "AKIAIOSFODNN7EXAMPLE aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
+    const { exec } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const cs = await dotfilesModule.capture(ctx, { modules: { dotfiles: [file] } });
+    expect((cs.blockedDetail ?? []).find((b) => b.id === file)?.reason).toBe("secret");
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   it("captures a real clean file normally", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-"));
     const file = path.join(dir, ".vimrc");

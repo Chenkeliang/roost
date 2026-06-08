@@ -31,7 +31,9 @@ export interface ModuleIndex {
 export type DriftState = "synced" | "drift" | "conflict" | "untracked";
 export interface DriftItem { id: string; state: DriftState; detail?: string; }
 export interface DriftReport { module: string; items: DriftItem[]; }
-export interface ChangeSet { module: string; written: string[]; encrypted: string[]; blocked?: string[]; }
+export type BlockReason = "secret" | "too-large" | "managed" | "error";
+export interface BlockedItem { id: string; reason: BlockReason; detail?: string }
+export interface ChangeSet { module: string; written: string[]; encrypted: string[]; blocked?: string[]; blockedDetail?: BlockedItem[]; }
 export type ApplyKind = "create" | "update" | "delete" | "skip";
 export interface ApplyAction { id: string; kind: ApplyKind; target: string; backup?: string; }
 export interface ApplyPlan { module: string; actions: ApplyAction[]; }
