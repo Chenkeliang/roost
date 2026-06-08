@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Roost app icon: coral squircle + two devices with a clean transfer arrow. -->
+  <rect x="104" y="104" width="816" height="816" rx="184" fill="#FF6363"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+    <!-- device A (top-left) and device B (bottom-right), clearly separated -->
+    <rect x="170" y="280" width="290" height="196" rx="44" stroke-width="44"/>
+    <rect x="560" y="548" width="290" height="196" rx="44" stroke-width="44"/>
+    <!-- solid transfer arrow A -> B -->
+    <path d="M445 462 L 556 548" stroke-width="40"/>
+    <path d="M556 548 L 520 540 M556 548 L 548 506" stroke-width="40"/>
+  </g>
+</svg>
