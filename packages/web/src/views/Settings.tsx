@@ -9,7 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
+import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, getSettings, saveSettings, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
 import { openExternal } from "../openExternal";
 
 export function Settings() {
@@ -24,11 +24,12 @@ export function Settings() {
   const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null);
   const [keyBusy, setKeyBusy] = useState<"generate" | "rotate" | null>(null);
   const [keyResult, setKeyResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [maxCaptureMB, setMaxCaptureMB] = useState(100);
 
   useEffect(() => {
     setLoading(true);
-    Promise.allSettled([getHealth(), getModules(), getGitStatus(), getKey()])
-      .then(([health, mods, git, key]) => {
+    Promise.allSettled([getHealth(), getModules(), getGitStatus(), getKey(), getSettings()])
+      .then(([health, mods, git, key, settings]) => {
         if (health.status === "fulfilled") {
           setRepoDir(health.value.repoDir ?? null);
           setAgeKey(health.value.ageKey ?? null);
@@ -36,9 +37,16 @@ export function Settings() {
         if (mods.status === "fulfilled") setModules(mods.value);
         if (git.status === "fulfilled") setGitStatus(git.value);
         if (key.status === "fulfilled") setKeyStatus(key.value);
+        if (settings.status === "fulfilled") setMaxCaptureMB(settings.value.maxCaptureMB);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  function commitMaxCapture(value: number) {
+    if (!Number.isFinite(value) || value <= 0) return;
+    setMaxCaptureMB(value);
+    void saveSettings(value);
+  }
 
   async function handleGenerateKey() {
     setKeyBusy("generate");
@@ -348,6 +356,33 @@ export function Settings() {
             {keyResult.text}
           </div>
         )}
+      </div>
+
+      {/* ── Capture limits ── */}
+      <div style={sectionLabel}>{t("settings.maxCapture.label")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={row}>
+          <span style={{ color: "var(--muted)", minWidth: 80 }}>{t("settings.maxCapture.label")}</span>
+          <input
+            type="number"
+            min={1}
+            value={maxCaptureMB}
+            onChange={(e) => setMaxCaptureMB(Number(e.target.value))}
+            onBlur={(e) => commitMaxCapture(parseInt(e.target.value, 10))}
+            style={{
+              width: 100,
+              padding: "5px 8px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-soft)",
+              borderRadius: "var(--rr)",
+              color: "var(--text)",
+              fontSize: 13,
+            }}
+          />
+        </div>
+        <div style={{ fontSize: 12, color: "var(--muted)", padding: "2px 2px", lineHeight: 1.5 }}>
+          {t("settings.maxCapture.note")}
+        </div>
       </div>
 
       {/* ── Privacy ── */}

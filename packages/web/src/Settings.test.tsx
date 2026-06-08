@@ -24,6 +24,8 @@ vi.mock("./api", () => ({
   getKey: vi.fn().mockResolvedValue({ exists: true, recipient: "age1examplerecipient", keyPath: "/Users/testuser/.config/sops/age/keys.txt", encryptedFiles: 0 }),
   generateKey: vi.fn().mockResolvedValue({ created: true, source: "generated", recipient: "age1examplerecipient", keyPath: "/x" }),
   rotateKey: vi.fn().mockResolvedValue({ recipient: "age1new", rotated: [], failed: [], swapped: true }),
+  getSettings: vi.fn().mockResolvedValue({ maxCaptureMB: 100 }),
+  saveSettings: vi.fn().mockResolvedValue({ ok: true, maxCaptureMB: 100 }),
 }));
 
 describe("Settings", () => {
@@ -79,6 +81,13 @@ describe("Settings", () => {
     await waitFor(() => {
       expect(screen.getByText("Push")).toBeTruthy();
       expect(screen.getByText("Pull")).toBeTruthy();
+    });
+  });
+
+  it("shows the max capture size field", async () => {
+    await act(async () => { render(<Settings />); });
+    await waitFor(() => {
+      expect(screen.getAllByText("Max capture size (MB)").length).toBeGreaterThan(0);
     });
   });
 

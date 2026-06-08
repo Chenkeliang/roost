@@ -41,6 +41,8 @@ import {
   effectiveSkill,
   loadSkillLinks,
   resolveSkillConflict,
+  loadRoostSettings,
+  saveRoostSettings,
 } from "@roost/core";
 import type { SkillTarget, SkillsConfig, SkillLink } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -730,6 +732,16 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.send({ ok: true });
     },
   );
+
+  // ── /api/settings ─────────────────────────────────────────────────────────────
+  server.get("/api/settings", async (_req, reply) => reply.send(loadRoostSettings(repoDir)));
+  server.post("/api/settings", async (req, reply) => {
+    const b = (req.body ?? {}) as { maxCaptureMB?: unknown };
+    const n = typeof b.maxCaptureMB === "number" && b.maxCaptureMB > 0 ? b.maxCaptureMB : 100;
+    saveRoostSettings(repoDir, { maxCaptureMB: n });
+    cache.invalidateAll();
+    return reply.send({ ok: true, maxCaptureMB: n });
+  });
 
   // ── static / SPA ─────────────────────────────────────────────────────────────
   if (webDir && fs.existsSync(webDir)) {

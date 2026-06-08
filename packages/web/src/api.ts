@@ -344,3 +344,9 @@ export function saveSkillsConfig(config: SkillsConfig): Promise<{ ok: boolean }>
     body: JSON.stringify(config),
   });
 }
+
+// ── Roost settings ───────────────────────────────────────────────────────────
+export function getSettings(): Promise<{ maxCaptureMB: number }> { return apiFetch("/api/settings"); }
+export function saveSettings(maxCaptureMB: number): Promise<{ ok: boolean; maxCaptureMB: number }> {
+  return apiFetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ maxCaptureMB }) });
+}

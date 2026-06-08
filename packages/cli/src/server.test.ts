@@ -1333,6 +1333,33 @@ describe("skills resolve api", () => {
   });
 });
 
+describe("settings api", () => {
+  it("GET /api/settings returns default maxCaptureMB 100", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-setapi-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "GET", url: "/api/settings" });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).maxCaptureMB).toBe(100);
+    await server.close();
+  });
+  it("POST /api/settings persists maxCaptureMB", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-setapi2-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "POST", url: "/api/settings", payload: { maxCaptureMB: 250 } });
+    expect(res.statusCode).toBe(200);
+    const get = await server.inject({ method: "GET", url: "/api/settings" });
+    expect(JSON.parse(get.body).maxCaptureMB).toBe(250);
+    await server.close();
+  });
+  it("POST /api/settings rejects non-positive with default", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-setapi3-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({ method: "POST", url: "/api/settings", payload: { maxCaptureMB: -5 } });
+    expect(JSON.parse(res.body).maxCaptureMB).toBe(100);
+    await server.close();
+  });
+});
+
 describe("cors", () => {
   it("allows the Tauri webview origin", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cors-"));

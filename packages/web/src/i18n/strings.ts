@@ -243,6 +243,11 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     en: "The age private key is the ONLY way to decrypt your data. Back it up offline (e.g. a password manager). Lose it and every encrypted file is unrecoverable.",
     zh: "age 私钥是解密你数据的唯一凭据。请离线备份(如密码管理器)。丢失后所有加密文件将无法恢复。",
   },
+  "settings.maxCapture.label": { en: "Max capture size (MB)", zh: "最大捕获大小 (MB)" },
+  "settings.maxCapture.note": {
+    en: "Raising this enlarges the repo and every push; cache dirs (e.g. raycast) aren't worth backing up.",
+    zh: "调高会让仓库和每次推送变大;缓存目录(如 raycast)不建议备份。",
+  },
 
   // ── Skills ───────────────────────────────────────────────────────────────
   "skills.title": { en: "Skills", zh: "Skills" },
