@@ -40,8 +40,37 @@ import {
   effectiveSkill,
   loadSkillLinks,
 } from "@roost/core";
+import type { SkillTarget, SkillsConfig, SkillLink } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 import { finalizeCapture } from "./captureFlow.js";
+
+// Target ids where a skill is enabled but the on-disk dest is a REAL (non-Roost)
+// directory — a genuine conflict the user must resolve before linking.
+export function computeConflicts(
+  home: string,
+  name: string,
+  targets: SkillTarget[],
+  links: SkillLink[],
+  cfg: SkillsConfig,
+): string[] {
+  const eff = effectiveSkill(cfg, name);
+  if (!eff.enabled) return [];
+  const conflicts: string[] = [];
+  for (const t of targets) {
+    if (!eff.targets.includes(t.id)) continue;
+    const dest = path.join(home, t.path, name);
+    let st: fs.Stats | undefined;
+    try {
+      st = fs.lstatSync(dest);
+    } catch {
+      continue; // absent → no conflict
+    }
+    if (st.isSymbolicLink()) continue; // Roost-style link, not a conflict
+    const owned = links.some((l) => l.skill === name && l.target === t.id);
+    if (!owned) conflicts.push(t.id);
+  }
+  return conflicts;
+}
 
 export interface ServerDeps {
   repoDir: string;
@@ -592,10 +621,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         managed = [];
       }
       const links = loadSkillLinks(repoDir);
+      const home = makeCtx(true).home;
       const skills = managed.map((name) => ({
         name,
         effective: effectiveSkill(cfg, name),
         links: links.filter((l) => l.skill === name),
+        conflicts: computeConflicts(home, name, targets, links, cfg),
       }));
       return reply.send({ config: cfg, targets, skills });
     } catch (err) {

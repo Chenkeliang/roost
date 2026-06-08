@@ -18,6 +18,7 @@ function targetStatus(row: SkillRow, targetId: string): "linked" | "copy" | "con
   const wanted = row.effective.enabled && row.effective.targets.includes(targetId);
   const link = row.links.find((l) => l.target === targetId);
   if (!wanted) return "off";
+  if (row.conflicts?.includes(targetId)) return "conflict"; // real non-Roost dir occupies the dest
   if (!link) return "broken"; // wanted but no link on disk yet
   if (link.kind === "copy") return "copy";
   return "linked";

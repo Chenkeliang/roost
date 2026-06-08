@@ -299,7 +299,7 @@ export interface SkillsConfig {
   targets: string[];
   skills: Record<string, { enabled?: boolean; targets?: string[]; method?: SkillMethod }>;
 }
-export interface SkillRow { name: string; effective: EffectiveSkill; links: SkillLink[]; }
+export interface SkillRow { name: string; effective: EffectiveSkill; links: SkillLink[]; conflicts: string[]; }
 export interface SkillsView { config: SkillsConfig; targets: SkillTarget[]; skills: SkillRow[]; }
 
 export function getSkills(): Promise<SkillsView> {

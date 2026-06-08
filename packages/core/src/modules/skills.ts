@@ -83,6 +83,11 @@ function removeOwnedLink(ctx: ModuleContext, link: SkillLink): boolean {
   return true;
 }
 
+// Source of truth for skills = roost/skills.yaml (recipe) + <repo>/skills/ +
+// state/skills-links.json — NOT selection.yaml. `sel.modules.skills` is accepted
+// by the generic capture/status path (so the orchestrator can pass names), but it
+// is intentionally not the truth here; do NOT wire skills into select/Manage —
+// that would create a competing truth source.
 export const skillsModule: SyncModule = {
   name: "skills",
 

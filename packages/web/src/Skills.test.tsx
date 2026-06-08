@@ -9,7 +9,7 @@ vi.mock("./api", () => ({
       { id: "claude", path: ".claude/skills", label: "Claude Code" },
       { id: "codex", path: ".codex/skills", label: "Codex" },
     ],
-    skills: [{ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [{ skill: "foo", target: "claude", path: "/h/.claude/skills/foo", kind: "symlink" }] }],
+    skills: [{ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [{ skill: "foo", target: "claude", path: "/h/.claude/skills/foo", kind: "symlink" }], conflicts: [] }],
   }),
   discoverSkills: vi.fn().mockResolvedValue({ candidates: [] }),
   captureSkills: vi.fn(),

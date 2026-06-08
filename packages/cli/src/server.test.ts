@@ -16,7 +16,7 @@ import type {
   ApplyPlan,
 } from "@roost/shared";
 import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData } from "@roost/core";
-import { buildServer } from "./server.js";
+import { buildServer, computeConflicts } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
 // A real-exec ctx so git commits actually run (for capture finalization tests).
@@ -1252,5 +1252,80 @@ describe("skills api", () => {
     const res = await server.inject({ method: "POST", url: "/api/skills/toggle", payload: { skill: "foo" } });
     expect(res.statusCode).toBe(400);
     await server.close();
+  });
+
+  it("computeConflicts: enabled target with a REAL non-Roost dir → conflict", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-skconf-home-"));
+    try {
+      const targets = [
+        { id: "claude", path: ".claude/skills", label: "Claude Code" },
+        { id: "codex", path: ".codex/skills", label: "Codex" },
+      ];
+      // foo is enabled on both, claude is symlinked (owned), codex is a real dir.
+      fs.mkdirSync(path.join(home, ".claude", "skills"), { recursive: true });
+      fs.symlinkSync(home, path.join(home, ".claude", "skills", "foo")); // a symlink → not a conflict
+      fs.mkdirSync(path.join(home, ".codex", "skills", "foo"), { recursive: true }); // real dir → conflict
+      const cfg = {
+        sourceDir: "~/.agents/skills",
+        method: "symlink" as const,
+        targets: ["claude", "codex"],
+        skills: {},
+      };
+      const conflicts = computeConflicts(home, "foo", targets, [], cfg);
+      expect(conflicts).toEqual(["codex"]);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("computeConflicts: a Roost-owned real dir (in links) is NOT a conflict", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-skconf2-home-"));
+    try {
+      const targets = [{ id: "claude", path: ".claude/skills", label: "Claude Code" }];
+      fs.mkdirSync(path.join(home, ".claude", "skills", "foo"), { recursive: true }); // copy-method real dir
+      const dest = path.join(home, ".claude", "skills", "foo");
+      const cfg = { sourceDir: "~/.agents/skills", method: "copy" as const, targets: ["claude"], skills: {} };
+      const links = [{ skill: "foo", target: "claude", path: dest, kind: "copy" as const }];
+      expect(computeConflicts(home, "foo", targets, links, cfg)).toEqual([]);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/skills surfaces conflicts for a target occupied by a real dir", async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "roost-skconfapi-repo-"));
+    // Unique home-relative target dir so we can plant a real dir under the REAL home.
+    const uniqueRel = path.join(`.roost-test-${Math.random().toString(36).slice(2)}`, "skills");
+    const realDest = path.join(os.homedir(), uniqueRel, "foo");
+    try {
+      // managed skill foo
+      fs.mkdirSync(path.join(repo, "skills", "foo"), { recursive: true });
+      fs.writeFileSync(path.join(repo, "skills", "foo", "SKILL.md"), "# foo");
+      // catalog override: a single target whose home-relative path is our unique dir
+      fs.mkdirSync(path.join(repo, "roost"), { recursive: true });
+      fs.writeFileSync(
+        path.join(repo, "roost", "skills-catalog.yaml"),
+        `targets:\n  - id: t1\n    path: ${uniqueRel}\n    label: T1\n`,
+      );
+      // recipe: enable foo only on t1
+      fs.writeFileSync(
+        path.join(repo, "roost", "skills.yaml"),
+        `sourceDir: ~/.agents/skills\nmethod: symlink\ntargets:\n  - t1\nskills:\n  foo:\n    enabled: true\n    targets:\n      - t1\n`,
+      );
+      // plant a REAL (non-Roost) dir at the resolved target path under the real home
+      fs.mkdirSync(realDest, { recursive: true });
+
+      const server = buildServer({ repoDir: repo, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(repo, d) });
+      const res = await server.inject({ method: "GET", url: "/api/skills" });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body) as { skills: { name: string; conflicts: string[] }[] };
+      const foo = body.skills.find((s) => s.name === "foo")!;
+      expect(foo.conflicts).toContain("t1");
+      await server.close();
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+      // clean the planted dir + its unique parent under the real home
+      fs.rmSync(path.join(os.homedir(), uniqueRel.split(path.sep)[0]!), { recursive: true, force: true });
+    }
   });
 });
