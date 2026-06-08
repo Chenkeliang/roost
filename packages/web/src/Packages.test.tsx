@@ -10,7 +10,8 @@ vi.mock("./api", () => ({
     exists: true,
     entries: { taps: ["homebrew/services"], formulae: ["git"], casks: ["firefox"], mas: [] },
   }),
-  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: ["brew:git", "cask:firefox"] } }),
+  getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { packages: ["brew:git", "brew:age", "cask:firefox"] } }),
+  getPackageStates: vi.fn().mockResolvedValue({ states: { "brew:git": "outdated", "brew:age": "installed", "cask:firefox": "missing" } }),
   getDiscoverModule: vi.fn().mockResolvedValue({
     candidates: { packages: [{ id: "brew:fd", path: "roost/Brewfile", category: "packages", recommendation: "track", note: "formula" }] },
   }),
@@ -38,12 +39,21 @@ describe("Packages", () => {
     expect(screen.getByRole("button", { name: /remove brew:git/i })).toBeInTheDocument();
   });
 
+  it("shows per-package status badges from getPackageStates", async () => {
+    await act(async () => { render(<Packages showHud={vi.fn()} />); });
+    await waitFor(() => expect(screen.getByText("git")).toBeInTheDocument());
+    // git is outdated → "Update available"; age installed; firefox missing.
+    expect(screen.getByText("Update available")).toBeInTheDocument();
+    expect(screen.getByText("Installed")).toBeInTheDocument();
+    expect(screen.getByText("Not installed")).toBeInTheDocument();
+  });
+
   it("Install all calls installPackages with the selected ids", async () => {
     const api = await import("./api");
     await act(async () => { render(<Packages showHud={vi.fn()} />); });
     await waitFor(() => expect(screen.getByText("git")).toBeInTheDocument());
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /install all/i })); });
-    expect(api.installPackages).toHaveBeenCalledWith(["brew:git", "cask:firefox"]);
+    expect(api.installPackages).toHaveBeenCalledWith(["brew:age", "brew:git", "cask:firefox"]);
   });
 
   it("Scan calls getDiscoverModule('packages')", async () => {

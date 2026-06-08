@@ -116,6 +116,13 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     en: "Whole Brewfile (legacy). Expand it to manage and install packages individually.",
     zh: "整份 Brewfile(旧版)。展开后即可逐个管理与安装。",
   },
+  "packages.state.installed": { en: "Installed", zh: "已安装" },
+  "packages.state.outdated": { en: "Update available", zh: "待更新" },
+  "packages.state.missing": { en: "Not installed", zh: "未安装" },
+  "packages.state.outdatedSummary": {
+    en: "Some packages need updating — run `brew upgrade`",
+    zh: "部分包待更新 —— 运行 `brew upgrade`",
+  },
 
   // ── Dotfiles ─────────────────────────────────────────────────────────────
   "dotfiles.explainer": {

@@ -227,6 +227,12 @@ export function installPackages(ids: string[]): Promise<InstallResult> {
   });
 }
 
+// Server GET /api/packages/states returns per-package install state keyed by id.
+export type PackageState = "installed" | "outdated" | "missing";
+export function getPackageStates(): Promise<{ states: Record<string, PackageState> }> {
+  return apiFetch<{ states: Record<string, PackageState> }>("/api/packages/states");
+}
+
 // Server GET /api/dotfiles returns chezmoi availability + managed relative paths.
 export interface DotfilesResponse {
   available: boolean;

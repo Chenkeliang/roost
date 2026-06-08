@@ -6,7 +6,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
-import { getIndex, getBrewfile, getSelection, getDiscoverModule, addSelection, removeSelection, installPackages, type BrewfileResponse } from "../api";
+import { getIndex, getBrewfile, getSelection, getDiscoverModule, addSelection, removeSelection, installPackages, getPackageStates, type BrewfileResponse, type PackageState } from "../api";
 
 interface PackagesProps { showHud?: (m: HudMessage) => void; }
 
@@ -23,6 +23,17 @@ function KindIcon({ kind }: { kind: string }) {
   if (kind === "tap") return <Storefront size={14} style={c} />;
   return <Package size={14} style={c} />;
 }
+const STATE_COLOR: Record<PackageState, string> = { installed: "var(--green)", outdated: "var(--amber)", missing: "var(--red)" };
+function StateBadge({ state, label }: { state: PackageState; label: string }) {
+  const color = STATE_COLOR[state];
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color, fontSize: 11, whiteSpace: "nowrap" }}>
+      <span aria-hidden style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      {label}
+    </span>
+  );
+}
+
 // Repo Brewfile entries → per-package ids (for migrating the legacy sentinel).
 function brewfileToIds(e: BrewfileResponse["entries"]): string[] {
   return [
@@ -40,6 +51,7 @@ export function Packages({ showHud }: PackagesProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [legacy, setLegacy] = useState(false); // selection still has the whole-Brewfile sentinel
   const [brewfile, setBrewfile] = useState<BrewfileResponse | null>(null);
+  const [states, setStates] = useState<Record<string, PackageState>>({});
   const [cands, setCands] = useState<Candidate[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -55,6 +67,8 @@ export function Packages({ showHud }: PackagesProps) {
     const pkgs = sel.modules.packages ?? [];
     setSelected(new Set(pkgs.filter((id) => id !== SENTINEL && id.includes(":"))));
     setLegacy(pkgs.includes(SENTINEL));
+    // Per-package install states are best-effort — a failure here must not break the page.
+    try { const r = await getPackageStates(); setStates(r.states); } catch { /* leave states empty */ }
   }, []);
 
   useEffect(() => {
@@ -124,6 +138,7 @@ export function Packages({ showHud }: PackagesProps) {
   }, [showHud]);
 
   const selectedList = [...selected].sort();
+  const anyOutdated = selectedList.some((id) => states[id] === "outdated");
   const newCands = (cands ?? []).filter((c) => !selected.has(c.id));
 
   if (loading) {
@@ -181,6 +196,12 @@ export function Packages({ showHud }: PackagesProps) {
             />
           ) : (
             <>
+              {anyOutdated && (
+                <div role="status" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "1px solid var(--amber)", borderRadius: "var(--rr)", marginBottom: 10, fontSize: 12.5, color: "var(--muted)" }}>
+                  <span aria-hidden style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--amber)", flexShrink: 0 }} />
+                  {t("packages.state.outdatedSummary")}
+                </div>
+              )}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                 <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
                   <input type="checkbox" aria-label="select all selected" checked={checked.size > 0 && selectedList.every((id) => checked.has(id))} onChange={(e) => setChecked(e.target.checked ? new Set(selectedList) : new Set())} />
@@ -201,6 +222,7 @@ export function Packages({ showHud }: PackagesProps) {
                     <input type="checkbox" aria-label={`select ${id}`} checked={checked.has(id)} onChange={() => toggleCheck(id)} />
                     <KindIcon kind={kindOf(id)} />
                     <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{valOf(id)}</span>
+                    {states[id] && <StateBadge state={states[id]} label={t(`packages.state.${states[id]}`)} />}
                     <span style={{ color: "var(--muted)", fontSize: 11 }}>{kindOf(id)}</span>
                     <button onClick={() => void remove(id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${id}`}><X size={11} />{t("common.remove")}</button>
                   </div>
