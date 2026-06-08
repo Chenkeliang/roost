@@ -170,3 +170,45 @@ describe("skills apply + reconcile", () => {
     expect(loadLinks(repo).some((l) => l.skill === "foo")).toBe(false);
   });
 });
+
+describe("skills delete-safety", () => {
+  it("reconcile does NOT delete a user's real dir that replaced a Roost symlink", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    const base = { sourceDir: path.join(home, ".agents/skills"), method: "symlink" as const, targets: ["claude"] };
+    saveSkillsConfig(repo, { ...base, skills: { foo: { enabled: true } } });
+    await skillsModule.apply({ ...ctx() }, { module: "skills", actions: [] } as never);
+    const dest = path.join(home, ".claude/skills/foo");
+    // user replaces the Roost symlink with their OWN real dir
+    fs.unlinkSync(dest);
+    fs.mkdirSync(dest, { recursive: true });
+    fs.writeFileSync(path.join(dest, "USER_DATA.md"), "precious");
+    // disable + apply -> reconcile must NOT delete the user's dir
+    saveSkillsConfig(repo, { ...base, skills: { foo: { enabled: false } } });
+    await skillsModule.apply({ ...ctx() }, { module: "skills", actions: [] } as never);
+    expect(fs.existsSync(path.join(dest, "USER_DATA.md"))).toBe(true);
+    expect(fs.readFileSync(path.join(dest, "USER_DATA.md"), "utf8")).toBe("precious");
+  });
+
+  it("unmanage does NOT delete a user's real dir that replaced a Roost symlink", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    saveSkillsConfig(repo, { sourceDir: path.join(home, ".agents/skills"), method: "symlink", targets: ["claude"], skills: { foo: {} } });
+    await skillsModule.apply({ ...ctx() }, { module: "skills", actions: [] } as never);
+    const dest = path.join(home, ".claude/skills/foo");
+    fs.unlinkSync(dest);
+    fs.mkdirSync(dest, { recursive: true });
+    fs.writeFileSync(path.join(dest, "USER_DATA.md"), "precious");
+    await skillsModule.unmanage({ ...ctx() }, { modules: { skills: ["foo"] } });
+    expect(fs.existsSync(path.join(dest, "USER_DATA.md"))).toBe(true);
+  });
+
+  it("reconcile still removes a genuine Roost symlink when undesired", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    const base = { sourceDir: path.join(home, ".agents/skills"), method: "symlink" as const, targets: ["claude"] };
+    saveSkillsConfig(repo, { ...base, skills: { foo: { enabled: true } } });
+    await skillsModule.apply({ ...ctx() }, { module: "skills", actions: [] } as never);
+    expect(fs.lstatSync(path.join(home, ".claude/skills/foo")).isSymbolicLink()).toBe(true);
+    saveSkillsConfig(repo, { ...base, skills: { foo: { enabled: false } } });
+    await skillsModule.apply({ ...ctx() }, { module: "skills", actions: [] } as never);
+    expect(fs.existsSync(path.join(home, ".claude/skills/foo"))).toBe(false);
+  });
+});

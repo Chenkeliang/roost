@@ -7,6 +7,7 @@ import type {
 } from "@roost/shared";
 import { loadSkillsTargets } from "../skills-catalog.js";
 import { loadSkillsConfig, loadSkillLinks, saveSkillLinks, effectiveSkill } from "../skills-config.js";
+import type { SkillLink } from "../skills-config.js";
 import { scanPathForSecrets } from "./dotfiles.js"; // reuse bounded content scanner
 
 function expandHome(home: string, p: string): string {
@@ -53,6 +54,33 @@ export function hashSkillDir(dir: string): string {
 
 function repoSkillsDir(ctx: ModuleContext): string {
   return path.join(ctx.repoDir, "skills");
+}
+
+// Remove a Roost-created distribution ONLY if we still own it. Returns true if
+// removed; false if the path was left untouched (user replaced it / gone).
+function removeOwnedLink(ctx: ModuleContext, link: SkillLink): boolean {
+  let st: ReturnType<typeof fs.lstatSync> | undefined;
+  try { st = fs.lstatSync(link.path); } catch { return false; } // already gone → nothing to delete
+  if (link.kind === "symlink") {
+    if (!st.isSymbolicLink()) {
+      ctx.log.warn(`skills: ${link.path} is no longer a Roost symlink; left in place`);
+      return false; // user replaced our link with a real file/dir — never delete
+    }
+    // unlink (not rmSync) removes only the symlink itself, never its target
+    if (!ctx.dryRun) fs.unlinkSync(link.path);
+    return true;
+  }
+  // kind === "copy": only remove if the dir's content still matches the canonical
+  // source (i.e. it's still our unmodified copy). If the user changed it, leave it.
+  const cfg = loadSkillsConfig(ctx.repoDir);
+  const srcHash = hashSkillDir(path.join(expandHome(ctx.home, cfg.sourceDir), link.skill));
+  const curHash = hashSkillDir(link.path);
+  if (st.isSymbolicLink() || curHash !== srcHash) {
+    ctx.log.warn(`skills: ${link.path} was modified or replaced; left in place`);
+    return false;
+  }
+  if (!ctx.dryRun) fs.rmSync(link.path, { recursive: true, force: true });
+  return true;
 }
 
 export const skillsModule: SyncModule = {
@@ -201,7 +229,7 @@ export const skillsModule: SyncModule = {
     for (const l of links) {
       if (desired.has(`${l.skill}@${l.target}`)) { keep.push(l); continue; }
       if (ctx.dryRun) { keep.push(l); continue; }
-      try { fs.rmSync(l.path, { recursive: true, force: true }); } catch { /* already gone */ }
+      removeOwnedLink(ctx, l); // removes only if still owned; user content preserved either way
       applied.push(`unlink ${l.skill}@${l.target}`);
     }
     if (!ctx.dryRun) saveSkillLinks(ctx.repoDir, keep);
@@ -215,7 +243,7 @@ export const skillsModule: SyncModule = {
     const kept: typeof links = [];
     for (const l of links) {
       if (!names.has(l.skill)) { kept.push(l); continue; }
-      if (!ctx.dryRun) { try { fs.rmSync(l.path, { recursive: true, force: true }); } catch { /* gone */ } }
+      removeOwnedLink(ctx, l); // removes only if still owned; self-gates on dryRun
       applied.push(`unlink ${l.skill}@${l.target}`);
     }
     if (!ctx.dryRun) saveSkillLinks(ctx.repoDir, kept);
