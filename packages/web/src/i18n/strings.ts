@@ -251,4 +251,9 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "skills.capture": { en: "Back up selected", zh: "备份所选" },
   "skills.sourceDir": { en: "Canonical source", zh: "规范源目录" },
   "skills.remove": { en: "Remove", zh: "移除" },
+  "skills.resolve.action": { en: "Resolve", zh: "解决" },
+  "skills.resolve.confirm": {
+    en: "Your existing folder will be moved to ~/.roost-backups (recoverable) and replaced with a link to the canonical source. Continue?",
+    zh: "你的现有目录将被移动到 ~/.roost-backups(可找回),并替换为指向规范源的软链。继续？",
+  },
 };

@@ -4,7 +4,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
-import { getSkills, discoverSkills, captureSkills, toggleSkill, linkSkills, saveSkillsConfig } from "../api";
+import { getSkills, discoverSkills, captureSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict } from "../api";
 import type { SkillsView, SkillRow, SkillMethod } from "../api";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
@@ -97,6 +97,13 @@ export function Skills() {
       await refetch();
     } finally { setBusy(false); }
   }, [view, refetch]);
+
+  const onResolve = useCallback(async (name: string, targetId: string) => {
+    if (!window.confirm(t("skills.resolve.confirm"))) return;
+    setBusy(true);
+    try { await resolveSkillConflict(name, targetId); await refetch(); }
+    finally { setBusy(false); }
+  }, [t, refetch]);
 
   const onApplyLinks = useCallback(async () => {
     setBusy(true);
@@ -221,7 +228,19 @@ export function Skills() {
                               onChange={(e) => void onToggleTarget(row, tg.id, e.target.checked)}
                               style={{ accentColor: "var(--accent)" }}
                             />
-                            <StatusBadge status={status} t={t} />
+                            {status === "conflict" ? (
+                              <button
+                                aria-label={t("skills.resolve.action")}
+                                title={t("skills.conflict")}
+                                disabled={busy}
+                                onClick={() => void onResolve(row.name, tg.id)}
+                                style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "2px 8px" }}
+                              >
+                                <Warning size={11} weight="fill" />{t("skills.resolve.action")}
+                              </button>
+                            ) : (
+                              <StatusBadge status={status} t={t} />
+                            )}
                           </span>
                         </td>
                       );

@@ -333,6 +333,10 @@ export function linkSkills(opts?: { copy?: boolean; targets?: string[] }): Promi
   });
 }
 
+export function resolveSkillConflict(skill: string, target: string): Promise<{ ok: boolean; backedUp: string; linked: string }> {
+  return apiFetch("/api/skills/resolve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skill, target }) });
+}
+
 export function saveSkillsConfig(config: SkillsConfig): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>("/api/skills/config", {
     method: "POST",
