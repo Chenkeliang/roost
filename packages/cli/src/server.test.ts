@@ -1361,6 +1361,18 @@ describe("settings api", () => {
 });
 
 describe("cors", () => {
+  it("allows PUT in the preflight (env save uses PUT)", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-corsput-"));
+    const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });
+    const res = await server.inject({
+      method: "OPTIONS",
+      url: "/api/env",
+      headers: { origin: "tauri://localhost", "access-control-request-method": "PUT", "access-control-request-headers": "content-type" },
+    });
+    expect(res.headers["access-control-allow-methods"]).toContain("PUT");
+    await server.close();
+  });
+
   it("allows the Tauri webview origin", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cors-"));
     const server = buildServer({ repoDir: tmp, registry: defaultRegistry(), makeCtx: (d) => makeRealCtx(tmp, d) });

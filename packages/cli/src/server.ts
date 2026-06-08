@@ -103,6 +103,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // cross-origin. Allow Tauri + loopback dev origins ONLY — NOT arbitrary
   // websites, since these endpoints are unauthenticated and mutate local state.
   void server.register(cors, {
+    // @fastify/cors defaults methods to GET,HEAD,POST — which silently blocks the
+    // env-save PUT (and any future PUT/PATCH/DELETE) from the cross-origin webview.
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
     origin(origin, cb) {
       // Non-CORS requests (curl, same-origin) send no Origin → allow.
       if (!origin) return cb(null, true);
