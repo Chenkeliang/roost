@@ -42,7 +42,8 @@ export function hashSkillDir(dir: string): string {
     for (const e of entries) {
       const abs = path.join(d, e.name);
       const r = rel ? `${rel}/${e.name}` : e.name;
-      if (e.isDirectory()) walk(abs, r);
+      if (e.isSymbolicLink()) { h.update(r); h.update("\0symlink\0"); h.update(fs.readlinkSync(abs)); }
+      else if (e.isDirectory()) walk(abs, r);
       else { h.update(r); h.update(fs.readFileSync(abs)); }
     }
   };
@@ -98,6 +99,7 @@ export const skillsModule: SyncModule = {
       const root = scanRoots(ctx).map((r) => path.join(r.dir, name)).find((p) => fs.existsSync(p));
       if (!root) { blocked.push(name); continue; }
       const scan = scanPathForSecrets(root);
+      if (scan.tooLarge) { ctx.log.warn(`skills: ${name} too large to scan safely; blocked`); blocked.push(name); continue; }
       if (scan.secretFiles.length > 0) {
         ctx.log.warn(
           `skills capture: skill "${name}" contains potential secrets — skipped. Rotate any exposed credentials.`,

@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { ModuleContext, Selection } from "@roost/shared";
-import { skillsModule } from "./skills.js";
+import { skillsModule, hashSkillDir } from "./skills.js";
 
 let home: string, repo: string;
 function ctx(): ModuleContext {
@@ -70,5 +70,37 @@ describe("skills module read ops", () => {
   it("unmanage returns a result without throwing when nothing linked", async () => {
     const res = await skillsModule.unmanage(ctx(), sel(["foo"]));
     expect(res.module).toBe("skills");
+  });
+});
+
+describe("skills hardening", () => {
+  it("hashSkillDir handles a symlinked sub-directory without aborting (stable, includes later files)", () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), "roost-hash-"));
+    const skill = path.join(base, "s");
+    fs.mkdirSync(path.join(skill, "real"), { recursive: true });
+    fs.writeFileSync(path.join(skill, "real", "a.md"), "A");
+    // a symlinked subdir, sorted BEFORE a later file so a buggy walk would drop "z.md"
+    const targetDir = path.join(base, "shared");
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.symlinkSync(targetDir, path.join(skill, "linkdir"));
+    fs.writeFileSync(path.join(skill, "z.md"), "Z");
+    const h1 = hashSkillDir(skill);
+    const h2 = hashSkillDir(skill);
+    expect(h1).toBe(h2);            // stable
+    expect(h1).not.toBe("");        // produced a real digest
+    // changing a file AFTER the symlink must change the hash (proves walk didn't abort at the symlink)
+    fs.writeFileSync(path.join(skill, "z.md"), "Z2");
+    expect(hashSkillDir(skill)).not.toBe(h1);
+    fs.rmSync(base, { recursive: true, force: true });
+  });
+
+  it("capture blocks an oversized (tooLarge) skill dir without writing it", async () => {
+    // trip the scanner's 2000-file cap
+    const src = path.join(home, ".agents", "skills", "huge");
+    fs.mkdirSync(src, { recursive: true });
+    for (let i = 0; i < 2100; i++) fs.writeFileSync(path.join(src, `f${i}.txt`), "x");
+    const cs = await skillsModule.capture(ctx(), { modules: { skills: ["huge"] } });
+    expect(cs.blocked ?? []).toContain("huge");
+    expect(fs.existsSync(path.join(repo, "skills", "huge"))).toBe(false);
   });
 });
