@@ -29,7 +29,24 @@ export interface ModuleIndex {
   summary?: Record<string, number | string>;
 }
 export type DriftState = "synced" | "drift" | "conflict" | "untracked";
-export interface DriftItem { id: string; state: DriftState; detail?: string; }
+
+// Sync-state model (ADR-0016 / ADR-0017). All fields optional + additive:
+// modules that have not been upgraded keep returning { id, state } and the
+// classifier falls back to a safe legacy mapping.
+export type Direction = "synced" | "ahead" | "behind" | "diverged";
+export type SyncException = "diverged" | "blocked" | "destructive";
+export interface DriftItem {
+  id: string;
+  state: DriftState;
+  detail?: string;
+  // null = absent on that side; undefined = module did not report a hash.
+  localHash?: string | null;
+  repoHash?: string | null;
+  baselineHash?: string | null;
+  direction?: Direction;
+  exception?: SyncException;
+  blocked?: boolean; // a prerequisite is missing (age key / tool / decrypt)
+}
 export interface DriftReport { module: string; items: DriftItem[]; }
 export type BlockReason = "secret" | "too-large" | "managed" | "error";
 export interface BlockedItem { id: string; reason: BlockReason; detail?: string }
