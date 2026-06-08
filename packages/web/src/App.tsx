@@ -16,6 +16,7 @@ import { Packages } from "./views/Packages";
 import { Dotfiles } from "./views/Dotfiles";
 import { AppConfig } from "./views/AppConfig";
 import { Skills } from "./views/Skills";
+import { openExternal } from "./openExternal";
 
 type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "skills" | "env" | "drift" | "timeline" | "settings";
 
@@ -302,6 +303,10 @@ export function App() {
               href={DOCS_URL}
               target="_blank"
               rel="noreferrer"
+              onClick={(e) => {
+                e.preventDefault();
+                void openExternal(DOCS_URL);
+              }}
               style={{ color: "var(--muted)", textDecoration: "none" }}
             >
               {t("app.docs")}

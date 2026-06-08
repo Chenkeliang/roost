@@ -10,6 +10,7 @@ import {
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
 import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
+import { openExternal } from "../openExternal";
 
 export function Settings() {
   const { t } = useT();
@@ -375,6 +376,10 @@ export function Settings() {
             href={href}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => {
+              e.preventDefault();
+              void openExternal(href);
+            }}
             style={{
               ...row,
               color: "var(--text)",

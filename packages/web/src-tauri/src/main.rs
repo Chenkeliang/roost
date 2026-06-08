@@ -11,6 +11,7 @@ struct EngineState(Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(EngineState::default())
         .setup(|app| {
             spawn_engine(app)?;
