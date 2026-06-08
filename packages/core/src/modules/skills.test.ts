@@ -104,3 +104,69 @@ describe("skills hardening", () => {
     expect(fs.existsSync(path.join(repo, "skills", "huge"))).toBe(false);
   });
 });
+
+import { skillsModule as M } from "./skills.js";
+import { saveSkillsConfig, loadSkillLinks as loadLinks, DEFAULT_SKILLS_CONFIG } from "../skills-config.js";
+
+function plan() { return { module: "skills", actions: [] as never[] }; }
+
+describe("skills apply + reconcile", () => {
+  it("apply materializes repo -> sourceDir and symlinks into enabled targets", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), targets: ["claude"], skills: { foo: {} } });
+    const res = await M.apply({ ...ctx(), dryRun: false }, plan() as never);
+    expect(fs.readFileSync(path.join(home, ".agents/skills/foo/SKILL.md"), "utf8")).toBe("# foo");
+    const link = path.join(home, ".claude/skills/foo");
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(fs.realpathSync(link)).toBe(fs.realpathSync(path.join(home, ".agents/skills/foo")));
+    expect(res.applied).toContain("foo@claude");
+    expect(loadLinks(repo).some((l) => l.skill === "foo" && l.target === "claude")).toBe(true);
+  });
+
+  it("dry-run makes no changes", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), targets: ["claude"], skills: { foo: {} } });
+    await M.apply({ ...ctx(), dryRun: true }, plan() as never);
+    expect(fs.existsSync(path.join(home, ".claude/skills/foo"))).toBe(false);
+    expect(loadLinks(repo)).toEqual([]);
+  });
+
+  it("is idempotent: second apply does not error and keeps one link", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), targets: ["claude"], skills: { foo: {} } });
+    await M.apply({ ...ctx() }, plan() as never);
+    await M.apply({ ...ctx() }, plan() as never);
+    expect(loadLinks(repo).filter((l) => l.skill === "foo" && l.target === "claude").length).toBe(1);
+  });
+
+  it("disabling a skill removes its Roost-owned link on next apply", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    const base = { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), targets: ["claude"] };
+    saveSkillsConfig(repo, { ...base, skills: { foo: { enabled: true } } });
+    await M.apply({ ...ctx() }, plan() as never);
+    expect(fs.existsSync(path.join(home, ".claude/skills/foo"))).toBe(true);
+    saveSkillsConfig(repo, { ...base, skills: { foo: { enabled: false } } });
+    await M.apply({ ...ctx() }, plan() as never);
+    expect(fs.existsSync(path.join(home, ".claude/skills/foo"))).toBe(false);
+    expect(loadLinks(repo).some((l) => l.skill === "foo")).toBe(false);
+  });
+
+  it("does not overwrite a real (non-Roost) directory at the target; marks skipped", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    mkSkill(path.join(home, ".claude/skills"), "foo", "# user's own foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), targets: ["claude"], skills: { foo: {} } });
+    const res = await M.apply({ ...ctx() }, plan() as never);
+    expect(fs.lstatSync(path.join(home, ".claude/skills/foo")).isSymbolicLink()).toBe(false);
+    expect(res.skipped.some((s) => s.includes("foo@claude"))).toBe(true);
+  });
+
+  it("unmanage removes Roost-owned links for the given skills", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# foo");
+    saveSkillsConfig(repo, { ...DEFAULT_SKILLS_CONFIG, sourceDir: path.join(home, ".agents/skills"), targets: ["claude"], skills: { foo: {} } });
+    await M.apply({ ...ctx() }, plan() as never);
+    expect(fs.existsSync(path.join(home, ".claude/skills/foo"))).toBe(true);
+    await M.unmanage({ ...ctx() }, { modules: { skills: ["foo"] } });
+    expect(fs.existsSync(path.join(home, ".claude/skills/foo"))).toBe(false);
+    expect(loadLinks(repo).some((l) => l.skill === "foo")).toBe(false);
+  });
+});

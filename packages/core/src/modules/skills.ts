@@ -6,7 +6,7 @@ import type {
   DriftReport, DriftItem, ChangeSet, ApplyPlan, ApplyResult, Health, ModuleIndex,
 } from "@roost/shared";
 import { loadSkillsTargets } from "../skills-catalog.js";
-import { loadSkillsConfig, loadSkillLinks } from "../skills-config.js";
+import { loadSkillsConfig, loadSkillLinks, saveSkillLinks, effectiveSkill } from "../skills-config.js";
 import { scanPathForSecrets } from "./dotfiles.js"; // reuse bounded content scanner
 
 function expandHome(home: string, p: string): string {
@@ -134,14 +134,92 @@ export const skillsModule: SyncModule = {
     return rep.items.map((i) => `${i.state.padEnd(9)} ${i.id}`).join("\n");
   },
 
-  // Task 5 fills this in (materialize + reconcile links).
-  async apply(_ctx: ModuleContext, _plan: ApplyPlan): Promise<ApplyResult> {
-    return { module: "skills", applied: [], backedUp: [], skipped: [] };
+  async apply(ctx: ModuleContext, _plan: ApplyPlan): Promise<ApplyResult> {
+    const cfg = loadSkillsConfig(ctx.repoDir);
+    const targets = loadSkillsTargets(ctx.repoDir);
+    const targetById = new Map(targets.map((t) => [t.id, t]));
+    const sourceRoot = expandHome(ctx.home, cfg.sourceDir);
+    const repoDirSkills = repoSkillsDir(ctx);
+    const managed = listSkillDirs(repoDirSkills);
+
+    const applied: string[] = [];
+    const backedUp: string[] = [];
+    const skipped: string[] = [];
+    let links = loadSkillLinks(ctx.repoDir);
+
+    const backupBase = path.join(ctx.home, ".roost-backups", "skills");
+
+    // Desired set: enabled skill × its targets.
+    const desired = new Set<string>(); // key `${skill}@${targetId}`
+    for (const name of managed) {
+      // 1) materialize repo -> sourceDir
+      const src = path.join(sourceRoot, name);
+      if (!ctx.dryRun) {
+        fs.mkdirSync(sourceRoot, { recursive: true });
+        fs.rmSync(src, { recursive: true, force: true });
+        fs.cpSync(path.join(repoDirSkills, name), src, { recursive: true });
+      }
+      const eff = effectiveSkill(cfg, name);
+      if (!eff.enabled) continue;
+      // 2) distribute to each enabled target
+      for (const tid of eff.targets) {
+        const t = targetById.get(tid);
+        if (!t) { skipped.push(`${name}@${tid} (unknown target)`); continue; }
+        desired.add(`${name}@${tid}`);
+        const targetDir = path.join(ctx.home, t.path);
+        const dest = path.join(targetDir, name);
+        const ownsExisting = links.some((l) => l.skill === name && l.target === tid && l.path === dest);
+        let existsKind: "none" | "link" | "real" = "none";
+        try {
+          const st = fs.lstatSync(dest);
+          existsKind = st.isSymbolicLink() ? "link" : "real";
+        } catch { existsKind = "none"; }
+
+        if (existsKind === "real" && !ownsExisting) { skipped.push(`${name}@${tid} (conflict: real dir)`); continue; }
+
+        if (ctx.dryRun) { applied.push(`${name}@${tid}`); continue; }
+
+        fs.mkdirSync(targetDir, { recursive: true });
+        if (existsKind !== "none") {
+          // back up before replacing (real backup dir created lazily)
+          const stamp = path.join(backupBase, String(Date.now()), tid);
+          fs.mkdirSync(stamp, { recursive: true });
+          fs.cpSync(dest, path.join(stamp, name), { recursive: true });
+          backedUp.push(dest);
+          fs.rmSync(dest, { recursive: true, force: true });
+        }
+        if (eff.method === "copy") fs.cpSync(src, dest, { recursive: true });
+        else fs.symlinkSync(src, dest);
+        links = links.filter((l) => !(l.skill === name && l.target === tid));
+        links.push({ skill: name, target: tid, path: dest, kind: eff.method });
+        applied.push(`${name}@${tid}`);
+      }
+    }
+
+    // 3) reconcile: remove Roost-owned links no longer desired
+    const keep: typeof links = [];
+    for (const l of links) {
+      if (desired.has(`${l.skill}@${l.target}`)) { keep.push(l); continue; }
+      if (ctx.dryRun) { keep.push(l); continue; }
+      try { fs.rmSync(l.path, { recursive: true, force: true }); } catch { /* already gone */ }
+      applied.push(`unlink ${l.skill}@${l.target}`);
+    }
+    if (!ctx.dryRun) saveSkillLinks(ctx.repoDir, keep);
+    return { module: "skills", applied, backedUp, skipped };
   },
 
-  async unmanage(_ctx: ModuleContext, _sel: Selection): Promise<ApplyResult> {
-    // Task 5 removes Roost-owned links here; for now no-op shell.
-    return { module: "skills", applied: [], backedUp: [], skipped: [] };
+  async unmanage(ctx: ModuleContext, sel: Selection): Promise<ApplyResult> {
+    const names = new Set(sel.modules.skills ?? []);
+    const links = loadSkillLinks(ctx.repoDir);
+    const applied: string[] = [];
+    const kept: typeof links = [];
+    for (const l of links) {
+      if (!names.has(l.skill)) { kept.push(l); continue; }
+      if (!ctx.dryRun) { try { fs.rmSync(l.path, { recursive: true, force: true }); } catch { /* gone */ } }
+      applied.push(`unlink ${l.skill}@${l.target}`);
+    }
+    if (!ctx.dryRun) saveSkillLinks(ctx.repoDir, kept);
+    return { module: "skills", applied, backedUp: [], skipped: [] };
   },
 
   async doctor(ctx: ModuleContext): Promise<Health[]> {
