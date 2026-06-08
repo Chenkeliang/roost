@@ -10,6 +10,8 @@ import { skillsModule } from "./modules/skills.js";
 import { assertNoPlaintextSecrets } from "./secrets/scanner.js";
 import { createChezmoi } from "./adapters/chezmoi.js";
 import { backupFiles } from "./apply.js";
+import { computeSyncState } from "./sync-state.js";
+import type { SyncStateReport } from "./sync-state.js";
 
 export function defaultRegistry(): ModuleRegistry {
   const reg = new ModuleRegistry();
@@ -76,6 +78,17 @@ export async function statusAll(
     reports.push(report);
   }
   return reports;
+}
+
+// Aggregate every module's status into the sync-state review model (ADR-0016).
+// Thin wrapper: statusAll already runs each module; computeSyncState is pure.
+export async function syncStateAll(
+  reg: ModuleRegistry,
+  ctx: ModuleContext,
+  sel: Selection,
+): Promise<SyncStateReport> {
+  const reports = await statusAll(reg, ctx, sel);
+  return computeSyncState(reports);
 }
 
 export async function loadAll(

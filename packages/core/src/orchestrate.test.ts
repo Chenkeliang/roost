@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import type { Exec, ExecResult, ModuleContext, Selection } from "@roost/shared";
-import { defaultRegistry, discoverAll, captureAll, gateSecrets, statusAll, loadAll, indexAll } from "./orchestrate.js";
+import type { Exec, ExecResult, ModuleContext, Selection, SyncModule, DriftReport } from "@roost/shared";
+import { defaultRegistry, discoverAll, captureAll, gateSecrets, statusAll, loadAll, indexAll, syncStateAll } from "./orchestrate.js";
+import { ModuleRegistry } from "./registry.js";
 
 // ── fake exec ─────────────────────────────────────────────────────────────────
 
@@ -251,5 +252,44 @@ describe("loadAll", () => {
     // backup dir was created and file copied (full path mirrored under backupDir)
     const zshrcRel = zshrcPath.replace(/^[/\\]/, "");
     expect(fs.existsSync(path.join(backupDir, zshrcRel))).toBe(true);
+  });
+});
+
+function fakeModule(name: string, report: DriftReport): SyncModule {
+  return {
+    name,
+    async discover() { return []; },
+    async status() { return report; },
+    async capture() { return { module: name, written: [], encrypted: [] }; },
+    async apply() { return { module: name, applied: [], backedUp: [], skipped: [] }; },
+    async diff() { return ""; },
+    async unmanage() { return { module: name, applied: [], backedUp: [], skipped: [] }; },
+    async doctor() { return []; },
+  };
+}
+
+describe("syncStateAll", () => {
+  it("runs every module's status and returns an aggregated SyncStateReport", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      fakeModule("dotfiles", {
+        module: "dotfiles",
+        items: [{ id: "x", state: "drift", localHash: null, repoHash: "r", baselineHash: null }],
+      }),
+    );
+    reg.register(
+      fakeModule("env", {
+        module: "env",
+        items: [{ id: "y", state: "conflict", localHash: "a", repoHash: "b", baselineHash: "o" }],
+      }),
+    );
+    const ctx = { repoDir: "/r", home: "/h", profile: "default", dryRun: true } as unknown as ModuleContext;
+    const sel: Selection = { modules: { dotfiles: ["x"], env: ["y"] } };
+
+    const out = await syncStateAll(reg, ctx, sel);
+    expect(out.items).toHaveLength(2);
+    expect(out.counts.auto).toBe(1); // x is behind
+    expect(out.counts.diverged).toBe(1); // y is diverged
+    expect(out.overall).toBe("diverged");
   });
 });
