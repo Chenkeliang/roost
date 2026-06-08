@@ -9,7 +9,6 @@ vi.mock("./api", () => ({
     name: "roost",
     repoDir: "/Users/testuser/.local/share/roost/repo",
     ageKey: true,
-    appMode: false,
   }),
   getModules: vi.fn().mockResolvedValue({ modules: ["dotfiles", "packages"] }),
   getGitStatus: vi.fn().mockResolvedValue({
@@ -25,7 +24,6 @@ vi.mock("./api", () => ({
   getKey: vi.fn().mockResolvedValue({ exists: true, recipient: "age1examplerecipient", keyPath: "/Users/testuser/.config/sops/age/keys.txt", encryptedFiles: 0 }),
   generateKey: vi.fn().mockResolvedValue({ created: true, source: "generated", recipient: "age1examplerecipient", keyPath: "/x" }),
   rotateKey: vi.fn().mockResolvedValue({ recipient: "age1new", rotated: [], failed: [], swapped: true }),
-  quitApp: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 describe("Settings", () => {
@@ -82,29 +80,6 @@ describe("Settings", () => {
       expect(screen.getByText("Push")).toBeTruthy();
       expect(screen.getByText("Pull")).toBeTruthy();
     });
-  });
-
-  it("shows a Quit Roost button when appMode is true", async () => {
-    const { getHealth } = await import("./api");
-    vi.mocked(getHealth).mockResolvedValueOnce({
-      ok: true,
-      name: "roost",
-      repoDir: "/some/repo",
-      ageKey: true,
-      appMode: true,
-    });
-    await act(async () => { render(<Settings />); });
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /quit roost/i })).toBeTruthy();
-    });
-  });
-
-  it("does NOT show a Quit Roost button when appMode is false", async () => {
-    await act(async () => { render(<Settings />); });
-    await waitFor(() => {
-      expect(screen.getByText("dotfiles")).toBeTruthy();
-    });
-    expect(screen.queryByRole("button", { name: /quit roost/i })).toBeNull();
   });
 
   it("links to the real repo and exposes a Documentation entry", async () => {
