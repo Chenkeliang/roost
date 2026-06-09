@@ -12,6 +12,7 @@ import { runInitGithub } from "./initGithub.js";
 import { runSelect } from "./commands/select.js";
 import { runCapture } from "./commands/capture.js";
 import { runLoad } from "./commands/load.js";
+import { runClone } from "./commands/clone.js";
 import { runList } from "./commands/list.js";
 import { runUnmanage } from "./commands/unmanage.js";
 import { runProfile } from "./commands/profile.js";
@@ -175,6 +176,16 @@ program
   .action(async (opts: { apply?: boolean }) => {
     const { repoDir, ctx } = buildCtx({ dryRun: !opts.apply });
     await runLoad({ repoDir, ctx, apply: opts.apply });
+  });
+
+program
+  .command("clone")
+  .description("Clone your private config repo onto a new machine (second-machine step 1)")
+  .argument("<url>", "git URL of your private config repo")
+  .action(async (url: string) => {
+    const { repoDir, ctx } = buildCtx();
+    const res = await runClone({ url, dest: repoDir, exec: ctx.exec, log: ctx.log });
+    if (!res.ok) process.exit(1);
   });
 
 program
