@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, LinkBreak, Copy, Circle } from "@phosphor-icons/react";
+import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, LinkBreak, Copy, Circle, UploadSimple } from "@phosphor-icons/react";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
-import { getSkills, discoverSkills, captureSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict } from "../api";
+import { getSkills, discoverSkills, captureSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict, postSkillsImportGit, postSkillsImportZip } from "../api";
+import type { SkillImportResponse } from "../api";
 import type { SkillsView, SkillRow, SkillMethod } from "../api";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
@@ -127,6 +128,60 @@ export function Skills() {
       setScanning(false);
     }
   }, []);
+
+  // ── import (zip / git) ──────────────────────────────────────────────────────
+  const [gitUrl, setGitUrl] = useState("");
+  const [importBusy, setImportBusy] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const afterImport = useCallback(
+    async (r: SkillImportResponse) => {
+      const parts: string[] = [];
+      if (r.imported.length) parts.push(`${t("skills.import.done")}: ${r.imported.join(", ")}`);
+      if (r.blocked.length) parts.push(`${t("skills.import.blocked")}: ${r.blocked.map((b) => b.id).join(", ")}`);
+      setImportMsg(parts.join("  ·  ") || t("skills.import.none"));
+      await refetch();
+      await scan();
+    },
+    [refetch, scan, t],
+  );
+
+  const importZipFile = useCallback(
+    async (file: File) => {
+      if (!/\.zip$/i.test(file.name)) { setImportMsg(t("skills.import.zipOnly")); return; }
+      setImportBusy(true); setImportMsg(null);
+      try {
+        const dataUrl = await new Promise<string>((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(String(fr.result));
+          fr.onerror = () => rej(fr.error);
+          fr.readAsDataURL(file);
+        });
+        const b64 = dataUrl.split(",")[1] ?? "";
+        await afterImport(await postSkillsImportZip(file.name, b64));
+      } catch (e) {
+        setImportMsg(e instanceof Error ? e.message : String(e));
+      } finally {
+        setImportBusy(false);
+      }
+    },
+    [afterImport, t],
+  );
+
+  const importGit = useCallback(async () => {
+    const url = gitUrl.trim();
+    if (!url) return;
+    setImportBusy(true); setImportMsg(null);
+    try {
+      await afterImport(await postSkillsImportGit(url));
+      setGitUrl("");
+    } catch (e) {
+      setImportMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImportBusy(false);
+    }
+  }, [gitUrl, afterImport]);
 
   const onTab = useCallback((id: string) => {
     const next = id as "managed" | "discovered";
@@ -309,7 +364,34 @@ export function Skills() {
       )}
 
       {tab === "discovered" && (
-        cands === null ? (
+        <div>
+          <div style={{ ...card, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>{t("skills.import.title")}</div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "stretch" }}>
+              <label
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) void importZipFile(f); }}
+                style={{ flex: 1, minWidth: 220, border: `1px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`, borderRadius: 10, padding: "16px", textAlign: "center", cursor: importBusy ? "default" : "pointer", color: "var(--muted)", fontSize: 13, background: dragOver ? "var(--raise)" : "transparent" }}
+              >
+                <UploadSimple size={18} style={{ display: "block", margin: "0 auto 6px" }} />
+                {t("skills.import.zipHint")}
+                <input type="file" accept=".zip" style={{ display: "none" }} disabled={importBusy}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void importZipFile(f); e.currentTarget.value = ""; }} />
+              </label>
+              <div style={{ flex: 1, minWidth: 240, display: "flex", flexDirection: "column", gap: 6, justifyContent: "center" }}>
+                <input value={gitUrl} onChange={(e) => setGitUrl(e.target.value)} placeholder={t("skills.import.gitPlaceholder")} disabled={importBusy}
+                  onKeyDown={(e) => { if (e.key === "Enter") void importGit(); }}
+                  style={{ ...ic, width: "100%", padding: "7px 10px" }} />
+                <button onClick={() => void importGit()} disabled={importBusy || !gitUrl.trim()}
+                  style={{ ...ic, justifyContent: "center", color: "var(--accent)", borderColor: "var(--accent)" }}>
+                  {importBusy ? t("skills.import.importing") : t("skills.import.fromGit")}
+                </button>
+              </div>
+            </div>
+            {importMsg && <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--muted)", wordBreak: "break-word" }}>{importMsg}</div>}
+          </div>
+          {cands === null ? (
           <EmptyState icon={<Stack size={24} />} title={t("skills.tab.discovered")} subtitle={t("dotfiles.scanning")} />
         ) : newCands.length === 0 ? (
           <EmptyState icon={<CheckCircle size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
@@ -341,7 +423,8 @@ export function Skills() {
               })}
             </div>
           </div>
-        )
+          )}
+        </div>
       )}
 
       {pending && (

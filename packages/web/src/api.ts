@@ -154,6 +154,25 @@ export function getItemDiff(module: string, id: string): Promise<ItemDiffRespons
   return apiFetch<ItemDiffResponse>(`/api/item-diff${q}`);
 }
 
+export interface SkillImportResponse {
+  imported: string[];
+  blocked: { id: string; reason: string; detail?: string }[];
+}
+export function postSkillsImportGit(url: string): Promise<SkillImportResponse> {
+  return apiFetch<SkillImportResponse>("/api/skills/import-git", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+}
+export function postSkillsImportZip(filename: string, dataBase64: string): Promise<SkillImportResponse> {
+  return apiFetch<SkillImportResponse>("/api/skills/import-zip", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename, dataBase64 }),
+  });
+}
+
 export type ResolveAction = "take-repo" | "keep-local";
 export interface ResolveResponse {
   ok: boolean;
