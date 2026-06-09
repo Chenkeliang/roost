@@ -76,7 +76,7 @@ export async function itemDiff(
     try {
       const st = fs.lstatSync(id);
       if (st.isFile()) local = readFileOrNull(id);
-      else return { kind: "summary", local: null, repo: null, summary: "目录或非文本条目,无法逐行对比" };
+      else return { kind: "summary", local: null, repo: null, summary: "dir-or-binary" };
     } catch {
       local = null;
     }
@@ -98,5 +98,5 @@ export async function itemDiff(
   }
 
   // Everything else (packages / projects / skills / env rc lines): a summary.
-  return { kind: "summary", local: null, repo: null, summary: "该类型无文本逐行对比" };
+  return { kind: "summary", local: null, repo: null, summary: "no-text" };
 }
