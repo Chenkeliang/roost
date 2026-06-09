@@ -30,6 +30,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "nav.projects": { en: "Projects", zh: "项目" },
   "nav.appconfig": { en: "App Config", zh: "应用配置" },
   "nav.env": { en: "Aliases & Env", zh: "别名与环境变量" },
+  "nav.sync": { en: "Sync Review", zh: "同步复核" },
   "nav.drift": { en: "Drift", zh: "偏移" },
   "nav.timeline": { en: "Timeline", zh: "时间线" },
   "nav.settings": { en: "Settings", zh: "设置" },

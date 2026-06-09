@@ -16,9 +16,10 @@ import { Packages } from "./views/Packages";
 import { Dotfiles } from "./views/Dotfiles";
 import { AppConfig } from "./views/AppConfig";
 import { Skills } from "./views/Skills";
+import { SyncState } from "./views/SyncState";
 import { openExternal } from "./openExternal";
 
-type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "skills" | "env" | "drift" | "timeline" | "settings";
+type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "skills" | "env" | "sync" | "drift" | "timeline" | "settings";
 
 type NavItem = { id: Tab; labelKey: string };
 
@@ -37,6 +38,7 @@ const MODULE_NAV: NavItem[] = [
 
 // Cross-module / system items below the divider.
 const TAIL_NAV: NavItem[] = [
+  { id: "sync", labelKey: "nav.sync" },
   { id: "drift", labelKey: "nav.drift" },
   { id: "timeline", labelKey: "nav.timeline" },
   { id: "settings", labelKey: "nav.settings" },
@@ -332,6 +334,7 @@ export function App() {
           {activeTab === "appconfig" && <AppConfig showHud={showHud} />}
           {activeTab === "skills" && <Skills />}
           {activeTab === "env" && <AliasesEnv showHud={showHud} />}
+          {activeTab === "sync" && <SyncState />}
           {activeTab === "drift" && <Drift />}
           {activeTab === "timeline" && <Timeline />}
           {activeTab === "settings" && <Settings />}

@@ -85,6 +85,33 @@ export function getStatus(): Promise<StatusResponse> {
   return apiFetch<StatusResponse>("/api/status");
 }
 
+// ── sync-state (ADR-0016) ──────────────────────────────────────────────────────
+export type SyncDirection = "synced" | "ahead" | "behind" | "diverged";
+export type SyncExceptionKind = "diverged" | "blocked" | "destructive";
+export interface SyncItem {
+  module: string;
+  id: string;
+  direction: SyncDirection;
+  exception: SyncExceptionKind | null;
+  detail?: string;
+}
+export interface SyncCounts {
+  synced: number;
+  auto: number;
+  diverged: number;
+  blocked: number;
+  destructive: number;
+}
+export interface SyncStateResponse {
+  items: SyncItem[];
+  counts: SyncCounts;
+  overall: SyncDirection;
+}
+
+export function getSyncState(): Promise<SyncStateResponse> {
+  return apiFetch<SyncStateResponse>("/api/sync-state");
+}
+
 export function getMachines(): Promise<MachinesResponse> {
   return apiFetch<MachinesResponse>("/api/machines");
 }
