@@ -1,0 +1,87 @@
+---
+title: 安装
+description: 开发环境搭建、前置依赖,以及运行 Roost CLI。
+sidebar:
+  order: 2
+---
+
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="仅支持 macOS(v1)">
+Roost v1 **仅面向 macOS**,没有跨平台构建。
+</Aside>
+
+Roost 目前处于早期开发阶段,如今只能从源码运行。尚无发布的二进制文件,因此安装意味着
+克隆仓库并构建整个工作区。
+
+## 前置依赖
+
+CLI 编排一小组受信任的外部工具。请按你打算使用的模块安装对应工具:
+
+- **[chezmoi](https://www.chezmoi.io/)**——管理你的 dotfiles 与 age 加密。
+- **[Homebrew](https://brew.sh/)**——软件包模块据此采集你的 `Brewfile`(formulae、cask 与 `mas` 应用)。
+- **[mise](https://mise.jdx.dev/)**——软件包模块据此采集语言/运行时版本。
+- **[age](https://github.com/FiloSottile/age)**——仅当你备份**密钥**值时才需要。
+
+以及一套用于从源码构建的 Node.js 工具链:
+
+- **Node.js 24**(见 `.nvmrc`)
+- **pnpm**(仓库通过 `packageManager` 锁定版本)
+
+`roost doctor` 会报告这些工具在你机器上的存在情况。
+
+## 从源码构建
+
+<Steps>
+
+1. 克隆引擎仓库:
+
+   ```sh
+   git clone https://github.com/Chenkeliang/roost.git
+   cd roost
+   ```
+
+2. 安装依赖并构建所有包:
+
+   ```sh
+   pnpm install
+   pnpm -r build
+   ```
+
+3. (可选)运行测试套件:
+
+   ```sh
+   pnpm test
+   ```
+
+</Steps>
+
+## 运行 CLI
+
+构建后的 CLI 位于 `packages/cli/dist/index.js`。在 `roost` 二进制发布之前,用 Node
+调用它:
+
+<Tabs>
+  <TabItem label="从源码运行">
+    ```sh
+    node packages/cli/dist/index.js doctor
+    node packages/cli/dist/index.js --help
+    ```
+  </TabItem>
+  <TabItem label="将来(已发布)">
+    ```sh
+    roost doctor
+    roost --help
+    ```
+  </TabItem>
+</Tabs>
+
+为简洁起见,本文档其余示例都用 `roost <命令>`;从源码运行时,请替换为
+`node packages/cli/dist/index.js <命令>`。
+
+## 常用环境变量
+
+- `ROOST_REPO`——你的配置仓库路径(默认为 chezmoi 的源目录 `~/.local/share/chezmoi`)。
+- `ROOST_LOCALE`——CLI 语言(默认 `en`)。
+
+继续阅读[快速上手](/zh-cn/quick-start/)。

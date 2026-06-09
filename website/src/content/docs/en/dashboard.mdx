@@ -1,0 +1,124 @@
+---
+title: Dashboard
+description: The optional local web UI launched with roost serve.
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Roost ships a **local** web dashboard for managing your setup visually. Start it
+with:
+
+```sh
+roost serve
+```
+
+This launches a local JSON API server (default port `4317`) that serves the web
+UI. You can point it at a specific config repo or web build:
+
+```sh
+roost serve --port 4317 --repo /path/to/config-repo --web packages/web/dist
+```
+
+<Aside type="note" title="Local only">
+The dashboard runs entirely on your machine. Like the rest of Roost, it has no
+server, no account, and no telemetry — nothing is sent anywhere.
+</Aside>
+
+## Navigation
+
+The dashboard uses a **left grouped sidebar** rather than top tabs. It is divided
+into three sections:
+
+**Top-level**
+- **Overview** — primary and follower status cards, a drift summary, quick
+  Capture / Load actions, and per-module health dots.
+
+**Modules group** — one dedicated page per SyncModule:
+- **Dotfiles** — managed dotfiles with filter + scan-to-add.
+- **Packages** — your Brewfile (Formulae / Casks / App Store), with
+  an Import from this Mac action.
+- **Projects** — managed git repos + on-demand scan grouped by remote host.
+- **App Config** — managed `defaults` domains + scan-to-add.
+- **Aliases & Env** — search-first panel for aliases, env vars, PATH entries,
+  and functions.
+
+**System items** (below the divider):
+- **Drift** — side-by-side diff of primary vs. follower state.
+- **Timeline** — snapshot history with preview and rollback.
+- **Settings** — repo path, age key, registered modules, Git remote & sync,
+  privacy summary, and documentation links.
+
+At the bottom of the sidebar there is a **Docs** link and an **EN / 中** language
+switcher that toggles the UI between English and Simplified Chinese.
+
+## Content-first, on-demand discovery
+
+Pages load managed content instantly — they do not scan your disk or call
+external tools (e.g. `brew`) on page load. Scanning is always **explicit**: you
+trigger it with a button such as **[Scan for git projects]** or **[Scan for
+dotfiles]**. This means the dashboard stays fast regardless of how large your
+home directory is.
+
+The underlying design principle is a cheap `index()` (count what is already
+managed) that runs at startup, and an explicit `discover()` that walks the
+filesystem only when you ask. See ADR-0006 in the source repository for details.
+
+## Module pages
+
+### Dotfiles
+
+Shows managed files in a filterable list categorised by type (shell, git,
+editor, other). Click **[Scan for dotfiles]** to discover additional candidates;
+each one can be added with a single click.
+
+### Packages
+
+Parses your `roost/Brewfile` and displays entries in sections: Formulae, Casks,
+App Store, Taps. If Homebrew is not installed the page shows an honest empty
+state. When no Brewfile exists yet, an **[Import from this Mac]** button runs
+capture for you.
+
+### Projects
+
+Shows the count of managed repos. Click **[Scan for git projects]** to walk your
+home directory for git repositories. Results appear **grouped by remote host**
+(for example `github.com`, `gitlab.yourcompany.com`, `no-remote`). Each row
+shows the home-relative path and remote URL, and has two actions:
+
+- **[Test]** — runs `git ls-remote` against the remote to check reachability.
+  Useful when you are on a VPN-gated network; the result is shown inline.
+- **[Save]** — adds the project to `selection.yaml`.
+
+Paths are stored home-relative (`~/…`) for portability across machines.
+
+### App Config
+
+Shows managed `defaults` domains in a filterable list. Click **[Scan]** to
+discover domains that changed recently; each can be added individually. Domains
+known to hold credentials are skipped automatically.
+
+### Aliases & Env
+
+Search-first panel: type to filter aliases, environment variables, PATH entries,
+and functions. Add new entries or edit existing ones inline. Secret env var
+values are never displayed; only the reference locator is shown.
+
+## Settings — Git remote & sync
+
+The **Settings** page now includes a **Git remote & sync** section that shows:
+
+- **Remote** — the configured git remote URL for your config repo.
+- **Branch** — the current branch plus ahead/behind commit count relative to the
+  remote.
+- **Push / Pull** — buttons to push local commits to the remote or pull updates
+  from it, with inline success/error output.
+
+If no remote is configured the section shows a placeholder and the Push/Pull
+buttons are disabled.
+
+<Aside type="caution" title="Status">
+The dashboard is under active development. Available views and panels track the
+locked design but may not all be fully wired up in the current build.
+</Aside>

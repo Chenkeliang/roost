@@ -1,0 +1,96 @@
+---
+title: Troubleshooting
+description: Common issues and their fixes — missing tools, age keys, secret backends, app prefs, GitHub, and serve.
+sidebar:
+  order: 13
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Most problems surface in one place first: run `roost doctor`. It reports every
+external dependency and per-module health check, so start there.
+
+```sh
+roost doctor
+```
+
+## Missing `chezmoi`, `age`, `brew`, or `mise`
+
+Roost is a thin orchestrator — it drives these tools rather than reimplementing
+them. If `doctor` reports one as missing, install it and re-run:
+
+```sh
+brew install chezmoi age mise
+```
+
+`brew` itself comes from [brew.sh](https://brew.sh). Until the tool a module
+needs is present, that module's checks stay red and its commands can't run.
+
+## No age key
+
+Secret features (encrypting secret env vars, decrypting them on a new Mac) need
+an age private key, expected at:
+
+```
+~/.config/sops/age/keys.txt
+```
+
+If `doctor` reports `age-key … no age key`, generate or restore one before
+capturing secrets. The age private key is your recovery material — see where it
+lives and how to back it up:
+
+```sh
+roost key backup
+```
+
+<Aside type="danger" title="No key, no recovery">
+If you lose the age key and every offline copy, encrypted data is
+**unrecoverable**. Back it up offline before you rely on it. See
+[Secrets](/secrets/).
+</Aside>
+
+## `op` or `rbw` not found for secret-env references
+
+A secret env var can resolve its value from 1Password (`op`) or Bitwarden
+(`rbw`) instead of age (see [Secrets](/secrets/)). If the referenced backend
+isn't installed, `doctor` flags it (`op not available …` / `rbw not available …`)
+and `load --apply` is **failure-safe**: it skips that one value, warns you naming
+only the variable, and writes no half-finished assignment.
+
+```sh
+brew install 1password-cli   # provides `op`
+brew install rbw             # Bitwarden CLI
+```
+
+## App preferences need Full Disk Access
+
+The appconfig module imports macOS preferences with `defaults import` (it never
+symlinks plists). For **sandboxed** apps whose prefs live under
+`~/Library/Containers/<id>/…`, macOS may still require **Full Disk Access** for
+the import to take effect, even after the app is quit. This is a known macOS
+limitation.
+
+**Fix:** grant your terminal Full Disk Access in *System Settings → Privacy &
+Security → Full Disk Access*, then re-run `roost load --apply`.
+
+## `init --github` fails
+
+`roost init --github` creates a private repo via the GitHub API. It needs a
+Personal Access Token with **`repo`** scope (entered once and never stored, or
+read from `GITHUB_TOKEN`). If creation or push fails, check that the token has
+`repo` scope and hasn't expired. To rehearse without touching GitHub:
+
+```sh
+roost init --github --dry-run
+```
+
+## `serve` port already in use
+
+`roost serve` listens on `4317` by default. If that port is taken, pick another:
+
+```sh
+roost serve --port 4318
+```
+
+You can also point `serve` at a specific repo or web build with `--repo` and
+`--web`. See the [CLI Reference](/cli-reference/).

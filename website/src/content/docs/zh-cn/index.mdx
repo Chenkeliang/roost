@@ -1,0 +1,42 @@
+---
+title: Roost
+description: 落脚任意一台 Mac。在主力机上备份配置,载入另一台——你来决定具体备份什么。
+template: splash
+hero:
+  tagline: 落脚任意一台 Mac。在主力机上备份配置,载入另一台——你来决定具体备份什么。
+  image:
+    file: ../../../assets/logo.svg
+  actions:
+    - text: 开始使用
+      link: /zh-cn/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: 在 GitHub 上查看
+      link: https://github.com/Chenkeliang/roost
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Roost 是什么?
+
+Roost 是一个开源的 macOS 配置备份与迁移工具。你**选择**要管理的内容,Roost 把它存进
+**你自己的私有 git 仓库**,在另一台 Mac 上你再把它**载入**回来——还有一个可视化管理
+界面查看已备份的内容。
+
+<CardGrid stagger>
+  <Card title="数据始终归你所有">
+    无服务器、无账号、无遥测。你的配置存放在你的私有 git 仓库里。
+  </Card>
+  <Card title="默认可逆">
+    `load` 会先预览改动,并在覆盖前备份已有文件。
+  </Card>
+  <Card title="两个互补层">
+    既原样备份已有 dotfiles,也管理可移植的别名 / 环境变量 / PATH——后者由 Roost 在
+    每台机器上重新生成。
+  </Card>
+  <Card title="构建于受信任的工具之上">
+    在 chezmoi、Homebrew、age 与 mise 之上做薄编排——绝不重新实现它们。
+  </Card>
+</CardGrid>

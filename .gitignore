@@ -1,0 +1,18 @@
+node_modules/
+dist/
+dist-app/
+coverage/
+*.log
+.DS_Store
+.env
+# secrets / keys never committed
+*.age
+keys.txt
+*.tsbuildinfo
+
+# Visual-companion brainstorm mockups (local, ephemeral)
+.superpowers/
+
+# Local dev / personal
+prototypes/
+.claude/

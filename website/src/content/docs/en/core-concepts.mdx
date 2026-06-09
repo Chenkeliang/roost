@@ -1,0 +1,104 @@
+---
+title: Core Concepts
+description: The mental model behind Roost — primary to follower, selection.yaml, and the two complementary layers.
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, Card } from '@astrojs/starlight/components';
+
+A few ideas explain almost everything Roost does.
+
+## Primary → follower, one way
+
+Roost has a clear direction of flow:
+
+- You **capture** on your **primary** machine — the Mac whose setup you consider
+  the source of truth.
+- You **load** onto a **follower** machine — another Mac that should match.
+
+Loading is **one-directional**: it brings the config repo's state onto the
+current machine. There is no two-way merge; the repo is authoritative.
+
+### Capture on ONE machine only (the primary)
+
+Roost is **single-primary** today. Capture on the primary; only `load` on
+followers. Do **not** `capture` on a follower:
+
+- Roost **can** show you what differs on a follower — `roost status` / `roost diff`
+  and the Drift page report drift (for dotfiles via `chezmoi diff`, etc.). So if 9
+  files match and 1 changed locally, you'll see that one.
+- But capturing on a follower commits a **divergent** history. Pushing it back is
+  rejected (non-fast-forward), and Roost only pulls with `git pull --ff-only` — it
+  will **not** auto-merge. You'd have to resolve the divergence by hand in plain git.
+- There is no per-item "capture just this one file" and no conflict resolution —
+  capture re-snapshots the whole selection; git records only what changed, but the
+  divergence remains.
+
+If you tweak something on a follower and want to keep it, make the change on the
+**primary** and let followers `load` it. True multi-machine (bidirectional edits,
+per-machine profiles, conflict handling) is future work (ADR-0005).
+
+### When a follower's local file differs from the repo
+
+`load` is **dry-run by default** — it shows the diff first. On `--apply`, the repo
+wins (it overwrites local); the generated `env.sh` is backed up first, and dotfiles
+are applied via `chezmoi apply` (preview the diff with `load` before `--apply`).
+
+## `selection.yaml` is the single source of truth
+
+What Roost manages is not implicit — it's written down. `selection.yaml` records
+exactly which items each module tracks. Commands like `select`, `capture`,
+`load`, `status`, and `list` all read from it. If it isn't in `selection.yaml`,
+Roost doesn't touch it.
+
+## Content-first, on-demand discovery
+
+Roost never scans your disk automatically. Every module exposes two separate
+operations:
+
+- **`index`** — a cheap read of what is already managed. Runs at startup and
+  powers the dashboard's instant page loads.
+- **`discover`** — an explicit scan of the machine for new candidates. Triggered
+  only when you click a button in the dashboard or run a CLI command.
+
+This keeps the dashboard responsive regardless of home directory size, and means
+nothing unexpected happens in the background.
+
+## Two complementary layers for shell config
+
+Roost can manage your shell setup two different ways, and they're meant to be
+used together:
+
+<CardGrid>
+  <Card title="Dotfiles — back up as-is">
+    The **Dotfiles** module captures existing files (like `~/.zshrc`,
+    `~/.gitconfig`) verbatim and restores them as files. Use this when you want
+    a file copied exactly as it is.
+  </Card>
+  <Card title="Aliases & Env — portable, managed">
+    The **Aliases & Env** module manages individual aliases, environment
+    variables, PATH entries, and functions as structured data. Roost regenerates
+    a single `~/.config/roost/env.sh` from that data on each machine — without
+    rewriting your `.zshrc`.
+  </Card>
+</CardGrid>
+
+The difference: Dotfiles preserves a file you already maintain; Aliases & Env
+lets Roost **own** a portable slice of shell config that it composes and writes
+itself. See [Aliases & Env](/aliases-and-env/) for the details.
+
+## Reversible by default
+
+Two guarantees make `load` safe to run:
+
+- **Dry-run first.** `roost load` only previews changes. You must pass `--apply`
+  to write anything.
+- **Backups before overwrite.** When applying, Roost backs up any existing file
+  before replacing it (for example under `~/.roost-backups/`).
+
+<Aside type="caution">
+Removing an item from management (`unmanage`) takes it out of the working tree,
+but does **not** rewrite git history. If a removed file ever held a secret,
+rotate it and purge history separately.
+</Aside>

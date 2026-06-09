@@ -1,0 +1,80 @@
+---
+title: 模块
+description: 模块模型,以及对每个内置模块的简短巡览。
+sidebar:
+  order: 5
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+## 模块模型
+
+Roost 中的每项能力都是一个实现了通用契约的**模块**。core 刻意不含领域逻辑——新能力
+是作为模块加入的,而不是把特例零散塞进 core。每个模块都知道如何:
+
+- 以低开销**索引**已管理的项(在启动时运行),
+- 在机器上**发现**候选项(显式触发,按需执行),
+- 报告**状态** / **diff**(仓库与机器之间的漂移),
+- 把所选项**采集**进配置仓库,
+- 把仓库状态**应用**到机器(支持 dry-run),以及
+- **解除管理**某一项。
+
+`index`(轻量)与 `discover`(显式扫描)的分离是内容优先仪表盘模型背后的核心设计决策。
+页面从索引中立即加载;只有在你主动请求时才会扫描磁盘。
+
+你可以列出当前已注册的模块:
+
+```sh
+roost plugins
+```
+
+## 内置模块
+
+### Dotfiles
+
+通过 chezmoi 编排,原样备份已有配置文件并按文件还原。它刻意跳过敏感路径(如
+`~/.ssh/`、`~/.aws/`、`~/.config/gh/`、`.npmrc`、`.git-credentials`、`.netrc`)以及
+由 Roost 管理的 `~/.config/roost/` 目录,从而绝不重复管理别名与环境变量模块所拥有的内容。
+
+**仪表盘页面:** 以可筛选的列表展示已管理的文件,按类型分类(shell、git、编辑器、其他)。
+扫描更多候选项是按需触发的。
+
+### 软件包
+
+通过 Homebrew 把你的软件集合采集进 `roost/Brewfile`——包括 formulae、cask 与 `mas`
+(Mac App Store)应用——并通过 mise 采集语言/运行时版本。
+
+**仪表盘页面:** 按分区展示 Brewfile 条目(Formulae、Casks、App Store、Taps)。brew
+未安装时显示诚实的空白状态。当还没有 Brewfile 时,提供 **[从本机导入]** 按钮为你执行 capture。
+
+<Aside type="note">
+`mas` 只能安装你已购买的应用;它无法替你获取新的付费应用。
+</Aside>
+
+### 应用配置
+
+使用 `defaults export` 采集 macOS 应用偏好,并用 `defaults import` 还原——**而非**
+symlink plist 文件。已知存放凭证的域(OpenAI、Anthropic、GitHub、AWS 等)默认跳过,
+以免把令牌一并卷入。`roost app learn` 命令帮助你发现:在 GUI 应用里切换某个设置时,
+哪些偏好域发生了变化。
+
+**仪表盘页面:** 以可筛选的列表展示已管理的域名;支持扫描添加新发现的域名。
+
+### 项目
+
+发现你本地的 git 仓库并记录它们,让你在新机器上重新克隆你的工作集。它能标记出没有
+remote 或存在未提交改动的仓库。项目路径以相对于主目录的格式存储(`~/…`),确保跨机器可移植。
+
+**仪表盘页面:** 详见[仪表盘项目章节](/zh-cn/dashboard/#项目),了解远程主机分组、测试与保存操作以及离线/VPN 处理。
+
+### 别名与环境变量
+
+把可移植的别名、环境变量、PATH 条目和 shell 函数作为结构化数据来管理,在每台机器上
+重新生成 `~/.config/roost/env.sh`。这是唯一一个**拥有**一片 shell 配置(而非拷贝文件)
+的模块。它有专门的页面:
+
+<LinkCard
+  title="别名与环境变量"
+  description="可移植的 shell 配置、受管的 env.sh,以及三种密钥环境变量来源。"
+  href="/zh-cn/aliases-and-env/"
+/>

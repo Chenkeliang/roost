@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    // tsup injects baseUrl into the dts build's tsconfig; TS 6.0 turned the
+    // baseUrl deprecation into a hard error (TS5101). Silence it until tsup
+    // stops emitting baseUrl / TS 7.0 removes the option.
+    "ignoreDeprecations": "6.0",
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}

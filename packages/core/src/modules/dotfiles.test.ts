@@ -1,0 +1,601 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+import type { Exec, ExecResult, ModuleContext, Selection } from "@roost/shared";
+import { classifyDotfile, isSensitivePath, dotfilesModule, scanPathForSecrets } from "./dotfiles.js";
+import { saveRoostSettings } from "../settings.js";
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function makeFakeExec(responses: ExecResult[]): {
+  exec: Exec;
+  calls: { cmd: string; args: string[] }[];
+} {
+  const calls: { cmd: string; args: string[] }[] = [];
+  let idx = 0;
+  const exec: Exec = {
+    async run(cmd: string, args: string[]): Promise<ExecResult> {
+      calls.push({ cmd, args });
+      const result = responses[idx] ?? { code: 0, stdout: "", stderr: "" };
+      idx++;
+      return result;
+    },
+  };
+  return { exec, calls };
+}
+
+function makeCtx(overrides: Partial<ModuleContext> & { exec: Exec; home: string }): ModuleContext {
+  return {
+    repoDir: "/tmp/roost-repo",
+    profile: "default",
+    dryRun: false,
+    log: { info: () => {}, warn: () => {}, error: () => {} },
+    t: (key) => key,
+    ...overrides,
+  };
+}
+
+// ── isSensitivePath ───────────────────────────────────────────────────────────
+
+describe("isSensitivePath", () => {
+  it("returns true for .ssh/ key path", () => {
+    expect(isSensitivePath("/home/user/.ssh/id_ed25519")).toBe(true);
+  });
+
+  it("returns true for .ssh directory itself", () => {
+    expect(isSensitivePath("/home/user/.ssh")).toBe(true);
+  });
+
+  it("returns true for .aws path", () => {
+    expect(isSensitivePath("/home/user/.aws/credentials")).toBe(true);
+  });
+
+  it("returns true for .npmrc", () => {
+    expect(isSensitivePath("/home/user/.npmrc")).toBe(true);
+  });
+
+  it("returns true for .git-credentials", () => {
+    expect(isSensitivePath("/home/user/.git-credentials")).toBe(true);
+  });
+
+  it("returns true for .netrc", () => {
+    expect(isSensitivePath("/home/user/.netrc")).toBe(true);
+  });
+
+  it("returns true for .config/gh/ path", () => {
+    expect(isSensitivePath("/home/user/.config/gh/config.yml")).toBe(true);
+  });
+
+  it("returns true for .config/env.sh", () => {
+    expect(isSensitivePath("/home/user/.config/env.sh")).toBe(true);
+  });
+
+  it("returns true for basename containing 'secret'", () => {
+    expect(isSensitivePath("/home/user/.my-secret-config")).toBe(true);
+  });
+
+  it("returns true for basename containing 'token'", () => {
+    expect(isSensitivePath("/home/user/.github-token")).toBe(true);
+  });
+
+  it("returns true for basename containing 'credential'", () => {
+    expect(isSensitivePath("/home/user/.stored-credentials")).toBe(true);
+  });
+
+  it("returns true for .key extension", () => {
+    expect(isSensitivePath("/home/user/id_rsa.key")).toBe(true);
+  });
+
+  it("returns true for .pem extension", () => {
+    expect(isSensitivePath("/home/user/server.pem")).toBe(true);
+  });
+
+  it("returns false for .zshrc", () => {
+    expect(isSensitivePath("/home/user/.zshrc")).toBe(false);
+  });
+
+  it("returns false for .vimrc", () => {
+    expect(isSensitivePath("/home/user/.vimrc")).toBe(false);
+  });
+
+  it("returns false for .config/nvim/", () => {
+    expect(isSensitivePath("/home/user/.config/nvim/init.lua")).toBe(false);
+  });
+});
+
+// ── classifyDotfile ───────────────────────────────────────────────────────────
+
+describe("classifyDotfile", () => {
+  it(".zshrc → track", () => {
+    expect(classifyDotfile("/home/user/.zshrc")).toBe("track");
+  });
+
+  it(".vimrc → track", () => {
+    expect(classifyDotfile("/home/user/.vimrc")).toBe("track");
+  });
+
+  it(".ssh/id_ed25519 → encrypt", () => {
+    expect(classifyDotfile("/home/user/.ssh/id_ed25519")).toBe("encrypt");
+  });
+
+  it(".npmrc → encrypt", () => {
+    expect(classifyDotfile("/home/user/.npmrc")).toBe("encrypt");
+  });
+
+  it(".cache → exclude (noise)", () => {
+    expect(classifyDotfile("/home/user/.cache")).toBe("exclude");
+  });
+
+  it(".DS_Store → exclude (noise)", () => {
+    expect(classifyDotfile("/home/user/.DS_Store")).toBe("exclude");
+  });
+
+  it(".bash_history → exclude (noise)", () => {
+    expect(classifyDotfile("/home/user/.bash_history")).toBe("exclude");
+  });
+});
+
+// ── discover ──────────────────────────────────────────────────────────────────
+
+describe("dotfilesModule.discover", () => {
+  let tmpHome: string;
+
+  beforeEach(() => {
+    tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "roost-dotfiles-home-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it("includes .zshrc as a track candidate", async () => {
+    fs.writeFileSync(path.join(tmpHome, ".zshrc"), "# zsh");
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome });
+    const candidates = await dotfilesModule.discover(ctx);
+    const zshrc = candidates.find((c) => c.path.endsWith(".zshrc"));
+    expect(zshrc).toBeDefined();
+    expect(zshrc!.recommendation).toBe("track");
+  });
+
+  it("includes .ssh as an encrypt candidate", async () => {
+    fs.mkdirSync(path.join(tmpHome, ".ssh"));
+    fs.writeFileSync(path.join(tmpHome, ".ssh", "id_ed25519"), "key-content");
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome });
+    const candidates = await dotfilesModule.discover(ctx);
+    const ssh = candidates.find((c) => c.path.endsWith(".ssh"));
+    expect(ssh).toBeDefined();
+    expect(ssh!.recommendation).toBe("encrypt");
+  });
+
+  it("excludes .cache directory", async () => {
+    fs.mkdirSync(path.join(tmpHome, ".cache"));
+    fs.writeFileSync(path.join(tmpHome, ".zshrc"), "# zsh");
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome });
+    const candidates = await dotfilesModule.discover(ctx);
+    expect(candidates.some((c) => c.path.endsWith(".cache"))).toBe(false);
+  });
+
+  it("includes items from .config subdirectory", async () => {
+    fs.mkdirSync(path.join(tmpHome, ".config"), { recursive: true });
+    fs.mkdirSync(path.join(tmpHome, ".config", "nvim"), { recursive: true });
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome });
+    const candidates = await dotfilesModule.discover(ctx);
+    const nvim = candidates.find((c) => c.path.endsWith("nvim"));
+    expect(nvim).toBeDefined();
+    expect(nvim!.recommendation).toBe("track");
+  });
+
+  it(".config dir itself is not a candidate but .config/<child> is", async () => {
+    fs.mkdirSync(path.join(tmpHome, ".config", "fish"), { recursive: true });
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome });
+    const candidates = await dotfilesModule.discover(ctx);
+    // .config entry at home level should not appear
+    const configEntry = candidates.find((c) => c.path === path.join(tmpHome, ".config"));
+    expect(configEntry).toBeUndefined();
+    // .config/fish child should appear
+    const fishEntry = candidates.find((c) => c.path.endsWith("fish"));
+    expect(fishEntry).toBeDefined();
+  });
+
+  it("assigns correct categories to known basenames", async () => {
+    fs.writeFileSync(path.join(tmpHome, ".zshrc"), "");
+    fs.writeFileSync(path.join(tmpHome, ".gitconfig"), "");
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome });
+    const candidates = await dotfilesModule.discover(ctx);
+    const zshrc = candidates.find((c) => c.path.endsWith(".zshrc"));
+    const gitconfig = candidates.find((c) => c.path.endsWith(".gitconfig"));
+    expect(zshrc?.category).toBe("shell");
+    expect(gitconfig?.category).toBe("git");
+  });
+
+  it("id equals the absolute path", async () => {
+    fs.writeFileSync(path.join(tmpHome, ".zshrc"), "# zsh");
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome });
+    const candidates = await dotfilesModule.discover(ctx);
+    const zshrc = candidates.find((c) => c.path.endsWith(".zshrc"));
+    expect(zshrc!.id).toBe(zshrc!.path);
+  });
+
+  it("surfaces app-config catalog paths (e.g. JetBrains options) with encrypt + note (ADR-0007)", async () => {
+    const opts = path.join(tmpHome, "Library/Application Support/JetBrains/DataGrip2026.1/options");
+    fs.mkdirSync(opts, { recursive: true });
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpHome }); // repoDir default → no override → default catalog
+    const candidates = await dotfilesModule.discover(ctx);
+    const jb = candidates.find((c) => c.path === opts);
+    expect(jb).toBeDefined();
+    expect(jb!.recommendation).toBe("encrypt");
+    expect(jb!.note).toBe("app config (JetBrains)");
+  });
+});
+
+// ── capture ───────────────────────────────────────────────────────────────────
+
+describe("dotfilesModule.capture", () => {
+  it("calls chezmoi add without --encrypt for non-sensitive id", async () => {
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" }, // chezmoi add .zshrc
+    ]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const sel: Selection = { modules: { dotfiles: ["/home/user/.zshrc"] } };
+    const result = await dotfilesModule.capture(ctx, sel);
+    const addCall = calls.find(
+      (c) => c.cmd === "chezmoi" && c.args.includes("add") && c.args.includes("/home/user/.zshrc"),
+    );
+    expect(addCall).toBeDefined();
+    expect(addCall!.args).not.toContain("--encrypt");
+    expect(result.module).toBe("dotfiles");
+    expect(result.written).toContain("/home/user/.zshrc");
+    expect(result.encrypted).toHaveLength(0);
+  });
+
+  it("calls chezmoi add with --encrypt for a sensitive id when an age key exists", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-enc-home-"));
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-enc-repo-"));
+    // age key must exist for recipientFromKey to run; age-keygen -y returns recipient
+    fs.mkdirSync(path.join(home, ".config", "sops", "age"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".config", "sops", "age", "keys.txt"), "AGE-SECRET-KEY-X");
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "age1recipientkey", stderr: "" }, // age-keygen -y (recipientFromKey)
+      { code: 0, stdout: "", stderr: "" }, // chezmoi add --encrypt
+    ]);
+    const ctx = makeCtx({ exec, home, repoDir });
+    const sel: Selection = { modules: { dotfiles: ["/home/user/.ssh"] } };
+    const result = await dotfilesModule.capture(ctx, sel);
+    const addCall = calls.find((c) => c.cmd === "chezmoi" && c.args.includes("add"));
+    expect(addCall!.args).toContain("--encrypt");
+    expect(result.encrypted).toContain("/home/user/.ssh");
+    // chezmoi age config was written from the key
+    expect(fs.existsSync(path.join(home, ".config", "chezmoi", "chezmoi.toml"))).toBe(true);
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  it("encrypts a path marked in 'dotfiles-encrypt' even if its content has secrets (ADR-0010)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-mark-home-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-mark-src-"));
+    fs.mkdirSync(path.join(home, ".config", "sops", "age"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".config", "sops", "age", "keys.txt"), "AGE-SECRET-KEY-X");
+    const file = path.join(dir, "clash.yaml");
+    fs.writeFileSync(file, "password: longsecretvalue12345"); // would normally be blocked
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "age1recipientkey", stderr: "" }, // age-keygen -y
+      { code: 0, stdout: "", stderr: "" }, // chezmoi add --encrypt
+    ]);
+    const ctx = makeCtx({ exec, home, repoDir: fs.mkdtempSync(path.join(os.tmpdir(), "roost-mark-repo-")) });
+    const sel: Selection = { modules: { dotfiles: [file], "dotfiles-encrypt": [file] } };
+    const result = await dotfilesModule.capture(ctx, sel);
+    expect(result.encrypted).toContain(file);
+    expect(result.blocked ?? []).not.toContain(file);
+    expect(calls.find((c) => c.args.includes("add"))!.args).toContain("--encrypt");
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("blocks an encrypt-wanted item when NO age key exists (no chezmoi add)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-nokey-home-"));
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home }); // no key file → recipientFromKey returns null
+    const result = await dotfilesModule.capture(ctx, { modules: { dotfiles: ["/home/user/.ssh"] } });
+    expect(result.blocked).toContain("/home/user/.ssh");
+    expect(result.encrypted).toHaveLength(0);
+    expect(calls.find((c) => c.cmd === "chezmoi" && c.args.includes("add"))).toBeUndefined();
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  it("handles empty selection gracefully", async () => {
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const sel: Selection = { modules: {} };
+    const result = await dotfilesModule.capture(ctx, sel);
+    expect(result.module).toBe("dotfiles");
+    expect(result.written).toHaveLength(0);
+    expect(result.encrypted).toHaveLength(0);
+  });
+
+  // ── H1: content secret scan blocks plaintext secrets (ADR-0007) ─────────────
+
+  it("blocks a non-sensitive path whose content has a plaintext secret (no chezmoi add)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-"));
+    const file = path.join(dir, "config.xml");
+    fs.writeFileSync(file, "<data-source><password>longsecretvalue12345</password></data-source>");
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const result = await dotfilesModule.capture(ctx, { modules: { dotfiles: [file] } });
+    expect(result.blocked).toContain(file);
+    expect(result.written).not.toContain(file);
+    expect(calls.find((c) => c.args.includes("add") && c.args.includes(file))).toBeUndefined();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("capture reports blockedDetail reason for a secret-bearing dotfile", async () => {
+    // non-sensitive basename so it takes the content-scan path (not the encrypt path)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-"));
+    const file = path.join(dir, ".myrc");
+    fs.writeFileSync(file, "AKIAIOSFODNN7EXAMPLE aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
+    const { exec } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const cs = await dotfilesModule.capture(ctx, { modules: { dotfiles: [file] } });
+    expect((cs.blockedDetail ?? []).find((b) => b.id === file)?.reason).toBe("secret");
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("captures a real clean file normally", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-"));
+    const file = path.join(dir, ".vimrc");
+    fs.writeFileSync(file, "set number\nsyntax on\n");
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const result = await dotfilesModule.capture(ctx, { modules: { dotfiles: [file] } });
+    expect(result.written).toContain(file);
+    expect(result.blocked ?? []).not.toContain(file);
+    expect(calls.find((c) => c.args.includes("add") && c.args.includes(file))).toBeDefined();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("honors maxCaptureMB from settings (tiny cap blocks an otherwise-fine dotfile)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-home-"));
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-repo-"));
+    const f = path.join(home, ".biggish");
+    fs.writeFileSync(f, "x".repeat(5000)); // 5KB
+    saveRoostSettings(repo, { maxCaptureMB: 0 }); // 0MB cap → any non-empty content is "too large"
+    const { exec } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const ctx = makeCtx({ exec, home, repoDir: repo });
+    const cs = await dotfilesModule.capture(ctx, { modules: { dotfiles: [f] } });
+    expect((cs.blockedDetail ?? []).find((b) => b.id === f)?.reason).toBe("too-large");
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(repo, { recursive: true, force: true });
+  });
+});
+
+// ── scanPathForSecrets (H1/H3 guard) ────────────────────────────────────────
+
+describe("scanPathForSecrets", () => {
+  let dir: string;
+  beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-scan-")); });
+  afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+  it("missing path → no findings, not too large (capture still proceeds)", () => {
+    const r = scanPathForSecrets(path.join(dir, "does-not-exist"));
+    expect(r.secretFiles).toHaveLength(0);
+    expect(r.tooLarge).toBe(false);
+  });
+
+  it("finds secrets in files under a directory", () => {
+    fs.mkdirSync(path.join(dir, "options"));
+    fs.writeFileSync(path.join(dir, "options", "clean.xml"), "<x>hi</x>");
+    fs.writeFileSync(path.join(dir, "options", "db.xml"), "url=\"jdbc:mysql://u:S3cretP4ss@h/db\"");
+    const r = scanPathForSecrets(dir);
+    expect(r.secretFiles.some((f) => f.endsWith("db.xml"))).toBe(true);
+  });
+
+  it("H3: flags a directory exceeding the file-count guard", () => {
+    for (let i = 0; i < 5; i++) fs.writeFileSync(path.join(dir, `f${i}`), "x");
+    const r = scanPathForSecrets(dir, { maxFiles: 2 });
+    expect(r.tooLarge).toBe(true);
+  });
+});
+
+// ── unmanage ──────────────────────────────────────────────────────────────────
+
+describe("dotfilesModule.unmanage", () => {
+  it("calls chezmoi forget --force for each selected id", async () => {
+    const ids = ["/home/user/.zshrc", "/home/user/.vimrc"];
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" }, // forget .zshrc
+      { code: 0, stdout: "", stderr: "" }, // forget .vimrc
+    ]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const sel: Selection = { modules: { dotfiles: ids } };
+    const result = await dotfilesModule.unmanage(ctx, sel);
+
+    for (const id of ids) {
+      const forgetCall = calls.find(
+        (c) => c.cmd === "chezmoi" && c.args.includes("forget") && c.args.includes("--force") && c.args.includes(id),
+      );
+      expect(forgetCall).toBeDefined();
+    }
+    expect(result.module).toBe("dotfiles");
+    expect(result.applied).toEqual(ids);
+    expect(result.backedUp).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+  });
+
+  it("handles empty selection gracefully", async () => {
+    const { exec, calls } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const sel: Selection = { modules: {} };
+    const result = await dotfilesModule.unmanage(ctx, sel);
+    expect(calls).toHaveLength(0);
+    expect(result.applied).toHaveLength(0);
+  });
+
+  it("logs a git history warning when items are removed", async () => {
+    const ids = ["/home/user/.zshrc"];
+    const { exec } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      home: os.homedir(),
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: { dotfiles: ids } };
+    await dotfilesModule.unmanage(ctx, sel);
+
+    expect(warnSpy).toHaveBeenCalled();
+    const msg: string = warnSpy.mock.calls[0]?.[0] ?? "";
+    expect(msg).toMatch(/git.*history|history.*git/i);
+    expect(msg).toMatch(/filter-repo|BFG/i);
+  });
+
+  it("does NOT log git history warning on empty selection", async () => {
+    const { exec } = makeFakeExec([]);
+    const warnSpy = vi.fn();
+    const ctx = makeCtx({
+      exec,
+      home: os.homedir(),
+      log: { info: () => {}, warn: warnSpy, error: () => {} },
+    });
+    const sel: Selection = { modules: {} };
+    await dotfilesModule.unmanage(ctx, sel);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ── doctor ────────────────────────────────────────────────────────────────────
+
+describe("dotfilesModule.doctor", () => {
+  it("returns ok:true when chezmoi --version exits 0", async () => {
+    const { exec } = makeFakeExec([{ code: 0, stdout: "chezmoi version 2.x", stderr: "" }]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const health = await dotfilesModule.doctor(ctx);
+    expect(health).toHaveLength(1);
+    expect(health[0]!).toMatchObject({ name: "chezmoi", ok: true });
+    expect(health[0]!.detail).toBeUndefined();
+  });
+
+  it("returns ok:false with detail when chezmoi --version exits non-zero", async () => {
+    const { exec } = makeFakeExec([{ code: 1, stdout: "", stderr: "not found" }]);
+    const ctx = makeCtx({ exec, home: os.homedir() });
+    const health = await dotfilesModule.doctor(ctx);
+    expect(health[0]!).toMatchObject({ name: "chezmoi", ok: false });
+    expect(health[0]!.detail).toBeTruthy();
+  });
+});
+
+describe("dotfilesModule.status guard", () => {
+  it("does NOT call chezmoi when no dotfiles are managed", async () => {
+    const exec = {
+      run: async () => {
+        throw new Error("exec must not be called when dotfiles unmanaged");
+      },
+    } as unknown as import("@roost/shared").Exec;
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/tmp/home" });
+    const report = await dotfilesModule.status(ctx, { modules: {} });
+    expect(report.module).toBe("dotfiles");
+    expect(report.items).toHaveLength(0);
+  });
+
+  it("marks only the dotfiles that actually changed (per-file via chezmoi status)", async () => {
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        if (cmd === "chezmoi" && args.includes("status")) {
+          return { code: 0, stdout: " M .zshrc\n", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/home/u" });
+    const report = await dotfilesModule.status(ctx, {
+      modules: { dotfiles: ["/home/u/.zshrc", "/home/u/.gitconfig"] },
+    });
+    const byId = Object.fromEntries(report.items.map((i) => [i.id, i.state]));
+    expect(byId["/home/u/.zshrc"]).toBe("drift");
+    expect(byId["/home/u/.gitconfig"]).toBe("synced");
+  });
+
+  it("a change inside a managed directory marks that directory id (prefix match)", async () => {
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        if (cmd === "chezmoi" && args.includes("status")) {
+          return { code: 0, stdout: " M .config/zed/settings.json\n", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/home/u" });
+    const report = await dotfilesModule.status(ctx, {
+      modules: { dotfiles: ["/home/u/.config/zed"] },
+    });
+    expect(report.items[0]?.state).toBe("drift");
+  });
+});
+
+// ── index ─────────────────────────────────────────────────────────────────────
+
+describe("dotfilesModule.index", () => {
+  it("is cheap: probes chezmoi --version + lists managed, never apply/diff/verify/fs scan", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push({ cmd, args });
+        if (cmd === "chezmoi" && args.includes("managed")) {
+          return { code: 0, stdout: "/home/u/.zshrc\n/home/u/.gitconfig\n", stderr: "" };
+        }
+        return { code: 0, stdout: "chezmoi version 2.x", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/tmp/home" });
+    const idx = await dotfilesModule.index!(ctx);
+    expect(idx.available).toBe(true);
+    expect(idx.reason).toBeUndefined();
+    expect(idx.managed).toBe(2);
+    expect(
+      calls.every(
+        (c) => !c.args.includes("apply") && !c.args.includes("diff") && !c.args.includes("verify"),
+      ),
+    ).toBe(true);
+  });
+
+  it("reports unavailable with reason when chezmoi is absent; managed falls back to 0", async () => {
+    const exec: Exec = {
+      async run(): Promise<ExecResult> {
+        return { code: 127, stdout: "", stderr: "command not found" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/tmp/home" });
+    const idx = await dotfilesModule.index!(ctx);
+    expect(idx.available).toBe(false);
+    expect(idx.reason).toBe("chezmoi not found");
+    expect(idx.managed).toBe(0);
+  });
+});
+
+describe("dotfilesModule.apply scope", () => {
+  it("applies only the plan's target paths (not the whole repo)", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push({ cmd, args });
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/home/u" });
+    const target = "/home/u/.gitconfig";
+    const result = await dotfilesModule.apply(ctx, {
+      module: "dotfiles",
+      actions: [{ id: target, kind: "update", target }],
+    });
+    const applyCall = calls.find((c) => c.cmd === "chezmoi" && c.args.includes("apply"));
+    expect(applyCall?.args).toContain(target);
+    expect(result.applied).toContain(target);
+  });
+});

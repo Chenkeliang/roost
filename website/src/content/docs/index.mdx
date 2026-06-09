@@ -1,0 +1,43 @@
+---
+title: Roost
+description: Settle into any Mac. Back up your config on your main machine, load it onto another — you choose exactly what.
+template: splash
+hero:
+  tagline: Settle into any Mac. Back up your config on your main machine, load it onto another — you choose exactly what.
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Get started
+      link: /introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/Chenkeliang/roost
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is Roost?
+
+Roost is an open-source macOS configuration backup and migration tool. You
+**select** what to manage, Roost stores it in **your own private git repo**, and
+on another Mac you **load** it back — with a visual manager for what's backed up.
+
+<CardGrid stagger>
+  <Card title="Your data stays yours">
+    No server, no account, no telemetry. Your config lives in your private git
+    repository.
+  </Card>
+  <Card title="Reversible by default">
+    `load` previews changes and backs up existing files before overwriting.
+  </Card>
+  <Card title="Two complementary layers">
+    Back up existing dotfiles as-is, and manage portable aliases / env / PATH
+    that Roost regenerates per machine.
+  </Card>
+  <Card title="Built on trusted tools">
+    Thin orchestration over chezmoi, Homebrew, age, and mise — never reimplementing them.
+  </Card>
+</CardGrid>

@@ -1,0 +1,88 @@
+---
+title: Aliases & Env
+description: Managing portable aliases, env vars, PATH, and functions — plus the three secret env sources.
+sidebar:
+  order: 6
+---
+
+import { Aside, Steps, Card, CardGrid } from '@astrojs/starlight/components';
+
+The **Aliases & Env** module manages the portable parts of your shell setup as
+**structured data** rather than as a copied file. You tell Roost about individual
+aliases, environment variables, PATH entries, and functions, and Roost composes
+them into one generated file on each machine.
+
+## The managed `env.sh`
+
+Roost regenerates a single file from your data:
+
+- **`~/.config/roost/env.sh`** — a flat POSIX-sh file containing your enabled
+  aliases, env vars, PATH entries, and functions. It is **regenerated on every
+  apply**, written atomically with mode `0600`, and is **not** committed to your
+  repo (the structured `roost/env.yaml` is the committed source).
+
+To make your shell use it, Roost adds **one source line** to each existing rc
+file (`.zshrc`, `.zprofile`, `.bashrc`, `.bash_profile`), wrapped in markers:
+
+```sh
+# >>> roost env >>>
+[ -f "$HOME/.config/roost/env.sh" ] && . "$HOME/.config/roost/env.sh"
+# <<< roost env <<<
+```
+
+<Aside type="tip" title="It never rewrites your rc files">
+Roost only appends that single, idempotent marker block — it does **not** edit or
+reorder the rest of your `.zshrc`. Unmanaging everything removes the block again.
+</Aside>
+
+## Importing from your shell
+
+Roost can read your existing rc files and **suggest** importable items —
+top-level aliases, simple `export NAME=value` lines, and straightforward PATH
+prepend/append entries. These are conservative, read-only suggestions: anything
+inside a control block, or any value using command substitution (`$(...)` or
+backticks), is skipped. Nothing is imported without your say-so.
+
+## Secret env values
+
+An environment variable can be marked **secret**. Secret values are never written
+in plaintext to your repo, never shown in the UI, and never logged. There are
+**three sources** for resolving a secret at apply time
+(see [ADR-0004](https://github.com/Chenkeliang/roost/blob/main/docs/adr/0004-secret-env-resolution.md)):
+
+<CardGrid>
+  <Card title="age (default)">
+    The plaintext is encrypted to your age key and stored as
+    `roost/env-secrets/<NAME>.age` in the repo. On apply, it's decrypted with your
+    local age key and inlined into `env.sh`.
+  </Card>
+  <Card title="1Password (op://…)">
+    The repo stores only an `op://Vault/Item/field` **reference** — no ciphertext.
+    On apply, Roost resolves it via the `op` CLI.
+  </Card>
+  <Card title="rbw">
+    The repo stores only an rbw item reference — no ciphertext. On apply, Roost
+    resolves it via the `rbw` CLI (a free, open-source Bitwarden client).
+  </Card>
+</CardGrid>
+
+With the **reference** sources (`op` / `rbw`), not even ciphertext lands in your
+repo — the reference is just a locator. The resolved value lives in memory only,
+gets inlined into the `0600` `env.sh`, and is discarded.
+
+<Aside type="caution" title="Non-secret values are stored verbatim">
+Aliases, PATH entries, and env vars **not** marked secret are committed to your
+repo in clear text (and pushed to your remote with `roost init --github`). Mark
+anything sensitive as `secret`. If a plaintext secret is detected in a non-secret
+field, `capture` is **blocked** until you mark it.
+</Aside>
+
+## Failure-safe resolution
+
+If a secret can't be resolved (no age key, or `op` / `rbw` unavailable or
+failing), Roost **skips that one value** with a warning that names only the
+variable — never the value — and writes a placeholder instead of a half-written
+assignment. `roost doctor` reports up front whether your age key and the `op` /
+`rbw` CLIs are available.
+
+See [Secrets](/secrets/) for setting up the age key and backends.

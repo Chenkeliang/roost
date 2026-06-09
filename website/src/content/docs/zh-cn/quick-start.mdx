@@ -1,0 +1,113 @@
+---
+title: 快速上手
+description: 从全新检出到在第二台 Mac 上载入你的配置。
+sidebar:
+  order: 3
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+本节带你走一遍:在**主力** Mac 上首次采集,以及在**第二台** Mac 上首次载入。
+示例使用 `roost <命令>`;从源码运行时,请替换为
+`node packages/cli/dist/index.js <命令>`。
+
+## 在你的主力 Mac 上
+
+<Steps>
+
+1. **检查环境。** `doctor` 会报告哪些外部工具可用,以及各模块的健康状况:
+
+   ```sh
+   roost doctor
+   ```
+
+2. **创建配置仓库。** 生成 `roost/` 目录结构与 chezmoi 模板:
+
+   ```sh
+   roost init
+   ```
+
+   若要一步**创建私有 GitHub 仓库**、接好 `origin` 并推送,加上 `--github`:
+
+   ```sh
+   roost init --github
+   ```
+
+   Roost 会提示输入个人访问令牌(只用一次,绝不存储)和仓库名。配合 `--github`
+   使用 `--dry-run` 可以只打印意图,而不发起任何 API 调用或推送。
+
+   <Aside type="tip">
+   你也可以在环境中设置 `GITHUB_TOKEN`,以非交互方式运行 `--github`。
+   </Aside>
+
+3. **选择要管理的内容。** 发现候选项并选择要跟踪的内容:
+
+   ```sh
+   roost select
+   roost select --all                       # 选择所有未被排除的候选项
+   roost select --preset developer-essentials
+   ```
+
+   你的选择记录在 `selection.yaml` 中——它是 Roost 管理范围的唯一事实源。
+
+4. **采集进仓库。** 把所选内容写入配置仓库(密钥值会被加密,扫描器会阻止明文密钥):
+
+   ```sh
+   roost capture
+   ```
+
+5. **审阅并提交。** 查看已跟踪的内容,然后像对待任何 git 仓库一样提交并推送:
+
+   ```sh
+   roost list
+   roost status
+   ```
+
+</Steps>
+
+## 在你的第二台 Mac 上
+
+<Steps>
+
+1. 把配置仓库克隆到新机器上(若不在默认的 chezmoi 源路径,记得设置 `ROOST_REPO`)。
+
+2. **先预览改动。** `load` **默认就是 dry-run**——它会展示将要发生的变化,而不动
+   任何东西:
+
+   ```sh
+   roost load
+   ```
+
+3. **确认无误后再应用。** Roost 会在覆盖前备份已有文件:
+
+   ```sh
+   roost load --apply
+   ```
+
+</Steps>
+
+<Aside type="note">
+载入是**单向**的:从你的配置仓库(主力机采集到的状态)流向从机。
+参见[核心概念](/zh-cn/core-concepts/)。
+</Aside>
+
+## 想用图形界面?
+
+上面的全部流程也能在本地 Web 仪表盘里完成——以内容为先地查看你的 dotfiles、
+软件包、项目、应用配置与别名/环境变量,支持按需发现,并带有 Git 远端/同步面板。
+先构建一次 web 包,然后启动:
+
+```sh
+pnpm --filter @roost/web build
+roost serve --web packages/web/dist
+# 从源码运行:node packages/cli/dist/index.js serve --web packages/web/dist
+```
+
+打开终端打印的地址(默认 `http://127.0.0.1:4317`)。仪表盘**完全运行在你本机**
+——无服务器、无账号、无遥测。各页面用途见[仪表盘](/zh-cn/dashboard/)。
+
+## 接下来
+
+- [核心概念](/zh-cn/core-concepts/)——capture/load 与 `selection.yaml` 背后的模型。
+- [别名与环境变量](/zh-cn/aliases-and-env/)——由 Roost 直接管理的可移植 shell 配置。
+- [密钥](/zh-cn/secrets/)——可选的 age 加密与密钥后端。

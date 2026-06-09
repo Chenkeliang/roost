@@ -1,0 +1,271 @@
+---
+title: CLI 参考
+description: 每个 roost 命令——用途、用法、旗标、示例,以及它的输出。
+sidebar:
+  order: 10
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+每个 Roost 命令,按使用场景分组。示例使用 `roost <command>`;从源码运行时,
+请替换为 `node packages/cli/dist/index.js <command>`。
+
+<Aside type="note" title="全局旗标">
+`--profile <name>` 在每个命令上都可用。它为本次调用覆盖当前机器画像
+(优先级:`--profile` > `ROOST_PROFILE` 环境变量 > hostname 匹配 > `base`)。
+参见[画像](/zh-cn/profiles/)。
+</Aside>
+
+## 初始化
+
+### `init`
+
+用 `roost/` 布局和 chezmoi 桩文件搭建配置仓库。
+
+```sh
+roost init
+roost init --github            # 同时创建一个私有 GitHub 仓库、接好 origin 并推送
+roost init --github --dry-run  # 打印意图,不做任何 API 调用或推送
+```
+
+| 旗标 | 含义 |
+| --- | --- |
+| `--repo <dir>` | 配置仓库目录路径(默认取 chezmoi 源路径或 `ROOST_REPO`)。 |
+| `--github` | 经 API 创建私有 GitHub 仓库、设置 `origin` 并推送。会提示输入 Personal Access Token(只用一次,绝不存储)与仓库名——或从环境读取 `GITHUB_TOKEN`。 |
+| `--dry-run` | 配合 `--github`,打印计划动作而不做任何 API 调用或推送。 |
+
+**输出:**它创建的文件(或 `already initialized, nothing to do`)。若已存在 age
+密钥,会提醒你离线备份。
+
+### `select`
+
+在机器上发现候选项并选择要纳管的内容。选择会写入 `selection.yaml`——它是 Roost
+纳管什么的唯一真相源。
+
+```sh
+roost select
+roost select --all                        # 所有未排除的候选项
+roost select --preset developer-essentials
+```
+
+| 旗标 | 含义 |
+| --- | --- |
+| `--all` | 选中每个未排除的候选项。 |
+| `--preset <name>` | 选中匹配某个预设的候选项(如 `developer-essentials`)。 |
+
+**输出:**`selected <n> items`。
+
+### `capture`
+
+把 `selection.yaml` 里的条目写进配置仓库。密钥值会被加密;明文密钥扫描器若发现
+明文密钥会阻止本次采集。
+
+```sh
+roost capture
+```
+
+**输出:**每个模块一行,形如 `[<module>] written: <n>, encrypted: <n>`。
+
+## 管理
+
+### `load`
+
+把配置仓库的状态应用到当前机器。**默认 dry-run**——不传 `--apply` 不会写入任何东西。
+应用时,Roost 会在覆盖前备份已有文件。
+
+```sh
+roost load            # 仅预览(dry-run)
+roost load --apply    # 真正应用
+```
+
+| 旗标 | 含义 |
+| --- | --- |
+| `--apply` | 应用变更(默认为 dry-run)。 |
+
+**输出:**每个模块计划或已应用的变更。
+
+### `unmanage`
+
+停止管理单个条目:从仓库里忘记它,并从 `selection.yaml` 里移除。这只影响工作区——
+**不会**重写 git 历史。
+
+```sh
+roost unmanage dotfiles ~/.zshrc
+roost unmanage --module dotfiles --id ~/.zshrc
+roost unmanage dotfiles ~/.zshrc --dry-run
+```
+
+| 参数 / 旗标 | 含义 |
+| --- | --- |
+| `<module>` / `--module <m>` | 拥有该条目的模块(如 `dotfiles`)。 |
+| `<id>` / `--id <id>` | 要停止管理的条目 id。 |
+| `--dry-run` | 打印意图,不写入任何东西。 |
+
+**输出:**被忘记并移除的内容(`--dry-run` 下为意图)。
+
+## 查看
+
+### `doctor`
+
+检查外部依赖与各模块健康度。出问题时先跑它。
+
+```sh
+roost doctor
+```
+
+**输出:**每项检查一行,`ok` 或 `FAIL`,附可选细节——例如缺少
+`chezmoi`/`age`/`op`/`rbw`、你的 rc 文件是否 source 了被管的 `env.sh`、以及是否存在
+age 密钥。
+
+### `list`
+
+列出已选条目及其漂移状态。
+
+```sh
+roost list
+```
+
+**输出:**每个模块的被管条目及当前同步状态。
+
+### `status`
+
+显示所有已选模块的漂移状态。
+
+```sh
+roost status
+```
+
+**输出:**每个模块的漂移摘要(synced / drift / conflict)。
+
+### `diff`
+
+显示仓库状态与当前机器之间的差异。
+
+```sh
+roost diff
+```
+
+**输出:**每个发生漂移的模块一份统一 diff。
+
+### `audit`
+
+审计配置仓库中的明文密钥。若发现任何明文则以非零退出。
+
+```sh
+roost audit
+roost audit --repo /path/to/config-repo
+```
+
+| 旗标 | 含义 |
+| --- | --- |
+| `--repo <dir>` | 配置仓库目录路径。 |
+
+**输出:**已加密与已扫描文件数、任何明文发现(路径 + 规则),以及一行 pass/fail。
+
+### `import`
+
+从已有的 dotfiles 仓库或 Mackup 配置导入候选项。它只提出候选项,不采集。
+
+```sh
+roost import                                   # 自动检测
+roost import --source dotfiles --path ~/dotfiles
+roost import --source mackup
+```
+
+| 旗标 | 含义 |
+| --- | --- |
+| `--source <source>` | `auto`(默认)、`dotfiles` 或 `mackup`。 |
+| `--path <dir>` | dotfiles 仓库路径(`--source dotfiles` 时必填)。 |
+
+**输出:**每个检测到的来源的候选数,以及每个候选项的建议与路径,外加任何提示。
+
+### `plugins`
+
+列出当前已注册的模块名。
+
+```sh
+roost plugins
+```
+
+**输出:**每行一个模块名。
+
+### `profile`
+
+显示解析出的机器画像及其解析方式;`profile list` 列出所有已定义画像并标出活动项。
+参见[画像](/zh-cn/profiles/)。
+
+```sh
+roost profile        # 显示活动画像及它如何被解析
+roost profile list   # 列出已定义画像,标出活动项
+```
+
+**输出:**活动画像与解析来源(flag / env / hostname / default);`list` 会额外列出
+每个已定义画像及其 hostnames。
+
+## 应用配置
+
+### `app learn`
+
+记录你在某个 GUI 应用里改设置时,哪些应用偏好域发生了变化。Roost 先快照各域,等你做出
+更改后再做差异比对。
+
+```sh
+roost app learn
+```
+
+**输出:**捕获到的变化域,或 `No domains changed.`
+
+## 密钥
+
+完整图景见[密钥](/zh-cn/secrets/);以下命令管理 age 密钥。
+
+### `key rotate`
+
+把仓库里每个 `.age` 文件重新加密到一个新的 age 接收方。
+
+```sh
+roost key rotate --new-recipient age1...
+```
+
+| 旗标 | 含义 |
+| --- | --- |
+| `--new-recipient <age1...>` | 新的 age 接收方公钥。**必填。** |
+| `--old-key <path>` | 现有 age 私钥路径(默认 `~/.config/age/key.txt`)。 |
+| `--repo <dir>` | 配置仓库目录路径。 |
+
+**输出:**逐个 `.age` 文件重新加密的进度。
+
+### `key backup`
+
+显示 age 密钥位于何处以及如何离线备份——age 私钥是每个加密条目的恢复材料。
+
+```sh
+roost key backup
+roost key backup --show          # 同时打印密钥内容(请谨慎处理)
+```
+
+| 旗标 | 含义 |
+| --- | --- |
+| `--key <path>` | age 私钥路径(默认 `~/.config/sops/age/keys.txt`)。 |
+| `--show` | 同时打印密钥内容——便于复制到安全之处。 |
+
+**输出:**密钥位置与离线备份指引。带 `--show` 时,密钥内容会在一条警告之下打印出来。
+
+## 服务
+
+### `serve`
+
+启动支撑 Web [仪表盘](/zh-cn/dashboard/)的本地 JSON API 服务器。
+
+```sh
+roost serve
+roost serve --port 4317 --repo /path/to/config-repo --web packages/web/dist
+```
+
+| 旗标 | 含义 |
+| --- | --- |
+| `--port <n>` | 监听端口(默认 `4317`)。 |
+| `--repo <dir>` | 配置仓库目录路径。 |
+| `--web <dir>` | Web 构建目录路径(`packages/web/dist`)。 |
+
+**输出:**监听 URL。仪表盘完全运行在你的机器上——无服务器、无账号、无遥测。

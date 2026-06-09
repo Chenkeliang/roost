@@ -1,0 +1,81 @@
+---
+title: 核心概念
+description: Roost 背后的心智模型——主力到从机、selection.yaml,以及两个互补层。
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, Card } from '@astrojs/starlight/components';
+
+几个观念几乎能解释 Roost 所做的一切。
+
+## 主力 → 从机,单向流动
+
+Roost 有清晰的流动方向:
+
+- 你在**主力**机器上**采集**——这台 Mac 的配置被你视为事实源。
+- 你**载入**到**从机**——另一台应当与之保持一致的 Mac。
+
+载入是**单向**的:它把配置仓库的状态带到当前机器上。不存在双向合并;仓库是权威。
+
+### 只在一台机器上采集(主力机)
+
+Roost 目前是**单主**模型:只在主力机 capture,从机只 `load`。**不要**在从机上 `capture`:
+
+- Roost **能**显示从机上哪些不一样 —— `roost status` / `roost diff` 和 Drift 页会报告漂移(dotfiles 走 `chezmoi diff` 等)。所以"9 个相同、1 个本地改了",你能看到那一个。
+- 但在从机上 capture 会提交一段**分叉**历史。推回去会被拒(非快进),而 Roost 只用 `git pull --ff-only` 拉取——**不会自动合并**。你得用原生 git 手动解决分叉。
+- **没有**"只 capture 某一个文件"的增量,也**没有冲突解决** —— capture 是整选单重快照;git 只记变化的部分,但分叉依然存在。
+
+如果你在从机上改了东西想保留:**到主力机上做这个改动**,再让从机 `load`。真·多机(双向编辑、按机器画像、冲突处理)是后续工作(ADR-0005)。
+
+### 从机本地文件与仓库不一致时
+
+`load` **默认 dry-run** —— 先给你看 diff。`--apply` 时仓库赢(覆盖本地);生成的 `env.sh` 会先备份,dotfiles 经 `chezmoi apply` 应用(`--apply` 前用 `load` 预览 diff)。
+
+## `selection.yaml` 是唯一事实源
+
+Roost 管理什么并非隐式——它被写了下来。`selection.yaml` 准确记录了每个模块跟踪哪些项。
+`select`、`capture`、`load`、`status`、`list` 等命令都从中读取。如果它不在
+`selection.yaml` 里,Roost 就不会碰它。
+
+## 内容优先,按需发现
+
+Roost 从不自动扫描你的磁盘。每个模块都提供两个独立的操作:
+
+- **`index`** — 对已管理内容的轻量读取。在启动时运行,支撑仪表盘的即时页面加载。
+- **`discover`** — 对机器上新候选项的显式扫描。只有当你在仪表盘点击按钮或运行 CLI
+  命令时才会触发。
+
+这样无论主目录多大,仪表盘都能保持响应,并且意味着后台不会发生任何意外操作。
+
+## shell 配置的两个互补层
+
+Roost 可以用两种不同方式管理你的 shell 配置,而它们本就该配合使用:
+
+<CardGrid>
+  <Card title="Dotfiles——原样备份">
+    **Dotfiles** 模块逐字采集已有文件(如 `~/.zshrc`、`~/.gitconfig`)并按文件还原。
+    当你想要一份完全照原样拷贝的文件时,用它。
+  </Card>
+  <Card title="别名与环境变量——可移植、受管">
+    **别名与环境变量**模块把单个别名、环境变量、PATH 条目和函数作为结构化数据来管理。
+    Roost 在每台机器上据此重新生成单个 `~/.config/roost/env.sh`——而不重写你的
+    `.zshrc`。
+  </Card>
+</CardGrid>
+
+区别在于:Dotfiles 保留一份你已在维护的文件;别名与环境变量则让 Roost **拥有**一片
+可移植的 shell 配置,由它自己组合并写出。详见[别名与环境变量](/zh-cn/aliases-and-env/)。
+
+## 默认可逆
+
+两条保证让 `load` 可以放心运行:
+
+- **先 dry-run。** `roost load` 只预览改动。你必须传 `--apply` 才会写入任何东西。
+- **覆盖前先备份。** 应用时,Roost 会在替换前备份任何已有文件(例如放到
+  `~/.roost-backups/` 下)。
+
+<Aside type="caution">
+把某项移出管理(`unmanage`)会将它从工作树中取出,但**不会**重写 git 历史。
+若某个被移除的文件曾经存放过密钥,请单独轮换它并清除历史。
+</Aside>

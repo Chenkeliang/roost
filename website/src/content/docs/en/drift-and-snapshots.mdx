@@ -1,0 +1,70 @@
+---
+title: Drift & Snapshots
+description: The dashboard's Drift and Timeline views, and their CLI equivalents status and diff.
+sidebar:
+  order: 12
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Once you're managing more than one Mac, the questions become "what's out of
+sync?" and "what changed, and when?". Roost answers both — visually in the
+[Dashboard](/dashboard/), and on the command line.
+
+## Drift — what's out of sync
+
+Drift is the difference between your config repo's state and the current
+machine. A module is **synced**, **drifted**, or in **conflict**.
+
+### In the dashboard
+
+The **Drift** view lists only the modules that have drifted (or conflict),
+each with a status dot. Expand a row with **View diff** to see a unified,
+`+`/`-`-colored diff for that module, fetched on demand. When everything is in
+sync, the view shows a "No drift detected" empty state.
+
+### On the CLI
+
+```sh
+roost status   # per-module drift summary: synced / drift / conflict
+roost diff     # unified diff per drifted module
+roost list     # managed items plus their drift state
+```
+
+`status` is the summary; `diff` is the detail. The dashboard's Drift view is the
+visual composition of the same two data sources.
+
+## Timeline — what changed, and when
+
+Each `capture` records a commit in your config repo, so the repo's git history
+*is* your snapshot history.
+
+### In the dashboard
+
+The **Timeline** view lists snapshots newest-first — short SHA, commit subject,
+and a relative time ("2h ago"). It reads your config repo's commit log; if you
+haven't captured yet, it shows a "No snapshots yet" empty state pointing you to
+`roost capture`.
+
+<Aside type="note" title="Read-only today">
+The Timeline currently *shows* snapshot history. Preview and rollback are part of
+the locked design for this view but may not be wired up in the current build —
+to roll back, check out an earlier commit in your config repo and `roost load`.
+</Aside>
+
+### On the CLI
+
+Snapshots are ordinary git commits, so you inspect and move between them with
+git directly:
+
+```sh
+git -C <config-repo> log --oneline    # the snapshot history
+git -C <config-repo> checkout <sha>   # move to an earlier snapshot
+roost load                            # preview applying it (dry-run)
+```
+
+<Aside type="tip">
+Drift compares *repo vs. machine right now*; Timeline is *the repo's history over
+time*. Together they answer "is this Mac in sync?" and "how did the repo get
+here?".
+</Aside>

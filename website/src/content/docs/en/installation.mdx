@@ -1,0 +1,88 @@
+---
+title: Installation
+description: Dev setup, prerequisites, and running the Roost CLI.
+sidebar:
+  order: 2
+---
+
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="macOS only (v1)">
+Roost v1 targets **macOS only**. There are no cross-platform builds.
+</Aside>
+
+Roost is in early development and is run from source today. There is no published
+binary yet, so installation means cloning the repo and building the workspace.
+
+## Prerequisites
+
+The CLI orchestrates a small set of trusted external tools. Install the ones for
+the modules you intend to use:
+
+- **[chezmoi](https://www.chezmoi.io/)** — manages your dotfiles and age encryption.
+- **[Homebrew](https://brew.sh/)** — the package module captures your `Brewfile` (formulae, casks, and `mas` apps).
+- **[mise](https://mise.jdx.dev/)** — language/runtime versions captured by the package module.
+- **[age](https://github.com/FiloSottile/age)** — only needed if you back up **secret** values.
+
+Plus a Node.js toolchain to build from source:
+
+- **Node.js 24** (see `.nvmrc`)
+- **pnpm** (the repo pins a version via `packageManager`)
+
+`roost doctor` reports which of these are present on your machine.
+
+## Build from source
+
+<Steps>
+
+1. Clone the engine repo:
+
+   ```sh
+   git clone https://github.com/Chenkeliang/roost.git
+   cd roost
+   ```
+
+2. Install dependencies and build all packages:
+
+   ```sh
+   pnpm install
+   pnpm -r build
+   ```
+
+3. (Optional) run the test suite:
+
+   ```sh
+   pnpm test
+   ```
+
+</Steps>
+
+## Running the CLI
+
+The built CLI lives at `packages/cli/dist/index.js`. Until a `roost` binary is
+published, invoke it with Node:
+
+<Tabs>
+  <TabItem label="Run from source">
+    ```sh
+    node packages/cli/dist/index.js doctor
+    node packages/cli/dist/index.js --help
+    ```
+  </TabItem>
+  <TabItem label="Later (published)">
+    ```sh
+    roost doctor
+    roost --help
+    ```
+  </TabItem>
+</Tabs>
+
+Examples in the rest of these docs use `roost <command>` for brevity; substitute
+`node packages/cli/dist/index.js <command>` while running from source.
+
+## Useful environment variables
+
+- `ROOST_REPO` — path to your config repo (defaults to chezmoi's source dir, `~/.local/share/chezmoi`).
+- `ROOST_LOCALE` — CLI language (`en` by default).
+
+Continue to the [Quick Start](/quick-start/).

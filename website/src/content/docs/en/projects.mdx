@@ -1,0 +1,66 @@
+---
+title: Projects
+description: Tracking and re-cloning your git repositories across Macs.
+sidebar:
+  order: 6
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The **Projects** module records your local git repositories so you can re-clone
+your full working set on a new machine.
+
+## How it works
+
+On first use the module knows only what is already in `selection.yaml` (cheap
+index). Disk scanning is **on-demand**: click **[Scan for git projects]** in the
+dashboard, or run:
+
+```sh
+roost discover projects
+```
+
+The scan walks your home directory looking for `.git` directories.
+
+## Host grouping
+
+After a scan, discovered repos are **grouped by remote host**. For example:
+
+- `github.com (12)` — public or private repos on GitHub
+- `gitlab.yourcompany.com (3)` — internal GitLab instance
+- `no-remote (2)` — repos with no configured remote
+
+Use the host filter pills at the top of the list to focus on one group at a
+time.
+
+## Test and Save
+
+Each discovered repo row offers two actions:
+
+- **[Test]** — runs `git ls-remote` against the remote URL to verify
+  reachability. The result (reachable / unreachable + message) appears inline.
+  This is useful when you are on a VPN-gated network or behind an SSH key
+  restriction and want to confirm access before committing the list.
+- **[Save]** — adds the repo to `selection.yaml`. Saved repos will be re-cloned
+  when you run `roost load` on a follower machine.
+
+You do not have to test before saving. Testing is informational only.
+
+## Home-relative paths
+
+Project paths are stored relative to your home directory — for example
+`~/code/my-project` rather than `/Users/alice/code/my-project`. This ensures
+the entry survives across machines even when usernames differ.
+
+## Honest offline / no-auth handling
+
+If a remote is unreachable (no VPN, SSH key missing, etc.) the Test action
+shows the exact error from `git ls-remote`. Nothing is hidden. You can still
+Save the repo — the path and remote are recorded; access is only needed when
+you re-clone on a follower.
+
+<Aside type="note">
+The Projects module records remotes for re-cloning. It does not sync your
+working-tree files, branches, or local commits — that is the job of git itself
+once the repo is cloned.
+</Aside>

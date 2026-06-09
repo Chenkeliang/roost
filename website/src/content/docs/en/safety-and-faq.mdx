@@ -1,0 +1,55 @@
+---
+title: Safety & FAQ
+description: How Roost keeps changes reversible, and answers to common questions.
+sidebar:
+  order: 9
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Safety model
+
+- **Dry-run by default.** `roost load` only previews changes. Nothing is written
+  until you pass `--apply`.
+- **Backups before overwrite.** When applying, Roost backs up any existing file
+  before replacing it (for example under `~/.roost-backups/`). The generated
+  `env.sh` and its backups are kept at mode `0600`.
+- **No cloud.** Your config lives in your own private git repo. There's no
+  server, no account, and no telemetry.
+- **Secrets are gated.** `capture` runs a plaintext-secret scanner; secrets are
+  encrypted with your age key and never shown in the UI or logs.
+
+<Aside type="caution" title="Removing items doesn't rewrite history">
+`unmanage` takes an item out of the working tree but does not purge git history.
+If a removed file ever held a secret, rotate it and purge history with a tool
+like `git filter-repo` or BFG.
+</Aside>
+
+## FAQ
+
+### Do I need a password manager?
+
+**No.** Most setups — dotfiles, packages, app config, projects — need no key at
+all. If you do back up secret values, you can copy your age key between machines
+manually; 1Password and rbw are just optional conveniences.
+
+### Is my data uploaded anywhere?
+
+**No.** Roost has no server and no telemetry. Your config repo and its remotes
+are entirely under your control. The dashboard runs locally too.
+
+### What happens if a secret can't be resolved on the new Mac?
+
+Roost is failure-safe: it skips that one value, warns you (naming only the
+variable, never the value), and writes a placeholder rather than a half-written
+assignment. `roost doctor` flags missing dependencies up front.
+
+### Will Roost edit my `.zshrc`?
+
+Only to append a single, idempotent source line for the managed `env.sh`,
+wrapped in markers. It never reorders or rewrites the rest of your file, and
+unmanaging removes the block again.
+
+### Which platforms are supported?
+
+macOS only for v1.

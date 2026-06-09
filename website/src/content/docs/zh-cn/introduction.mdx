@@ -1,0 +1,56 @@
+---
+title: 简介
+description: Roost 是什么,以及为什么你的数据始终归你所有。
+sidebar:
+  order: 1
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+Roost 是一个开源的 macOS 配置备份与迁移工具。
+
+在你的主力 Mac 上,你**选择**要管理的内容——dotfiles、软件包、应用配置、项目、
+别名与环境变量,以及(可选的)密钥。Roost 把它们存进**你自己的私有 git 仓库**。
+在另一台 Mac 上,你用一条命令把它们**载入**回来,并有一个可视化管理界面查看所有
+已备份的内容。
+
+<Aside type="note" title="早期开发阶段">
+Roost 目前处于早期开发阶段(P1 MVP)。本文档描述的是当前代码库**已有**的功能,
+而非未来计划。
+</Aside>
+
+## 为什么安全
+
+<CardGrid>
+  <Card title="数据始终归你所有">
+    配置存放在**你自己的**私有 git 仓库里。无服务器、无账号、**无遥测**,不向任何
+    地方回传。
+  </Card>
+  <Card title="密钥是可选的">
+    多数场景——dotfiles、软件包、应用配置、项目——完全不需要密钥。若你确实要备份
+    密钥值,它们会用你自己的 [age](https://github.com/FiloSottile/age) 密钥加密,
+    绝不在 UI 或日志中显形,且提交前的扫描器会阻止明文密钥进入仓库。
+  </Card>
+  <Card title="无需密码管理器">
+    如何把 age 密钥带到第二台 Mac 由你决定——手动拷贝一次,或从 1Password / rbw
+    拉取。即便全都不用,每台机器也会各自生成自己的密钥。没有哪一项是必需的。
+  </Card>
+  <Card title="默认可逆">
+    `load` 会先预览改动(dry-run),并在覆盖前备份已有文件。
+  </Card>
+</CardGrid>
+
+## 两个仓库——别搞混
+
+Roost 之于你的配置仓库,正如 git 之于你的代码仓库。这里有两样独立的东西:
+
+- **Roost(本工具)**——引擎 + CLI(以及之后的桌面应用)。它**不含任何个人数据**。
+- **你的配置仓库**——你的私有 git 仓库。它是**唯一事实源**(即 Roost 的 chezmoi 源)。
+
+数据归你;Roost 只是负责采集并载回的工具。
+
+## 接下来
+
+- [安装](/zh-cn/installation/)——配置开发工具链与前置依赖。
+- [快速上手](/zh-cn/quick-start/)——首次采集,以及在第二台 Mac 上首次载入。
+- [核心概念](/zh-cn/core-concepts/)——Roost 背后的心智模型。

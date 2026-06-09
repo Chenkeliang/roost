@@ -1,0 +1,19 @@
+{
+  "name": "@roost/core",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@roost/shared": "workspace:*",
+    "execa": "^9.6.1",
+    "js-yaml": "^4.1.1"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9"
+  }
+}

@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0b0b0d;
+  --surface: #161618;
+  --surface-2: #1c1c20;
+  --raise: #212126;
+  --border: #2a2a2e;
+  --border-soft: #242428;
+  --text: #ececee;
+  --muted: #8a8a8f;
+  --faint: #5c5c62;
+  --accent: #ff6363;
+  --accent-dim: #d9534f;
+  --green: #34d399;
+  --amber: #fbbf24;
+  --red: #f2555a;
+  --blue: #7fb0e8;
+  --violet: #a99be0;
+  --rc: 14px;
+  --rr: 9px;
+  --rt: 8px;
+  --rk: 6px;
+  --row: 40px;
+  --font: "Geist", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui,
+    sans-serif;
+  --mono: "Geist Mono", "SF Mono", ui-monospace, Menlo, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+/* Global UI scale — enlarge everything (text, controls, icons, spacing)
+   uniformly. WKWebView (Tauri) supports `zoom`. Tune this one number to taste. */
+html {
+  zoom: 1.04;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

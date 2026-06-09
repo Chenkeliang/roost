@@ -1,0 +1,93 @@
+---
+title: Modules
+description: The module model and a short tour of each built-in module.
+sidebar:
+  order: 5
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+## The module model
+
+Every capability in Roost is a **module** that implements a common contract.
+The core is deliberately empty of domain logic — new abilities are added as
+modules, not as special cases sprinkled through the core. Each module knows how
+to:
+
+- **index** already-managed items cheaply (runs at startup),
+- **discover** candidates on the machine (explicit, on-demand),
+- report **status** / **diff** (drift between the repo and the machine),
+- **capture** selected items into the config repo,
+- **apply** the repo's state to the machine (dry-run aware), and
+- **unmanage** an item.
+
+The split between `index` (cheap) and `discover` (explicit scan) is the key
+design decision behind the content-first dashboard model. Pages load instantly
+from the index; scanning the disk only happens when you ask.
+
+You can list the currently registered modules:
+
+```sh
+roost plugins
+```
+
+## Built-in modules
+
+### Dotfiles
+
+Backs up existing config files as-is and restores them as files, orchestrated
+through chezmoi. It deliberately skips sensitive paths (such as `~/.ssh/`,
+`~/.aws/`, `~/.config/gh/`, `.npmrc`, `.git-credentials`, `.netrc`) and the
+Roost-managed `~/.config/roost/` directory so it never double-manages what the
+Aliases & Env module owns.
+
+**Dashboard page:** shows managed files in a filterable list categorised by type
+(shell, git, editor, other). Scanning for additional candidates is on-demand.
+
+### Packages
+
+Captures your software set into a `roost/Brewfile` via Homebrew — including
+formulae, casks, and `mas` (Mac App Store) apps — plus language/runtime versions
+via mise.
+
+**Dashboard page:** displays Brewfile entries in sections (Formulae, Casks, App
+Store, Taps). Shows an honest "Homebrew not installed" state when brew is absent.
+An **[Import from this Mac]** button runs capture when no Brewfile exists yet.
+
+<Aside type="note">
+`mas` only installs apps you've already purchased; it can't acquire new paid apps for you.
+</Aside>
+
+### App Config
+
+Captures macOS application preferences using `defaults export` and restores them
+with `defaults import` — **not** by symlinking plist files. Domains known to hold
+credentials (OpenAI, Anthropic, GitHub, AWS, and similar) are skipped by default
+so tokens aren't swept in. The `roost app learn` command helps you discover which
+preference domains change when you toggle a setting in a GUI app.
+
+**Dashboard page:** managed domains in a filterable list; scan-to-add for newly
+discovered domains.
+
+### Projects
+
+Discovers your local git repositories and records them so you can re-clone your
+working set on a new machine. It can flag repos that have no remote or
+uncommitted changes. Project paths are stored home-relative (`~/…`) for
+portability across machines.
+
+**Dashboard page:** see [Projects](/en/dashboard/#projects) for details on host
+grouping, the Test and Save actions, and offline/VPN handling.
+
+### Aliases & Env
+
+Manages portable aliases, environment variables, PATH entries, and shell
+functions as structured data, regenerating `~/.config/roost/env.sh` on each
+machine. This is the one module that **owns** a slice of shell config rather than
+copying a file. It gets its own page:
+
+<LinkCard
+  title="Aliases & Env"
+  description="Portable shell config, the managed env.sh, and three secret env sources."
+  href="/en/aliases-and-env/"
+/>

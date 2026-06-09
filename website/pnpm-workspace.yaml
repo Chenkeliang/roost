@@ -1,0 +1,4 @@
+# Standalone workspace root for the docs site, kept OUTSIDE the product pnpm
+# workspace so the product gate (root install/lint/build/typecheck/test) is
+# completely unaffected. The docs site is built and deployed separately.
+packages: []
