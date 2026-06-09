@@ -9,7 +9,7 @@ vi.mock("./api", () => ({
     candidates: {
       projects: [
         { id: "/Users/k/work/a", path: "/Users/k/work/a", category: "projects", recommendation: "track", remote: "git@github.com:u/a.git", host: "github.com", protocol: "ssh" },
-        { id: "/Users/k/work/b", path: "/Users/k/work/b", category: "projects", recommendation: "track", remote: "git@gitlab.luojilab.com:t/b.git", host: "gitlab.luojilab.com", protocol: "ssh" },
+        { id: "/Users/k/work/b", path: "/Users/k/work/b", category: "projects", recommendation: "track", remote: "git@gitlab.example.com:t/b.git", host: "gitlab.example.com", protocol: "ssh" },
       ],
     },
   }),
@@ -28,7 +28,7 @@ describe("Projects", () => {
     const scan = await screen.findByRole("button", { name: /scan/i });
     await act(async () => { fireEvent.click(scan); });
     await waitFor(() => expect(screen.getByText("github.com")).toBeInTheDocument());
-    expect(screen.getByText("gitlab.luojilab.com")).toBeInTheDocument();
+    expect(screen.getByText("gitlab.example.com")).toBeInTheDocument();
     // host filter chip narrows
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^github\.com/ })); });
     expect(screen.queryByText(/work\/b/)).not.toBeInTheDocument();

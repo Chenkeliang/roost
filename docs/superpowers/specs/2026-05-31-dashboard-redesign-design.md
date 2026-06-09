@@ -118,11 +118,11 @@ interface SyncModule {
 
 ### 5.4 Projects(你的 #1 重点)
 - **目的**:管理"要随身带"的 git 项目(换机一键重建)。
-- **真实场景(首台真机审计)**:95 仓库 · 无远端 0 · SSH 80/HTTPS 15 · 主机分布 `gitlab.luojilab.com`×72、`github.com`×20、`code.qschou.com`×3 —— **异构远端(多内网 GitLab + GitHub)是常态,设计必须按此**。
+- **真实场景(首台真机审计)**:95 仓库 · 无远端 0 · SSH 80/HTTPS 15 · 主机分布 `gitlab.example.com`×72、`github.com`×20、`git.example.org`×3 —— **异构远端(多内网 GitLab + GitHub)是常态,设计必须按此**。
 - **内容(来源)**:
   - **已纳管项目**(读 `projects.yaml`,便宜):名字、**远端地址(原样保留 SSH/HTTPS)**、**本地文件夹路径**、本地在否、**远端主机**。
   - **可发现项目**(按需扫描):有界遍历 home 找 `.git`(MAX_VISITS),**读 `.git/config` 拿远端(不调 git 子进程)**;列出文件夹 + 远端 + 解析出的主机。
-- **按主机分组/筛选**:页面顶部 chip = `全部 / github.com / gitlab.luojilab.com / code.qschou.com / 无远端`(按实际主机动态生成),区分内网/公网、工作/个人。
+- **按主机分组/筛选**:页面顶部 chip = `全部 / github.com / gitlab.example.com / git.example.org / 无远端`(按实际主机动态生成),区分内网/公网、工作/个人。
 - **按钮+交互**:
   - **[扫描本机 git 项目]**(次):`/api/discover?module=projects` → 列表(文件夹 + 远端 + 主机 + 协议 + 无远端标注),带加载进度("40/88")。
   - 每行:**[测试]**(`git ls-remote <remote>` 验"可达+可鉴权",按需单点;内网仓库借此暴露"需 VPN/无权限")· **[保存/纳管]**(写 `projects.yaml`,URL 原样)· 已纳管但本地缺失 → **[克隆]**(`git clone`,走 apply,失败逐个跳过+报告)。
@@ -186,7 +186,7 @@ interface SyncModule {
 - **C 类 · 机器特定**:必须因机而异(办公代理、某机独有路径、`.gitconfig` 邮箱、仅工作机的仓库)。**base + 机器覆盖**(Profiles/ADR-0005),dotfiles 另可用 chezmoi 模板。
 
 **总策略:**
-1. **默认家目录相对**:存 `~/go` 而非 `/Users/keliang/go`;apply 用副机 `$HOME` 还原 → 不同用户名自动对。
+1. **默认家目录相对**:存 `~/go` 而非 `/Users/alex/go`;apply 用副机 `$HOME` 还原 → 不同用户名自动对。
 2. **工具路径交还工具**:nvm/`g`/brew/orbstack 的 PATH 由各自 init 设(已留在 rc、不进 Roost)→ 版本/架构差异天然消化。
 3. **机器差异 → Profiles 覆盖(ADR-0005)**:同一项在不同机器取不同值/路径——这就是"可以指定"。
 4. **采集时检测并建议**:遇 `/Users/<当前用户>/…` 字面量 → 自动建议改 `~`;遇版本固定/架构固定/`/Volumes/…` 的"机器味"路径 → 标注"机器特定,建议设为覆盖项"。
@@ -211,7 +211,7 @@ interface SyncModule {
 | 副机无 VPN/权限(内网仓库) | clone 逐个失败跳过+报告;[测试] 提前暴露(§5.4) |
 
 **当前两处缺口(待修):**
-- env 值为单引号字面量,**无法表达会展开的家目录相对值** → 需支持 B 类 env 值安全展开(双引号 + C3 白名单)。我们写死的 `GOPATH=/Users/keliang/go` 即此问题。
+- env 值为单引号字面量,**无法表达会展开的家目录相对值** → 需支持 B 类 env 值安全展开(双引号 + C3 白名单)。我们写死的 `GOPATH=/Users/alex/go` 即此问题。
 - projects 存**绝对路径** → 改家目录相对 + 可配置克隆基目录。
 
 **诚实限制:** 真正机器特定且无规律的路径(外置盘等)**无法自动移植**,只能显式覆盖或排除——Roost 检测并提示,但不假装能搬。

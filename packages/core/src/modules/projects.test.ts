@@ -58,12 +58,12 @@ describe("parseRemoteHost / parseRemoteProtocol", () => {
     expect(parseRemoteProtocol("git@github.com:u/r.git")).toBe("ssh");
   });
   it("parses https", () => {
-    expect(parseRemoteHost("https://gitlab.luojilab.com/g/r.git")).toBe("gitlab.luojilab.com");
-    expect(parseRemoteProtocol("https://gitlab.luojilab.com/g/r.git")).toBe("https");
+    expect(parseRemoteHost("https://gitlab.example.com/g/r.git")).toBe("gitlab.example.com");
+    expect(parseRemoteProtocol("https://gitlab.example.com/g/r.git")).toBe("https");
   });
   it("parses ssh:// url", () => {
-    expect(parseRemoteHost("ssh://git@code.qschou.com:22/g/r.git")).toBe("code.qschou.com");
-    expect(parseRemoteProtocol("ssh://git@code.qschou.com/g/r.git")).toBe("ssh");
+    expect(parseRemoteHost("ssh://git@git.example.org:22/g/r.git")).toBe("git.example.org");
+    expect(parseRemoteProtocol("ssh://git@git.example.org/g/r.git")).toBe("ssh");
   });
   it("handles null / unknown", () => {
     expect(parseRemoteHost(null)).toBeNull();
@@ -73,10 +73,10 @@ describe("parseRemoteHost / parseRemoteProtocol", () => {
 
 describe("home-relative paths", () => {
   it("stores under home as ~/…", () => {
-    expect(toHomeRelative("/Users/keliang/go/src/x", "/Users/keliang")).toBe("~/go/src/x");
+    expect(toHomeRelative("/Users/alex/go/src/x", "/Users/alex")).toBe("~/go/src/x");
   });
   it("leaves outside-home paths absolute", () => {
-    expect(toHomeRelative("/Volumes/Work/x", "/Users/keliang")).toBe("/Volumes/Work/x");
+    expect(toHomeRelative("/Volumes/Work/x", "/Users/alex")).toBe("/Volumes/Work/x");
   });
   it("resolves ~/… against home", () => {
     expect(fromHomeRelative("~/go/src/x", "/Users/bob")).toBe("/Users/bob/go/src/x");
@@ -277,7 +277,7 @@ describe("projectsModule.discover enrichment", () => {
     fs.mkdirSync(path.join(repo, ".git"), { recursive: true });
     fs.writeFileSync(
       path.join(repo, ".git", "config"),
-      '[remote "origin"]\n\turl = git@gitlab.luojilab.com:team/app.git\n',
+      '[remote "origin"]\n\turl = git@gitlab.example.com:team/app.git\n',
     );
     // exec that throws if any git per-repo command runs (discover must read the file, not call git)
     const exec = {
@@ -287,8 +287,8 @@ describe("projectsModule.discover enrichment", () => {
     const cands = await projectsModule.discover(ctx);
     const c = cands.find((x) => x.path.endsWith("work/app"));
     expect(c).toBeDefined();
-    expect(c!.remote).toBe("git@gitlab.luojilab.com:team/app.git");
-    expect(c!.host).toBe("gitlab.luojilab.com");
+    expect(c!.remote).toBe("git@gitlab.example.com:team/app.git");
+    expect(c!.host).toBe("gitlab.example.com");
     expect(c!.protocol).toBe("ssh");
     expect(c!.recommendation).toBe("track");
     fs.rmSync(home, { recursive: true, force: true });
@@ -303,7 +303,7 @@ describe("testRemote", () => {
   });
   it("unreachable when git ls-remote fails (no credentials in message)", async () => {
     const exec = { run: async () => ({ code: 128, stdout: "", stderr: "fatal: Could not read from remote repository" }) } as unknown as import("@roost/shared").Exec;
-    const r = await testRemote(exec, "git@gitlab.luojilab.com:t/p.git");
+    const r = await testRemote(exec, "git@gitlab.example.com:t/p.git");
     expect(r.reachable).toBe(false);
     expect(r.message).toMatch(/unreachable|denied|remote/i);
   });

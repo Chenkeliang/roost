@@ -12,3 +12,7 @@ keys.txt
 
 # Visual-companion brainstorm mockups (local, ephemeral)
 .superpowers/
+
+# Local dev / personal
+prototypes/
+.claude/
