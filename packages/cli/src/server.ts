@@ -21,6 +21,8 @@ import {
   itemDiff,
   checkEnvironment,
   brewInstall,
+  importFromZip,
+  importFromGit,
   discoverAll,
   defaultRegistry,
   createExec,
@@ -843,6 +845,46 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     cache.invalidateAll();
     return reply.send(cs);
   });
+
+  // ── POST /api/skills/import-git ──────────────────────────────────────────────
+  // Clone a remote repo (single skill or a skills/ pack) and ingest it — gated by
+  // the same secret/size scan as capture. Files only; never executed.
+  server.post<{ Body: { url?: string } }>("/api/skills/import-git", async (req, reply) => {
+    const url = req.body?.url?.trim();
+    if (!url || !/^(https?:\/\/|git@)/.test(url)) {
+      return reply.status(400).send({ error: "a git/https URL is required" });
+    }
+    try {
+      const result = await importFromGit(makeCtx(false), url);
+      cache.invalidateAll();
+      return reply.send(result);
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // ── POST /api/skills/import-zip ──────────────────────────────────────────────
+  // Ingest a .zip uploaded as base64 (drag-drop or file picker in the web UI).
+  server.post<{ Body: { filename?: string; dataBase64?: string } }>(
+    "/api/skills/import-zip",
+    { bodyLimit: 64 * 1024 * 1024 },
+    async (req, reply) => {
+      const { filename, dataBase64 } = req.body ?? {};
+      if (!dataBase64) return reply.status(400).send({ error: "dataBase64 (zip bytes) is required" });
+      const safe = (filename && /\.zip$/i.test(filename) ? filename : "import.zip").replace(/[^\w.-]/g, "_");
+      const tmpZip = path.join(os.tmpdir(), `roost-skill-${process.pid}-${safe}`);
+      try {
+        fs.writeFileSync(tmpZip, Buffer.from(dataBase64, "base64"));
+        const result = await importFromZip(makeCtx(false), tmpZip);
+        cache.invalidateAll();
+        return reply.send(result);
+      } catch (err) {
+        return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+      } finally {
+        fs.rmSync(tmpZip, { force: true });
+      }
+    },
+  );
 
   // ── POST /api/skills/toggle ──────────────────────────────────────────────────
   server.post<{ Body: { skill?: string; target?: string; enabled?: boolean } }>(

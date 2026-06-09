@@ -336,6 +336,55 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  // exec that fakes `git clone …<dest>` and `ditto -x -k …<dest>` by writing a
+  // SKILL.md into the destination dir, so import endpoints are testable offline.
+  const fakeImportExec = {
+    async run(cmd: string, args: string[]) {
+      const dest = cmd === "git" ? args[args.length - 1] : cmd === "ditto" ? args[3] : null;
+      if (dest) {
+        fs.mkdirSync(dest, { recursive: true });
+        fs.writeFileSync(path.join(dest, "SKILL.md"), "---\nname: remote-skill\n---\n# x", "utf8");
+      }
+      return { code: 0, stdout: "", stderr: "" };
+    },
+  };
+
+  it("POST /api/skills/import-git clones + ingests a skill into repo/skills", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec: fakeImportExec }) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/import-git", payload: { url: "https://github.com/me/skill.git" } });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { imported: string[] }).imported).toContain("remote-skill");
+    expect(fs.existsSync(path.join(tmpDir, "skills", "remote-skill", "SKILL.md"))).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/skills/import-git → 400 on a non-URL", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/import-git", payload: { url: "not a url" } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+
+  it("POST /api/skills/import-zip ingests an uploaded zip", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec: fakeImportExec }) });
+    const dataBase64 = Buffer.from("PK fake zip bytes").toString("base64");
+    const res = await server.inject({ method: "POST", url: "/api/skills/import-zip", payload: { filename: "remote-skill.zip", dataBase64 } });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { imported: string[] }).imported).toContain("remote-skill");
+    await server.close();
+  });
+
+  it("POST /api/skills/import-zip → 400 without data", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/import-zip", payload: {} });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+
   it("POST /api/resolve take-repo → applies just that item", async () => {
     const reg = new ModuleRegistry();
     const applied: string[] = [];
