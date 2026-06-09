@@ -52,12 +52,12 @@ const DOCS_URL = "https://github.com/Chenkeliang/roost/tree/main/website";
 function RoostMark() {
   return (
     <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      viewBox="6.5 6 11 11"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="1.3"
       strokeLinecap="round"
       strokeLinejoin="round"
       style={{ color: "var(--accent)", flexShrink: 0 }}
@@ -288,7 +288,9 @@ export function App() {
               marginTop: "auto",
               display: "flex",
               alignItems: "center",
-              gap: 10,
+              flexWrap: "wrap",
+              gap: 8,
+              rowGap: 8,
               padding: "12px 10px 2px",
               color: "var(--muted)",
               fontSize: 13,
@@ -303,6 +305,7 @@ export function App() {
                 border: "1px solid var(--border)",
                 borderRadius: 999,
                 fontSize: 13,
+                flexShrink: 0,
               }}
             >
               <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
@@ -316,7 +319,7 @@ export function App() {
                 e.preventDefault();
                 void openExternal(DOCS_URL);
               }}
-              style={{ color: "var(--muted)", textDecoration: "none" }}
+              style={{ color: "var(--muted)", textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
             >
               {t("app.docs")}
             </a>

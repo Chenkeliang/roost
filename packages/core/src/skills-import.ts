@@ -32,29 +32,38 @@ export function skillName(dir: string): string {
   return frontmatterName(dir) ?? path.basename(dir);
 }
 
+const SKIP_DIRS = new Set([".git", "node_modules", ".github", "dist", "build", "__pycache__"]);
+
 // Locate skill root(s) inside a staged directory:
 //  - the dir itself if it holds SKILL.md (single skill)
-//  - otherwise child dirs (and skills/* children) that hold SKILL.md (a pack)
+//  - otherwise a bounded recursive walk collecting every dir that directly holds
+//    SKILL.md (handles repos that nest skills under any folder structure).
 export function findSkillRoots(stagedDir: string, fallbackName?: string): { name: string; path: string }[] {
   if (fs.existsSync(path.join(stagedDir, "SKILL.md"))) {
     const name = frontmatterName(stagedDir) ?? fallbackName ?? path.basename(stagedDir);
     return [{ name, path: stagedDir }];
   }
   const roots: { name: string; path: string }[] = [];
-  for (const parent of [stagedDir, path.join(stagedDir, "skills")]) {
-    if (!fs.existsSync(parent)) continue;
+  const maxDepth = 5;
+  const walk = (dir: string, depth: number): void => {
+    if (depth > maxDepth) return;
     let entries: fs.Dirent[];
     try {
-      entries = fs.readdirSync(parent, { withFileTypes: true });
+      entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
-      continue;
+      return;
     }
     for (const e of entries) {
-      if (e.isDirectory() && fs.existsSync(path.join(parent, e.name, "SKILL.md"))) {
-        roots.push({ name: e.name, path: path.join(parent, e.name) });
+      if (!e.isDirectory() || SKIP_DIRS.has(e.name)) continue;
+      const child = path.join(dir, e.name);
+      if (fs.existsSync(path.join(child, "SKILL.md"))) {
+        roots.push({ name: skillName(child), path: child }); // a skill — don't descend further
+      } else {
+        walk(child, depth + 1);
       }
     }
-  }
+  };
+  walk(stagedDir, 0);
   return roots;
 }
 

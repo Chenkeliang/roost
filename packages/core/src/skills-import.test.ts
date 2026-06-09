@@ -51,6 +51,18 @@ describe("findSkillRoots", () => {
     mkSkill(path.join(tmp, "skills"), "gamma");
     expect(findSkillRoots(tmp).map((r) => r.name)).toEqual(["gamma"]);
   });
+
+  it("finds skills nested several levels deep (recursive)", () => {
+    mkSkill(path.join(tmp, "packages", "a", "src"), "deep-skill");
+    mkSkill(path.join(tmp, "category", "b"), "another");
+    expect(findSkillRoots(tmp).map((r) => r.name).sort()).toEqual(["another", "deep-skill"]);
+  });
+
+  it("does not descend into .git / node_modules", () => {
+    mkSkill(path.join(tmp, "node_modules", "pkg"), "should-skip");
+    mkSkill(tmp, "real");
+    expect(findSkillRoots(tmp).map((r) => r.name)).toEqual(["real"]);
+  });
 });
 
 describe("importStaged", () => {
