@@ -238,6 +238,36 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/item-diff → 200 with local/repo for an appconfig domain", async () => {
+    const dir = path.join(tmpDir, "roost", "appconfig");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "com.example.app.plist"), "<plist>REPO</plist>", "utf8");
+    const reg = new ModuleRegistry();
+    const server = buildServer({
+      repoDir: tmpDir,
+      registry: reg,
+      makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec: { async run() { return { code: 0, stdout: "<plist>LIVE</plist>", stderr: "" }; } } }),
+    });
+    const res = await server.inject({
+      method: "GET",
+      url: "/api/item-diff?module=appconfig&id=domain:com.example.app",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { kind: string; local: string | null; repo: string | null };
+    expect(body.kind).toBe("text");
+    expect(body.local).toBe("<plist>LIVE</plist>");
+    expect(body.repo).toBe("<plist>REPO</plist>");
+    await server.close();
+  });
+
+  it("GET /api/item-diff → 400 when params missing", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/item-diff?module=appconfig" });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+
   it("POST /api/resolve take-repo → applies just that item", async () => {
     const reg = new ModuleRegistry();
     const applied: string[] = [];
@@ -1203,7 +1233,7 @@ describe("buildServer", () => {
     const body = res.json() as { candidates: Record<string, unknown[]> };
     expect(Object.keys(body.candidates)).toEqual(["projects"]);
     await server.close();
-  });
+  }, 20000); // projects discover scans the filesystem; allow headroom under load
 
   it("GET /api/packages/brewfile → 200 shape; parses an on-disk Brewfile", async () => {
     const brewDir = path.join(tmpDir, "roost");

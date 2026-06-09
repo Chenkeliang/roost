@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { getSyncState, postResolve } from "../api";
-import type { SyncStateResponse, SyncItem, SyncExceptionKind, ResolveAction } from "../api";
+import { getSyncState, postResolve, getItemDiff } from "../api";
+import type {
+  SyncStateResponse,
+  SyncItem,
+  SyncExceptionKind,
+  ResolveAction,
+  ItemDiffResponse,
+} from "../api";
 
 // Automation-first review surface (ADR-0016 §6): non-conflicts auto-resolve;
 // only three typed exceptions need a human. Per-item resolve hits POST /api/resolve.
@@ -41,6 +47,40 @@ function Pill({ text, color }: { text: string; color: string }) {
   );
 }
 
+function DiffPane({ label, text, accent }: { label: string; text: string | null; accent: string }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0, border: `1px solid ${accent}`, borderRadius: 8, overflow: "hidden" }}>
+      <div
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: ".05em",
+          color: "var(--muted)",
+          padding: "4px 8px",
+          borderBottom: "1px solid var(--border-soft)",
+        }}
+      >
+        {label}
+      </div>
+      <pre
+        style={{
+          margin: 0,
+          padding: "8px 10px",
+          fontSize: 11,
+          fontFamily: "var(--font-mono, monospace)",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          maxHeight: 260,
+          overflow: "auto",
+          color: text === null ? "var(--muted)" : "var(--text)",
+        }}
+      >
+        {text === null ? "(不存在)" : text || "(空)"}
+      </pre>
+    </div>
+  );
+}
+
 function Row({
   item,
   busy,
@@ -51,44 +91,90 @@ function Row({
   onResolve: (item: SyncItem, action: ResolveAction) => void;
 }) {
   const actions = item.exception ? ACTIONS[item.exception] : [];
+  const [open, setOpen] = useState(false);
+  const [diff, setDiff] = useState<ItemDiffResponse | null>(null);
+  const [diffErr, setDiffErr] = useState<string | null>(null);
+
+  const toggleDiff = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && diff === null && diffErr === null) {
+      getItemDiff(item.module, item.id)
+        .then(setDiff)
+        .catch((e) => setDiffErr(e instanceof Error ? e.message : String(e)));
+    }
+  };
+
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "9px 14px",
-        borderBottom: "1px solid var(--border-soft)",
-        fontSize: 12.5,
-        opacity: busy ? 0.5 : 1,
-      }}
-    >
-      <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 72 }}>{item.module}</span>
-      <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{item.id}</span>
-      {item.detail ? <span style={{ color: "var(--muted)", fontSize: 11 }}>{item.detail}</span> : null}
-      <span style={{ flex: 1 }} />
-      {actions.map((a) => (
+    <>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "9px 14px",
+          borderBottom: open ? "none" : "1px solid var(--border-soft)",
+          fontSize: 12.5,
+          opacity: busy ? 0.5 : 1,
+        }}
+      >
+        <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 72 }}>{item.module}</span>
+        <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{item.id}</span>
+        {item.detail ? <span style={{ color: "var(--muted)", fontSize: 11 }}>{item.detail}</span> : null}
+        <span style={{ flex: 1 }} />
         <button
-          key={a.action}
-          disabled={busy}
-          onClick={() => onResolve(item, a.action)}
+          onClick={toggleDiff}
           style={{
             fontSize: 10.5,
-            fontWeight: 600,
-            padding: "3px 11px",
+            padding: "3px 9px",
             borderRadius: 7,
-            cursor: busy ? "default" : "pointer",
+            cursor: "pointer",
             background: "transparent",
-            border: a.primary ? "1px solid var(--accent)" : "1px solid var(--border)",
-            color: a.primary ? "var(--accent)" : "var(--muted)",
-            minWidth: a.primary ? 64 : undefined,
-            textAlign: "center",
+            border: "1px solid var(--border)",
+            color: "var(--muted)",
           }}
         >
-          {a.label}
+          {open ? "收起" : "diff ▸"}
         </button>
-      ))}
-    </div>
+        {actions.map((a) => (
+          <button
+            key={a.action}
+            disabled={busy}
+            onClick={() => onResolve(item, a.action)}
+            style={{
+              fontSize: 10.5,
+              fontWeight: 600,
+              padding: "3px 11px",
+              borderRadius: 7,
+              cursor: busy ? "default" : "pointer",
+              background: "transparent",
+              border: a.primary ? "1px solid var(--accent)" : "1px solid var(--border)",
+              color: a.primary ? "var(--accent)" : "var(--muted)",
+              minWidth: a.primary ? 64 : undefined,
+              textAlign: "center",
+            }}
+          >
+            {a.label}
+          </button>
+        ))}
+      </div>
+      {open ? (
+        <div style={{ padding: "0 14px 12px", borderBottom: "1px solid var(--border-soft)" }}>
+          {diffErr ? (
+            <div style={{ color: "#ff8c8c", fontSize: 12 }}>{diffErr}</div>
+          ) : diff === null ? (
+            <div style={{ color: "var(--muted)", fontSize: 12 }}>加载 diff…</div>
+          ) : diff.kind === "summary" ? (
+            <div style={{ color: "var(--muted)", fontSize: 12 }}>{diff.summary}</div>
+          ) : (
+            <div style={{ display: "flex", gap: 8 }}>
+              <DiffPane label="本地" text={diff.local} accent="#5aa9f033" />
+              <DiffPane label="仓库" text={diff.repo} accent="#FF636333" />
+            </div>
+          )}
+        </div>
+      ) : null}
+    </>
   );
 }
 

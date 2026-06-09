@@ -112,6 +112,8 @@ export { hashContent, loadModuleBaseline, recordModuleBaseline } from "./sync-ba
 export { cloneRepo, remoteHead, checkPushSafety } from "./onboarding.js";
 export { preflight } from "./preflight.js";
 export type { PreflightResult } from "./preflight.js";
+export { itemDiff } from "./item-diff.js";
+export type { ItemDiff } from "./item-diff.js";
 export { readBaseline, writeBaseline } from "./state.js";
 export type { ModuleBaseline } from "./state.js";
 export {

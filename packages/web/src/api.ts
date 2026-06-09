@@ -112,6 +112,17 @@ export function getSyncState(): Promise<SyncStateResponse> {
   return apiFetch<SyncStateResponse>("/api/sync-state");
 }
 
+export interface ItemDiffResponse {
+  kind: "text" | "summary";
+  local: string | null;
+  repo: string | null;
+  summary?: string;
+}
+export function getItemDiff(module: string, id: string): Promise<ItemDiffResponse> {
+  const q = `?module=${encodeURIComponent(module)}&id=${encodeURIComponent(id)}`;
+  return apiFetch<ItemDiffResponse>(`/api/item-diff${q}`);
+}
+
 export type ResolveAction = "take-repo" | "keep-local";
 export interface ResolveResponse {
   ok: boolean;

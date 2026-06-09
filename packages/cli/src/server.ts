@@ -18,6 +18,7 @@ import {
   statusAll,
   syncStateAll,
   preflight,
+  itemDiff,
   discoverAll,
   defaultRegistry,
   createExec,
@@ -203,6 +204,27 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.status(500).send({ error: msg });
     }
   });
+
+  // ── GET /api/item-diff ─────────────────────────────────────────────────────
+  // Per-item local-vs-repo content for the two-column review (ADR-0016 §6.6).
+  server.get<{ Querystring: { module?: string; id?: string } }>(
+    "/api/item-diff",
+    async (req, reply) => {
+      const mod = req.query.module;
+      const id = req.query.id;
+      if (!mod || !id) {
+        return reply.status(400).send({ error: "module and id are required" });
+      }
+      try {
+        const ctx = makeCtx(true);
+        const result = await itemDiff({ repoDir, home: ctx.home, exec: ctx.exec }, mod, id);
+        return reply.send(result);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return reply.status(500).send({ error: msg });
+      }
+    },
+  );
 
   // ── POST /api/resolve ──────────────────────────────────────────────────────
   // Resolve one reviewed item (ADR-0016 §6.2). "take-repo" applies just that

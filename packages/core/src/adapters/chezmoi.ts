@@ -11,6 +11,9 @@ export interface Chezmoi {
   // Target-relative paths (relative to home) that differ from the source — i.e.
   // the per-file equivalent of `verify` (parses `chezmoi status`).
   changedPaths(): Promise<string[]>;
+  // The contents chezmoi would write for a target path (the "repo" side of a
+  // diff). Returns null if the path is not managed / cannot be produced.
+  cat(targetPath: string): Promise<string | null>;
   managed(): Promise<string[]>;
   forget(path: string): Promise<void>;
 }
@@ -66,6 +69,11 @@ export function createChezmoi(exec: Exec, opts: { sourceDir: string }): Chezmoi 
           return (m ? m[1]! : line.trim()).trim();
         })
         .filter((p) => p.length > 0);
+    },
+
+    async cat(targetPath: string): Promise<string | null> {
+      const r = await exec.run("chezmoi", ["--source", sourceDir, "cat", targetPath]);
+      return r.code === 0 ? r.stdout : null;
     },
 
     async managed(): Promise<string[]> {
