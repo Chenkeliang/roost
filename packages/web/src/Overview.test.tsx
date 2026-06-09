@@ -67,11 +67,11 @@ describe("Overview", () => {
     });
   });
 
-  it("renders capture and load buttons", async () => {
+  it("renders capture and review buttons", async () => {
     await act(async () => { render(<Overview showHud={noop} />); });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Capture/i })).toBeTruthy();
-      expect(screen.getByRole("button", { name: /Load/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Review & restore/i })).toBeTruthy();
     });
   });
 
@@ -114,18 +114,13 @@ describe("Overview", () => {
     });
   });
 
-  it("does not render with old shape: result.changes (must use result.results)", async () => {
-    // The mock returns { results: [...] } not { changes: [...] } — if Overview
-    // accidentally reads .changes it would get undefined and show "0 results"
-    // or crash. This test confirms the HUD fires with the results count.
-    const showHud = vi.fn();
-    await act(async () => { render(<Overview showHud={showHud} />); });
-    const loadBtn = await screen.findByRole("button", { name: /Load \(dry-run\)/i });
-    fireEvent.click(loadBtn);
+  it("the review button navigates to Sync Review (calls onOpenSync)", async () => {
+    const onOpenSync = vi.fn();
+    await act(async () => { render(<Overview showHud={noop} onOpenSync={onOpenSync} />); });
+    const reviewBtn = await screen.findByRole("button", { name: /Review & restore/i });
+    fireEvent.click(reviewBtn);
     await waitFor(() => {
-      expect(showHud).toHaveBeenCalledWith(
-        expect.objectContaining({ text: expect.stringContaining("1") })
-      );
+      expect(onOpenSync).toHaveBeenCalled();
     });
   });
 });

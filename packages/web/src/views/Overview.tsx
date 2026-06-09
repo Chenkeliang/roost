@@ -12,7 +12,6 @@ import {
   getMachines,
   getStatus,
   postCapture,
-  postLoad,
   addSelection,
   removeSelection,
   type HealthResponse,
@@ -23,6 +22,7 @@ import {
 
 interface OverviewProps {
   showHud: (msg: HudMessage) => void;
+  onOpenSync?: () => void;
 }
 
 interface ModuleHealthProps {
@@ -83,14 +83,13 @@ function ModuleHealthChip({ report }: ModuleHealthProps) {
   );
 }
 
-export function Overview({ showHud }: OverviewProps) {
+export function Overview({ showHud, onOpenSync }: OverviewProps) {
   const { t } = useT();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [machines, setMachines] = useState<MachinesResponse | null>(null);
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [capturing, setCapturing] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [blockedDetail, setBlockedDetail] = useState<BlockedItem[]>([]);
@@ -176,18 +175,6 @@ export function Overview({ showHud }: OverviewProps) {
       await fetchData();
     } catch (e) {
       showHud({ text: e instanceof Error ? e.message : "Remove failed", type: "error" });
-    }
-  };
-
-  const handleLoad = async () => {
-    setLoading(true);
-    try {
-      const result = await postLoad(false);
-      showHud({ text: `Load preview: ${result.results.length} result${result.results.length === 1 ? "" : "s"}`, type: "success" });
-    } catch (e) {
-      showHud({ text: e instanceof Error ? e.message : "Load failed", type: "error" });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -320,14 +307,13 @@ export function Overview({ showHud }: OverviewProps) {
         </button>
 
         <button
-          onClick={() => void handleLoad()}
-          disabled={loading}
+          onClick={() => onOpenSync?.()}
           style={{
             appearance: "none",
             fontFamily: "var(--font)",
             fontSize: 13,
             fontWeight: 540,
-            cursor: loading ? "not-allowed" : "pointer",
+            cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
             gap: 8,
@@ -336,16 +322,13 @@ export function Overview({ showHud }: OverviewProps) {
             background: "var(--raise)",
             color: "var(--text)",
             border: "1px solid var(--border)",
-            opacity: loading ? 0.7 : 1,
             transition: "transform .08s, background .12s",
           }}
-          onMouseDown={(e) =>
-            (e.currentTarget.style.transform = "scale(.975)")
-          }
+          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.975)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
         >
-          <DownloadSimple size={16} weight={loading ? "duotone" : "regular"} />
-          {loading ? t("overview.loading") : t("overview.load")}
+          <DownloadSimple size={16} weight="regular" />
+          {t("overview.review")}
         </button>
 
         <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 12 }}>

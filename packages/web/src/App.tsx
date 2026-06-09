@@ -326,7 +326,7 @@ export function App() {
 
         {/* Main content */}
         <main style={{ flex: 1, minWidth: 0, paddingTop: 28, paddingBottom: 60 }}>
-          {activeTab === "overview" && <Overview showHud={showHud} />}
+          {activeTab === "overview" && <Overview showHud={showHud} onOpenSync={() => setActiveTab("sync")} />}
           {activeTab === "manage" && <Manage showHud={showHud} />}
           {activeTab === "projects" && <Projects showHud={showHud} />}
           {activeTab === "packages" && <Packages showHud={showHud} />}

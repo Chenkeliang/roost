@@ -94,6 +94,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "overview.capture": { en: "Capture", zh: "捕获" },
   "overview.capturing": { en: "Capturing…", zh: "捕获中…" },
   "overview.load": { en: "Load (dry-run)", zh: "加载（预演）" },
+  "overview.review": { en: "Review & restore", zh: "检查并恢复" },
   "overview.loading": { en: "Loading…", zh: "加载中…" },
   "overview.moduleHealth": { en: "Module Health", zh: "模块健康度" },
   "overview.blockedTitle": { en: "items blocked — potential secrets", zh: "项被拦下 —— 疑似密钥" },
