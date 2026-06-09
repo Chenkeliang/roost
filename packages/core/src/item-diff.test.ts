@@ -58,6 +58,20 @@ describe("itemDiff", () => {
     expect(out.repo).toBe("<plist>REPO</plist>");
   });
 
+  it("appconfig: per-key diff lists only changed keys", async () => {
+    const dir = path.join(tmp, "roost", "appconfig");
+    fs.mkdirSync(dir, { recursive: true });
+    const repoPlist =
+      "<plist><dict><key>tilesize</key><integer>48</integer><key>autohide</key><false/></dict></plist>";
+    fs.writeFileSync(path.join(dir, "com.apple.dock.plist"), repoPlist, "utf8");
+    const livePlist =
+      "<plist><dict><key>tilesize</key><integer>64</integer><key>autohide</key><false/></dict></plist>";
+    const exec = fakeExec((cmd) => (cmd === "defaults" ? { code: 0, stdout: livePlist } : { code: 0 }));
+    const out = await itemDiff({ repoDir: tmp, home: tmp, exec }, "appconfig", "domain:com.apple.dock");
+    expect(out.keys).toBeDefined();
+    expect(out.keys).toEqual([{ key: "tilesize", local: "64", repo: "48" }]);
+  });
+
   it("packages: summary kind", async () => {
     const exec = fakeExec(() => ({ code: 0 }));
     const out = await itemDiff({ repoDir: tmp, home: tmp, exec }, "packages", "Brewfile");

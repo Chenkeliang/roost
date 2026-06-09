@@ -185,6 +185,24 @@ function Row({
             <div style={{ color: "var(--muted)", fontSize: 12 }}>加载 diff…</div>
           ) : diff.kind === "summary" ? (
             <div style={{ color: "var(--muted)", fontSize: 12 }}>{diff.summary}</div>
+          ) : diff.keys && diff.keys.length > 0 ? (
+            <div style={{ border: "1px solid var(--border-soft)", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ display: "flex", fontSize: 10, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--muted)", padding: "5px 10px", borderBottom: "1px solid var(--border-soft)" }}>
+                <span style={{ flex: 1.2 }}>键</span>
+                <span style={{ flex: 1, color: "#9ec5f0" }}>本地</span>
+                <span style={{ flex: 1, color: "#f0a0a0" }}>仓库</span>
+              </div>
+              {diff.keys.map((k) => (
+                <div key={k.key} style={{ display: "flex", fontSize: 11, fontFamily: "var(--font-mono, monospace)", padding: "4px 10px", borderBottom: "1px solid var(--border-soft)" }}>
+                  <span style={{ flex: 1.2, color: "var(--text)", wordBreak: "break-all" }}>{k.key}</span>
+                  <span style={{ flex: 1, color: "#9ec5f0", wordBreak: "break-all" }}>{k.local ?? "(无)"}</span>
+                  <span style={{ flex: 1, color: "#f0a0a0", wordBreak: "break-all" }}>{k.repo ?? "(无)"}</span>
+                </div>
+              ))}
+              <div style={{ fontSize: 10.5, color: "var(--muted)", padding: "5px 10px" }}>
+                逐键仅供看清;处置仍整域级(取仓库 / 保留本地)。
+              </div>
+            </div>
           ) : (
             <div style={{ display: "flex", gap: 8 }}>
               <DiffPane label="本地" text={diff.local} accent="#5aa9f033" />

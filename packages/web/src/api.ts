@@ -112,11 +112,17 @@ export function getSyncState(): Promise<SyncStateResponse> {
   return apiFetch<SyncStateResponse>("/api/sync-state");
 }
 
+export interface KeyDiff {
+  key: string;
+  local: string | null;
+  repo: string | null;
+}
 export interface ItemDiffResponse {
   kind: "text" | "summary";
   local: string | null;
   repo: string | null;
   summary?: string;
+  keys?: KeyDiff[];
 }
 export function getItemDiff(module: string, id: string): Promise<ItemDiffResponse> {
   const q = `?module=${encodeURIComponent(module)}&id=${encodeURIComponent(id)}`;
