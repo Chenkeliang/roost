@@ -984,3 +984,49 @@ describe("env status three-way (env.sh)", () => {
     }
   });
 });
+
+describe("env status blocked (age key missing)", () => {
+  function writeSecretRepo(tmp: string) {
+    const roostDir = path.join(tmp, "roost");
+    fs.mkdirSync(roostDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(roostDir, "env.yaml"),
+      "schemaVersion: 1\naliases: []\nenv:\n  - kind: env\n    name: TOKEN\n    value: \"\"\n    secret: true\n    enabled: true\npath: []\nfunctions: []\n",
+      "utf8",
+    );
+  }
+  function ctxFor(tmp: string) {
+    return {
+      repoDir: tmp, home: tmp, profile: "base", dryRun: true,
+      exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+      log: { info() {}, warn() {}, error() {} }, t: (k: string) => k,
+    } as never;
+  }
+
+  it("emits a blocked env-secrets item when secrets exist but no age key", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-envblk-"));
+    try {
+      writeSecretRepo(tmp);
+      const report = await envModule.status(ctxFor(tmp), { modules: {} });
+      const blk = report.items.find((i) => i.id === "env-secrets");
+      expect(blk).toBeDefined();
+      expect(blk!.blocked).toBe(true);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("does NOT emit blocked when the age key is present", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-envblk2-"));
+    try {
+      writeSecretRepo(tmp);
+      const keyDir = path.join(tmp, ".config", "sops", "age");
+      fs.mkdirSync(keyDir, { recursive: true });
+      fs.writeFileSync(path.join(keyDir, "keys.txt"), "AGE-SECRET-KEY-...", "utf8");
+      const report = await envModule.status(ctxFor(tmp), { modules: {} });
+      expect(report.items.find((i) => i.id === "env-secrets")).toBeUndefined();
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});

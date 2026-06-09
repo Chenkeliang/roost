@@ -85,10 +85,12 @@ function Row({
   item,
   busy,
   onResolve,
+  onOpenSettings,
 }: {
   item: SyncItem;
   busy: boolean;
   onResolve: (item: SyncItem, action: ResolveAction) => void;
+  onOpenSettings?: () => void;
 }) {
   const actions = item.exception ? ACTIONS[item.exception] : [];
   const [open, setOpen] = useState(false);
@@ -136,6 +138,23 @@ function Row({
         >
           {open ? "收起" : "diff ▸"}
         </button>
+        {item.exception === "blocked" && onOpenSettings ? (
+          <button
+            onClick={onOpenSettings}
+            style={{
+              fontSize: 10.5,
+              fontWeight: 600,
+              padding: "3px 11px",
+              borderRadius: 7,
+              cursor: "pointer",
+              background: "transparent",
+              border: "1px solid #b79af0",
+              color: "#b79af0",
+            }}
+          >
+            去设置 ▸
+          </button>
+        ) : null}
         {actions.map((a) => (
           <button
             key={a.action}
@@ -184,12 +203,14 @@ function Group({
   items,
   busyId,
   onResolve,
+  onOpenSettings,
 }: {
   title: string;
   dot?: string;
   items: SyncItem[];
   busyId: string | null;
   onResolve: (item: SyncItem, action: ResolveAction) => void;
+  onOpenSettings?: () => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -220,14 +241,22 @@ function Group({
       >
         {items.map((it) => {
           const key = `${it.module}:${it.id}`;
-          return <Row key={key} item={it} busy={busyId === key} onResolve={onResolve} />;
+          return (
+            <Row
+              key={key}
+              item={it}
+              busy={busyId === key}
+              onResolve={onResolve}
+              onOpenSettings={onOpenSettings}
+            />
+          );
         })}
       </div>
     </div>
   );
 }
 
-export function SyncState() {
+export function SyncState({ onOpenSettings }: { onOpenSettings?: () => void } = {}) {
   const [data, setData] = useState<SyncStateResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -424,7 +453,7 @@ export function SyncState() {
             <>
               <Group title="已自动就绪(Behind / 新机)" items={auto} busyId={busyId} onResolve={onResolve} />
               <Group title={LABEL.diverged} dot={DOT.diverged} items={diverged} busyId={busyId} onResolve={onResolve} />
-              <Group title={LABEL.blocked} dot={DOT.blocked} items={blocked} busyId={busyId} onResolve={onResolve} />
+              <Group title={LABEL.blocked} dot={DOT.blocked} items={blocked} busyId={busyId} onResolve={onResolve} onOpenSettings={onOpenSettings} />
               <Group title={LABEL.destructive} dot={DOT.destructive} items={destructive} busyId={busyId} onResolve={onResolve} />
               {needDecision === 0 && auto.length === 0 ? (
                 <div style={{ color: "#5fd08a", fontSize: 13 }}>全部同步,无需处理。</div>

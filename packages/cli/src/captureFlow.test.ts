@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createExec, readState, STATE_SCHEMA_VERSION } from "@roost/core";
+import { createExec, readState, writeState, STATE_SCHEMA_VERSION } from "@roost/core";
 import { ensureGitRepo } from "./gitRepo.js";
 import { finalizeCapture } from "./captureFlow.js";
 
@@ -36,5 +36,20 @@ describe("finalizeCapture", () => {
     const exec = createExec();
     const log = await exec.run("git", ["-C", repoDir, "log", "--pretty=%s"]);
     expect(log.stdout).toContain("roost: capture");
+  });
+
+  it("preserves an existing baseline (does not wipe modules) and stamps lastSeen", async () => {
+    const host = os.hostname();
+    // Simulate a prior load having written a baseline.
+    writeState(repoDir, {
+      host,
+      schemaVersion: STATE_SCHEMA_VERSION,
+      capturedAt: null,
+      modules: { appconfig: { baseline: { "domain:x": "h1" } } },
+    });
+    await finalizeCapture(createExec(), repoDir, os.homedir());
+    const state = readState(repoDir, host)!;
+    expect((state.modules["appconfig"] as { baseline: unknown }).baseline).toEqual({ "domain:x": "h1" });
+    expect(typeof state.lastSeen).toBe("string");
   });
 });

@@ -334,7 +334,7 @@ export function App() {
           {activeTab === "appconfig" && <AppConfig showHud={showHud} />}
           {activeTab === "skills" && <Skills />}
           {activeTab === "env" && <AliasesEnv showHud={showHud} />}
-          {activeTab === "sync" && <SyncState />}
+          {activeTab === "sync" && <SyncState onOpenSettings={() => setActiveTab("settings")} />}
           {activeTab === "drift" && <Drift />}
           {activeTab === "timeline" && <Timeline />}
           {activeTab === "settings" && <Settings />}

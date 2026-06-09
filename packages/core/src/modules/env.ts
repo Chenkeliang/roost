@@ -548,6 +548,18 @@ export const envModule: SyncModule = {
       });
     }
 
+    // Blocked (ADR-0016 §6.3): the repo has encrypted secret env values but this
+    // machine has no age key — they cannot be restored until the key is imported.
+    const hasSecrets = data.env.some((e) => e.secret && e.enabled);
+    if (hasSecrets && !fs.existsSync(defaultAgeKeyPath(ctx.home))) {
+      items.push({
+        id: "env-secrets",
+        state: "drift",
+        blocked: true,
+        detail: "需要 age 私钥才能恢复加密的环境变量(去设置导入)",
+      });
+    }
+
     return { module: "env", items };
   },
 
