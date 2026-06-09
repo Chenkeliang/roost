@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createExec, readState } from "@roost/core";
+import { createExec, readState, STATE_SCHEMA_VERSION } from "@roost/core";
 import { ensureGitRepo } from "./gitRepo.js";
 import { finalizeCapture } from "./captureFlow.js";
 
@@ -29,7 +29,7 @@ describe("finalizeCapture", () => {
     const state = readState(repoDir, host);
     expect(state).not.toBeNull();
     expect(state?.host).toBe(host);
-    expect(state?.schemaVersion).toBe(1);
+    expect(state?.schemaVersion).toBe(STATE_SCHEMA_VERSION);
     expect(typeof state?.capturedAt).toBe("string");
     expect(state?.modules).toEqual({});
 

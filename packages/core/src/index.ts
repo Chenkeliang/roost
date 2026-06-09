@@ -90,9 +90,28 @@ export {
   captureAll,
   gateSecrets,
   statusAll,
+  syncStateAll,
   loadAll,
   indexAll,
 } from "./orchestrate.js";
+export {
+  classifyDirection,
+  classifyException,
+  computeSyncState,
+  classifyPushSafety,
+} from "./sync-state.js";
+export type {
+  ThreeWay,
+  ItemSignal,
+  SyncItem,
+  SyncCounts,
+  SyncStateReport,
+  PushSafety,
+} from "./sync-state.js";
+export { hashContent, loadModuleBaseline } from "./sync-baseline.js";
+export { cloneRepo, remoteHead, checkPushSafety } from "./onboarding.js";
+export { readBaseline, writeBaseline } from "./state.js";
+export type { ModuleBaseline } from "./state.js";
 export {
   createDotfilesRepoImporter,
   createMackupImporter,

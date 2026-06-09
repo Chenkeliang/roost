@@ -204,6 +204,36 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/sync-state → 200 with counts/overall derived from three-way hashes", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        statusFn: async () => ({
+          module: "dotfiles",
+          items: [
+            { id: "behind", state: "drift" as const, localHash: null, repoHash: "r", baselineHash: null },
+            { id: "div", state: "conflict" as const, localHash: "a", repoHash: "b", baselineHash: "o" },
+          ],
+        }),
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/sync-state" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      items: { id: string; direction: string; exception: string | null }[];
+      counts: { auto: number; diverged: number };
+      overall: string;
+    };
+    expect(body.counts.auto).toBe(1);
+    expect(body.counts.diverged).toBe(1);
+    expect(body.overall).toBe("diverged");
+    expect(body.items.find((i) => i.id === "div")!.exception).toBe("diverged");
+    await server.close();
+  });
+
   it("GET /api/machines → 200 { hosts: string[], states: Record<string, unknown> }", async () => {
     // Write a fake state file
     const stateDir = path.join(tmpDir, "state");

@@ -16,6 +16,7 @@ import {
   captureAll,
   loadAll,
   statusAll,
+  syncStateAll,
   discoverAll,
   defaultRegistry,
   createExec,
@@ -155,6 +156,22 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         return statusAll(registry, makeCtx(true), sel);
       });
       return reply.send({ reports });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── /api/sync-state ────────────────────────────────────────────────────────
+  // The automation-first review model (ADR-0016): direction + typed exceptions
+  // + counts, derived from each module's three-way status.
+  server.get("/api/sync-state", async (_req, reply) => {
+    try {
+      const result = await cache.getOrCompute("sync-state", () => {
+        const sel = loadSelection(repoDir);
+        return syncStateAll(registry, makeCtx(true), sel);
+      });
+      return reply.send(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });
