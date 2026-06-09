@@ -233,6 +233,8 @@ export function SyncState() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [policy, setPolicy] = useState<ResolveAction>("take-repo");
+  const [batching, setBatching] = useState(false);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -275,6 +277,29 @@ export function SyncState() {
   const blocked = items.filter((i) => i.exception === "blocked");
   const destructive = items.filter((i) => i.exception === "destructive");
   const needDecision = diverged.length + blocked.length + destructive.length;
+
+  // Batch-resolve every exception by the chosen basis. Destructive stays safe
+  // (keep-local, never auto-delete); blocked is skipped (needs setup first).
+  const runBatch = useCallback(async () => {
+    const targets = (data?.items ?? []).filter((i) => i.exception === "diverged" || i.exception === "destructive");
+    if (targets.length === 0) return;
+    setBatching(true);
+    setError(null);
+    let done = 0;
+    for (const it of targets) {
+      const action: ResolveAction = it.exception === "destructive" ? "keep-local" : policy;
+      try {
+        await postResolve(it.module, it.id, action);
+        done += 1;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        break;
+      }
+    }
+    setBatching(false);
+    setNotice(`批量完成:处理 ${done} 项(基调:${policy === "take-repo" ? "以仓库为准" : "保留本地"};破坏性项已保留本地)`);
+    refresh();
+  }, [data, policy, refresh]);
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
@@ -342,10 +367,54 @@ export function SyncState() {
             }}
           >
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }} />
-            <span>
-              基调:<b>以仓库为准</b>(覆盖前全部备份)— 自动 {data.counts.auto} 项,需你决定 {needDecision} 项
+            <span>基调</span>
+            <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 999, overflow: "hidden" }}>
+              {([
+                { v: "take-repo", label: "以仓库为准" },
+                { v: "keep-local", label: "保留本地" },
+              ] as { v: ResolveAction; label: string }[]).map((o) => {
+                const active = policy === o.v;
+                return (
+                  <button
+                    key={o.v}
+                    onClick={() => setPolicy(o.v)}
+                    style={{
+                      appearance: "none",
+                      border: 0,
+                      background: active ? "var(--raise)" : "transparent",
+                      color: active ? "var(--text)" : "var(--muted)",
+                      fontSize: 11.5,
+                      padding: "3px 11px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+            <span style={{ color: "var(--muted)", fontSize: 11.5 }}>
+              覆盖前全部备份 · 自动 {data.counts.auto} 项,需你决定 {needDecision} 项
             </span>
             <span style={{ flex: 1 }} />
+            {diverged.length + destructive.length > 0 ? (
+              <button
+                onClick={runBatch}
+                disabled={batching}
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  padding: "5px 13px",
+                  borderRadius: 8,
+                  cursor: batching ? "default" : "pointer",
+                  background: "var(--accent)",
+                  border: "1px solid var(--accent)",
+                  color: "#1b1b1e",
+                }}
+              >
+                {batching ? "处理中…" : `全部应用基调(${diverged.length + destructive.length})`}
+              </button>
+            ) : null}
             <Pill text={`整体:${data.overall}`} color={data.overall === "synced" ? "#5fd08a" : "var(--accent)"} />
           </div>
 
