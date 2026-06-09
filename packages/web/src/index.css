@@ -44,7 +44,7 @@ body,
 /* Global UI scale — enlarge everything (text, controls, icons, spacing)
    uniformly. WKWebView (Tauri) supports `zoom`. Tune this one number to taste. */
 html {
-  zoom: 1.15;
+  zoom: 1.08;
 }
 
 body {
