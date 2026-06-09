@@ -129,20 +129,19 @@ function Row({
           opacity: busy ? 0.5 : 1,
         }}
       >
-        <span style={{ color: "var(--muted)", fontSize: 12.5, minWidth: 72 }}>{item.module}</span>
-        <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{item.id}</span>
-        {detailText ? <span style={{ color: "var(--muted)", fontSize: 12.5 }}>{detailText}</span> : null}
-        <span style={{ flex: 1 }} />
+        <span style={{ color: "var(--muted)", fontSize: 12.5, minWidth: 72, flexShrink: 0 }}>{item.module}</span>
+        <span style={{ fontFamily: "var(--font-mono, monospace)", flex: 1, minWidth: 0, wordBreak: "break-all" }}>{item.id}</span>
+        {detailText ? <span style={{ color: "var(--muted)", fontSize: 12.5, flexShrink: 0 }}>{detailText}</span> : null}
         <button
           onClick={toggleDiff}
-          style={{ fontSize: 12, padding: "3px 9px", borderRadius: 7, cursor: "pointer", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)" }}
+          style={{ fontSize: 12, padding: "3px 9px", borderRadius: 7, cursor: "pointer", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}
         >
           {open ? t("sync.collapse") : `${t("sync.diff")} ▸`}
         </button>
         {item.exception === "blocked" && onOpenSettings ? (
           <button
             onClick={onOpenSettings}
-            style={{ fontSize: 12, fontWeight: 600, padding: "3px 11px", borderRadius: 7, cursor: "pointer", background: "transparent", border: "1px solid #b79af0", color: "#b79af0" }}
+            style={{ fontSize: 12, fontWeight: 600, padding: "3px 11px", borderRadius: 7, cursor: "pointer", background: "transparent", border: "1px solid #b79af0", color: "#b79af0", whiteSpace: "nowrap", flexShrink: 0 }}
           >
             {t("sync.goSettings")} ▸
           </button>
@@ -163,6 +162,8 @@ function Row({
               color: a.primary ? "var(--accent)" : "var(--muted)",
               minWidth: a.primary ? 72 : undefined,
               textAlign: "center",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             {actionLabel(t, a.action)}
