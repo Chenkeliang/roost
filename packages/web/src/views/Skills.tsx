@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, LinkBreak, Copy } from "@phosphor-icons/react";
+import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, LinkBreak, Copy, Circle } from "@phosphor-icons/react";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
@@ -24,12 +24,68 @@ function targetStatus(row: SkillRow, targetId: string): "linked" | "copy" | "con
   return "linked";
 }
 
-function StatusBadge({ status, t }: { status: ReturnType<typeof targetStatus>; t: (k: string) => string }) {
-  if (status === "off") return null;
-  if (status === "linked") return <CheckCircle size={18} weight="fill" style={{ color: "var(--green)" }} aria-label={t("skills.enabled")} />;
-  if (status === "copy") return <Copy size={18} style={{ color: "var(--muted)" }} aria-label={t("skills.method.copy")} />;
-  if (status === "conflict") return <Warning size={18} weight="fill" style={{ color: "var(--accent)" }} aria-label={t("skills.conflict")} />;
-  return <LinkBreak size={18} style={{ color: "var(--red)" }} aria-label={t("skills.dangling")} />;
+// One indicator per (skill, IDE) cell — replaces the old checkbox + badge pair.
+// Click toggles on/off; a conflict opens the resolve dialog instead.
+function CellToggle({
+  row,
+  targetLabel,
+  status,
+  busy,
+  t,
+  onToggle,
+  onResolve,
+}: {
+  row: SkillRow;
+  targetLabel: string;
+  status: ReturnType<typeof targetStatus>;
+  busy: boolean;
+  t: (k: string) => string;
+  onToggle: (next: boolean) => void;
+  onResolve: () => void;
+}) {
+  const on = status !== "off";
+  const ICON = 20;
+  const btn: React.CSSProperties = {
+    width: 34,
+    height: 30,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: 0,
+    background: "transparent",
+    borderRadius: 8,
+    cursor: busy ? "default" : "pointer",
+  };
+  if (status === "conflict") {
+    return (
+      <button disabled={busy} title={t("skills.conflict")} aria-label={t("skills.resolve.action")} onClick={onResolve} style={btn}>
+        <Warning size={ICON} weight="fill" style={{ color: "#f0b352" }} />
+      </button>
+    );
+  }
+  const glyph =
+    status === "linked" ? (
+      <CheckCircle size={ICON} weight="fill" style={{ color: "var(--accent)" }} />
+    ) : status === "copy" ? (
+      <Copy size={ICON} style={{ color: "var(--accent)" }} />
+    ) : status === "broken" ? (
+      <LinkBreak size={ICON} style={{ color: "var(--red)" }} />
+    ) : (
+      <Circle size={ICON} style={{ color: "var(--border)" }} />
+    );
+  const titleKey =
+    status === "linked" ? "skills.enabled" : status === "copy" ? "skills.method.copy" : status === "broken" ? "skills.dangling" : "skills.disabled";
+  return (
+    <button
+      disabled={busy || !row.effective.enabled}
+      aria-label={`${row.name} · ${targetLabel}`}
+      title={t(titleKey)}
+      onClick={() => onToggle(!on)}
+      style={{ ...btn, opacity: row.effective.enabled ? 1 : 0.4 }}
+    >
+      {glyph}
+    </button>
+  );
 }
 
 export function Skills() {
@@ -217,33 +273,18 @@ export function Skills() {
                       />
                     </td>
                     {targets.map((tg) => {
-                      const on = row.effective.enabled && row.effective.targets.includes(tg.id);
                       const status = targetStatus(row, tg.id);
                       return (
                         <td key={tg.id} style={{ ...cellPad, textAlign: "center" }}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                            <input
-                              type="checkbox"
-                              aria-label={`${row.name} on ${tg.label}`}
-                              checked={on}
-                              disabled={busy || !row.effective.enabled}
-                              onChange={(e) => void onToggleTarget(row, tg.id, e.target.checked)}
-                              style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }}
-                            />
-                            {status === "conflict" ? (
-                              <button
-                                aria-label={t("skills.resolve.action")}
-                                title={t("skills.conflict")}
-                                disabled={busy}
-                                onClick={() => setPending({ skill: row.name, target: tg.id })}
-                                style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "2px 8px" }}
-                              >
-                                <Warning size={11} weight="fill" />{t("skills.resolve.action")}
-                              </button>
-                            ) : (
-                              <StatusBadge status={status} t={t} />
-                            )}
-                          </span>
+                          <CellToggle
+                            row={row}
+                            targetLabel={tg.label}
+                            status={status}
+                            busy={busy}
+                            t={t}
+                            onToggle={(next) => void onToggleTarget(row, tg.id, next)}
+                            onResolve={() => setPending({ skill: row.name, target: tg.id })}
+                          />
                         </td>
                       );
                     })}

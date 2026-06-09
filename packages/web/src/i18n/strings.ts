@@ -350,6 +350,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "skills.method.symlink": { en: "Symlink", zh: "软链" },
   "skills.method.copy": { en: "Copy", zh: "拷贝" },
   "skills.enabled": { en: "Enabled", zh: "启用" },
+  "skills.disabled": { en: "Off — click to enable", zh: "未启用 — 点击开启" },
   "skills.conflict": { en: "Conflict", zh: "冲突" },
   "skills.dangling": { en: "Broken link", zh: "断链" },
   "skills.link": { en: "Apply links", zh: "应用软链" },
