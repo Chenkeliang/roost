@@ -26,10 +26,10 @@ function targetStatus(row: SkillRow, targetId: string): "linked" | "copy" | "con
 
 function StatusBadge({ status, t }: { status: ReturnType<typeof targetStatus>; t: (k: string) => string }) {
   if (status === "off") return null;
-  if (status === "linked") return <CheckCircle size={13} weight="fill" style={{ color: "var(--green)" }} aria-label={t("skills.enabled")} />;
-  if (status === "copy") return <Copy size={13} style={{ color: "var(--muted)" }} aria-label={t("skills.method.copy")} />;
-  if (status === "conflict") return <Warning size={13} weight="fill" style={{ color: "var(--accent)" }} aria-label={t("skills.conflict")} />;
-  return <LinkBreak size={13} style={{ color: "var(--red)" }} aria-label={t("skills.dangling")} />;
+  if (status === "linked") return <CheckCircle size={18} weight="fill" style={{ color: "var(--green)" }} aria-label={t("skills.enabled")} />;
+  if (status === "copy") return <Copy size={18} style={{ color: "var(--muted)" }} aria-label={t("skills.method.copy")} />;
+  if (status === "conflict") return <Warning size={18} weight="fill" style={{ color: "var(--accent)" }} aria-label={t("skills.conflict")} />;
+  return <LinkBreak size={18} style={{ color: "var(--red)" }} aria-label={t("skills.dangling")} />;
 }
 
 export function Skills() {
@@ -213,7 +213,7 @@ export function Skills() {
                         checked={row.effective.enabled}
                         disabled={busy}
                         onChange={() => void onToggleMaster(row)}
-                        style={{ accentColor: "var(--accent)" }}
+                        style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }}
                       />
                     </td>
                     {targets.map((tg) => {
@@ -228,7 +228,7 @@ export function Skills() {
                               checked={on}
                               disabled={busy || !row.effective.enabled}
                               onChange={(e) => void onToggleTarget(row, tg.id, e.target.checked)}
-                              style={{ accentColor: "var(--accent)" }}
+                              style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }}
                             />
                             {status === "conflict" ? (
                               <button
@@ -287,7 +287,7 @@ export function Skills() {
                 const conflict = c.note ? /conflict/i.test(c.note) : false;
                 return (
                   <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
-                    <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} style={{ accentColor: "var(--accent)" }} />
+                    <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }} />
                     <Stack size={14} style={{ color: "var(--muted)" }} />
                     <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.id}</span>
                     {c.note && (
