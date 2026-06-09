@@ -19,6 +19,7 @@ import type {
 import { scanForSecrets } from "../secrets/scanner.js";
 import { createOpBackend, createRbwBackend } from "../secrets/backend.js";
 import { backupFiles } from "../apply.js";
+import { hashContent, loadModuleBaseline } from "../sync-baseline.js";
 import {
   loadEnvData,
   saveEnvData,
@@ -519,14 +520,20 @@ export const envModule: SyncModule = {
     const items: DriftItem[] = [];
     const data = loadEnvData(ctx.repoDir);
 
-    // Compare the non-secret preview against the live artifact.
+    // Compare the non-secret preview against the live artifact (three-way: ADR-0017).
+    const baseline = loadModuleBaseline(ctx.repoDir, "env");
     const preview = generateEnvSh(data);
     const livePath = envShPath(ctx.home);
     const live = fs.existsSync(livePath) ? readFileSafe(livePath) : null;
+    const envHashes = {
+      localHash: hashContent(live),
+      repoHash: hashContent(preview),
+      baselineHash: baseline["env.sh"] ?? null,
+    };
     if (live === null) {
-      items.push({ id: "env.sh", state: "untracked", detail: "env.sh not generated yet" });
+      items.push({ id: "env.sh", state: "untracked", detail: "env.sh not generated yet", ...envHashes });
     } else {
-      items.push({ id: "env.sh", state: live === preview ? "synced" : "drift" });
+      items.push({ id: "env.sh", state: live === preview ? "synced" : "drift", ...envHashes });
     }
 
     // Check the rc marker block in each existing rc file.

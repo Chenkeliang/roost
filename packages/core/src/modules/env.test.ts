@@ -952,3 +952,35 @@ describe("envModule.index", () => {
     expect(idx.managed).toBe(4);
   });
 });
+
+describe("env status three-way (env.sh)", () => {
+  it("sets repoHash from the generated preview and localHash from the live env.sh", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-env3-"));
+    try {
+      const roostDir = path.join(tmp, "roost");
+      fs.mkdirSync(roostDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(roostDir, "env.yaml"),
+        "schemaVersion: 1\naliases: []\nenv: []\npath: []\nfunctions: []\n",
+        "utf8",
+      );
+      const ctx = {
+        repoDir: tmp,
+        home: tmp,
+        profile: "base",
+        dryRun: true,
+        exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} },
+        t: (k: string) => k,
+      } as never;
+      const report = await envModule.status(ctx, { modules: {} });
+      const envItem = report.items.find((i) => i.id === "env.sh")!;
+      expect(envItem.state).toBe("untracked");
+      expect(envItem.localHash).toBeNull();
+      expect(envItem.repoHash).not.toBeNull();
+      expect(envItem.baselineHash).toBeNull();
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
