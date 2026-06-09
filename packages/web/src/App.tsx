@@ -281,48 +281,49 @@ export function App() {
             />
           ))}
 
-          {/* Bottom — two tidy left-aligned rows */}
+          {/* Bottom — single row, no wrap */}
           <div
             style={{
               marginTop: "auto",
               display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: 10,
+              alignItems: "center",
+              flexWrap: "nowrap",
+              gap: 8,
               padding: "12px 10px 2px",
               color: "var(--muted)",
               fontSize: 13,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "3px 9px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 999,
-                  fontSize: 13,
-                }}
-              >
-                <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
-                local
-              </span>
-              <a
-                href={DOCS_URL}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  void openExternal(DOCS_URL);
-                }}
-                style={{ color: "var(--muted)", textDecoration: "none", whiteSpace: "nowrap" }}
-              >
-                {t("app.docs")}
-              </a>
-            </div>
-            <LanguageSwitcher locale={locale} setLocale={setLocale} />
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "3px 8px",
+                border: "1px solid var(--border)",
+                borderRadius: 999,
+                fontSize: 12.5,
+                flexShrink: 0,
+              }}
+            >
+              <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
+              local
+            </span>
+            <a
+              href={DOCS_URL}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => {
+                e.preventDefault();
+                void openExternal(DOCS_URL);
+              }}
+              style={{ color: "var(--muted)", textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
+            >
+              {t("app.docs")}
+            </a>
+            <span style={{ marginLeft: "auto", flexShrink: 0 }}>
+              <LanguageSwitcher locale={locale} setLocale={setLocale} />
+            </span>
           </div>
         </aside>
 
