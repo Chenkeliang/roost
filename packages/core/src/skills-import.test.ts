@@ -90,9 +90,10 @@ describe("importStaged", () => {
       const res = importStaged(ctx(), staged);
       expect(res.imported).toEqual(["cool-skill"]);
       expect(res.blocked).toEqual([]);
+      // Lands in the source dir (→ appears under Discover), NOT directly in the repo.
       expect(fs.existsSync(path.join(home, ".agents", "skills", "cool-skill", "SKILL.md"))).toBe(true);
-      expect(fs.existsSync(path.join(repo, "skills", "cool-skill", "SKILL.md"))).toBe(true);
-      expect(fs.existsSync(path.join(repo, "skills", "cool-skill", ".git"))).toBe(false);
+      expect(fs.existsSync(path.join(home, ".agents", "skills", "cool-skill", ".git"))).toBe(false);
+      expect(fs.existsSync(path.join(repo, "skills", "cool-skill"))).toBe(false);
     } finally {
       fs.rmSync(staged, { recursive: true, force: true });
     }
@@ -106,7 +107,7 @@ describe("importStaged", () => {
       expect(res.imported).toEqual([]);
       expect(res.blocked[0]?.id).toBe("leaky");
       expect(res.blocked[0]?.reason).toBe("secret");
-      expect(fs.existsSync(path.join(repo, "skills", "leaky"))).toBe(false);
+      expect(fs.existsSync(path.join(home, ".agents", "skills", "leaky"))).toBe(false);
     } finally {
       fs.rmSync(staged, { recursive: true, force: true });
     }

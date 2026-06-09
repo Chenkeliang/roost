@@ -90,13 +90,16 @@ function makeFakeModule(opts: {
 // ── test state ────────────────────────────────────────────────────────────────
 
 let tmpDir: string;
+let importHome: string; // isolated $HOME for skill-import tests (never the real home)
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-server-test-"));
+  importHome = fs.mkdtempSync(path.join(os.tmpdir(), "roost-imp-home-"));
 });
 
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
+  fs.rmSync(importHome, { recursive: true, force: true });
 });
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -349,14 +352,21 @@ describe("buildServer", () => {
     },
   };
 
-  it("POST /api/skills/import-git clones + ingests a skill into repo/skills", async () => {
+  it("POST /api/skills/import-git clones + ingests a skill into the source dir", async () => {
     const reg = new ModuleRegistry();
-    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec: fakeImportExec }) });
-    const res = await server.inject({ method: "POST", url: "/api/skills/import-git", payload: { url: "https://github.com/me/skill.git" } });
-    expect(res.statusCode).toBe(200);
-    expect((res.json() as { imported: string[] }).imported).toContain("remote-skill");
-    expect(fs.existsSync(path.join(tmpDir, "skills", "remote-skill", "SKILL.md"))).toBe(true);
-    await server.close();
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-imp-home-"));
+    try {
+      const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), home, exec: fakeImportExec }) });
+      const res = await server.inject({ method: "POST", url: "/api/skills/import-git", payload: { url: "https://github.com/me/skill.git" } });
+      expect(res.statusCode).toBe(200);
+      expect((res.json() as { imported: string[] }).imported).toContain("remote-skill");
+      // Lands in source (→ Discover), not the repo.
+      expect(fs.existsSync(path.join(home, ".agents", "skills", "remote-skill", "SKILL.md"))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, "skills", "remote-skill"))).toBe(false);
+      await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
   });
 
   it("POST /api/skills/import-git → 400 on a non-URL", async () => {
@@ -369,7 +379,7 @@ describe("buildServer", () => {
 
   it("POST /api/skills/import-zip ingests an uploaded zip", async () => {
     const reg = new ModuleRegistry();
-    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec: fakeImportExec }) });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), home: importHome, exec: fakeImportExec }) });
     const dataBase64 = Buffer.from("PK fake zip bytes").toString("base64");
     const res = await server.inject({ method: "POST", url: "/api/skills/import-zip", payload: { filename: "remote-skill.zip", dataBase64 } });
     expect(res.statusCode).toBe(200);
@@ -387,7 +397,7 @@ describe("buildServer", () => {
 
   it("import-scan lists skills, then import-apply ingests only the selected ones", async () => {
     const reg = new ModuleRegistry();
-    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec: fakeImportExec }) });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), home: importHome, exec: fakeImportExec }) });
     const scan = await server.inject({ method: "POST", url: "/api/skills/import-scan", payload: { url: "https://github.com/me/pack.git" } });
     expect(scan.statusCode).toBe(200);
     const sb = scan.json() as { token: string; skills: { name: string }[] };
@@ -396,7 +406,8 @@ describe("buildServer", () => {
     const apply = await server.inject({ method: "POST", url: "/api/skills/import-apply", payload: { token: sb.token, names: ["remote-skill"] } });
     expect(apply.statusCode).toBe(200);
     expect((apply.json() as { imported: string[] }).imported).toContain("remote-skill");
-    expect(fs.existsSync(path.join(tmpDir, "skills", "remote-skill", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(importHome, ".agents", "skills", "remote-skill", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "skills", "remote-skill"))).toBe(false);
     await server.close();
   });
 

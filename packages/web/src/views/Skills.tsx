@@ -136,9 +136,11 @@ export function Skills() {
   const [dragOver, setDragOver] = useState(false);
   const [scanResult, setScanResult] = useState<SkillScanResponse | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [importFilter, setImportFilter] = useState("");
 
   const onScanned = useCallback((r: SkillScanResponse) => {
     setScanResult(r);
+    setImportFilter("");
     // default-select everything importable (not blocked)
     setSelected(new Set(r.skills.filter((s) => !s.blocked).map((s) => s.name)));
     if (r.skills.length === 0) setImportMsg(t("skills.import.none"));
@@ -189,6 +191,7 @@ export function Skills() {
       setImportMsg(parts.join("  ·  ") || t("skills.import.none"));
       setScanResult(null);
       setSelected(new Set());
+      setImportFilter("");
       setGitUrl("");
       await refetch();
       await scan();
@@ -406,12 +409,31 @@ export function Skills() {
               </div>
             </div>
 
-            {scanResult && (
+            {scanResult && (() => {
+              const q = importFilter.trim().toLowerCase();
+              const matches = (s: { name: string }) => !q || s.name.toLowerCase().includes(q);
+              const visible = scanResult.skills.filter(matches);
+              const visibleImportable = visible.filter((s) => !s.blocked);
+              const hasImportable = scanResult.skills.some((s) => !s.blocked);
+              const bulk = (fn: (n: Set<string>, name: string) => void) =>
+                setSelected((prev) => { const n = new Set(prev); for (const s of visibleImportable) fn(n, s.name); return n; });
+              return (
               <div style={{ marginTop: 12, border: "1px solid var(--border-soft)", borderRadius: 10, overflow: "hidden" }}>
+                {hasImportable && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 12px", borderBottom: "1px solid var(--border-soft)" }}>
+                    <input value={importFilter} onChange={(e) => setImportFilter(e.target.value)} placeholder={t("skills.import.search")}
+                      style={{ ...ic, flex: 1, padding: "5px 9px" }} />
+                    <button onClick={() => bulk((n, name) => n.add(name))} style={{ ...ic }}>{t("skills.import.selectAll")}</button>
+                    <button onClick={() => bulk((n, name) => { if (n.has(name)) n.delete(name); else n.add(name); })} style={{ ...ic }}>{t("skills.import.invert")}</button>
+                    <button onClick={() => setSelected(new Set())} style={{ ...ic }}>{t("skills.import.clear")}</button>
+                  </div>
+                )}
                 {scanResult.skills.length === 0 ? (
                   <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--muted)" }}>{t("skills.import.none")}</div>
+                ) : visible.length === 0 ? (
+                  <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--muted)" }}>{t("skills.import.noMatch")}</div>
                 ) : (
-                  scanResult.skills.map((s) => (
+                  visible.map((s) => (
                     <label key={s.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: "1px solid var(--border-soft)", fontSize: 13, opacity: s.blocked ? 0.6 : 1 }}>
                       <input type="checkbox" disabled={!!s.blocked || importBusy} checked={selected.has(s.name)}
                         onChange={() => setSelected((set) => { const n = new Set(set); if (n.has(s.name)) n.delete(s.name); else n.add(s.name); return n; })}
@@ -425,19 +447,20 @@ export function Skills() {
                     </label>
                   ))
                 )}
-                {scanResult.skills.some((s) => !s.blocked) && (
+                {hasImportable && (
                   <div style={{ display: "flex", gap: 8, padding: "10px 12px", alignItems: "center" }}>
                     <button onClick={() => void applyImport()} disabled={importBusy || selected.size === 0}
                       style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
                       {importBusy ? t("skills.import.importing") : `${t("skills.import.importSelected")} (${selected.size})`}
                     </button>
-                    <button onClick={() => { setScanResult(null); setSelected(new Set()); }} disabled={importBusy} style={{ ...ic }}>
+                    <button onClick={() => { setScanResult(null); setSelected(new Set()); setImportFilter(""); }} disabled={importBusy} style={{ ...ic }}>
                       {t("skills.resolve.cancel")}
                     </button>
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
             {importMsg && <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--muted)", wordBreak: "break-word" }}>{importMsg}</div>}
           </div>
           {cands === null ? (

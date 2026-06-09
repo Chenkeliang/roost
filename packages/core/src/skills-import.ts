@@ -108,7 +108,6 @@ export function importStaged(
 ): SkillImportResult {
   const cfg = loadSkillsConfig(ctx.repoDir);
   const sourceRoot = expandHome(ctx.home, cfg.sourceDir);
-  const repoSkills = path.join(ctx.repoDir, "skills");
   const all = findSkillRoots(stagedDir, opts?.fallbackName);
   const want = opts?.names ? new Set(opts.names) : null;
   const roots = want ? all.filter((r) => want.has(r.name)) : all;
@@ -125,13 +124,13 @@ export function importStaged(
       blocked.push({ id: r.name, reason: "secret", detail: `${scan.secretFiles.length} file(s)` });
       continue;
     }
+    // Land only in the canonical source dir — the skill then appears under
+    // "Discover" for the user to capture into the repo (managed) explicitly.
     const cpFilter = (src: string): boolean => path.basename(src) !== ".git";
-    for (const destRoot of [sourceRoot, repoSkills]) {
-      const dest = path.join(destRoot, r.name);
-      fs.rmSync(dest, { recursive: true, force: true });
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.cpSync(r.path, dest, { recursive: true, dereference: false, filter: cpFilter });
-    }
+    const dest = path.join(sourceRoot, r.name);
+    fs.rmSync(dest, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.cpSync(r.path, dest, { recursive: true, dereference: false, filter: cpFilter });
     imported.push(r.name);
   }
   return { imported, blocked };
