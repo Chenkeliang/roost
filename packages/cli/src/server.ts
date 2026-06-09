@@ -78,15 +78,28 @@ export function computeConflicts(
   return conflicts;
 }
 
-// Classify git push/pull failure output: "auth" when the failure is a missing
-// or rejected credential (so the UI can offer a run-it-in-a-terminal fallback),
-// undefined otherwise.
-export function classifyGitError(output: string): "auth" | undefined {
-  return /authentication failed|could not read (username|password)|permission denied|terminal prompts disabled|fatal: could not read|invalid username or password|support for password authentication was removed/i.test(
-    output,
-  )
-    ? "auth"
-    : undefined;
+// Classify git push/pull failure output so the UI can offer the right next step:
+//  - "auth": missing/rejected credential → offer a run-it-in-a-terminal fallback.
+//  - "pull-first": the remote advanced since this machine last synced (another
+//    machine pushed) → the push was rejected non-fast-forward; pull/merge first
+//    (push-safety, ADR-0016 §6.4).
+//  - undefined: anything else.
+export function classifyGitError(output: string): "auth" | "pull-first" | undefined {
+  if (
+    /authentication failed|could not read (username|password)|permission denied|terminal prompts disabled|fatal: could not read|invalid username or password|support for password authentication was removed/i.test(
+      output,
+    )
+  ) {
+    return "auth";
+  }
+  if (
+    /non-fast-forward|fetch first|updates were rejected|tip of your current branch is behind/i.test(
+      output,
+    )
+  ) {
+    return "pull-first";
+  }
+  return undefined;
 }
 
 export interface ServerDeps {

@@ -1464,6 +1464,12 @@ describe("classifyGitError", () => {
     expect(classifyGitError("remote: Permission denied")).toBe("auth");
     expect(classifyGitError("terminal prompts disabled")).toBe("auth");
   });
+  it("flags non-fast-forward push rejections as pull-first (push-safety §6.4)", () => {
+    expect(
+      classifyGitError("! [rejected] main -> main (non-fast-forward)\nUpdates were rejected because the tip of your current branch is behind"),
+    ).toBe("pull-first");
+    expect(classifyGitError("hint: Updates were rejected; ... fetch first")).toBe("pull-first");
+  });
   it("returns undefined for non-auth output", () => {
     expect(classifyGitError("Everything up-to-date")).toBeUndefined();
     expect(classifyGitError("")).toBeUndefined();
