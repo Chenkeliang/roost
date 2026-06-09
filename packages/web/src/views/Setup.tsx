@@ -16,7 +16,7 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1200);
       }}
-      style={{ fontSize: 10.5, padding: "3px 9px", borderRadius: 7, cursor: "pointer", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)" }}
+      style={{ fontSize: 12, padding: "3px 9px", borderRadius: 7, cursor: "pointer", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)" }}
     >
       {copied ? t("setup.copied") : t("setup.copy")}
     </button>
@@ -62,37 +62,37 @@ export function Setup({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-      <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, marginBottom: 14 }}>
+      <div style={{ fontSize: 12.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, marginBottom: 14 }}>
         {t("setup.title")}
       </div>
 
       {error ? (
-        <div role="alert" style={{ padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", color: "#ff8c8c", fontSize: 13, marginBottom: 12 }}>
+        <div role="alert" style={{ padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", color: "#ff8c8c", fontSize: 14, marginBottom: 12 }}>
           {error}
         </div>
       ) : null}
 
       {checks === null ? (
-        <div style={{ color: "var(--muted)", fontSize: 13 }}>{t("setup.loading")}</div>
+        <div style={{ color: "var(--muted)", fontSize: 14 }}>{t("setup.loading")}</div>
       ) : (
         <>
           {/* Action bar */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", marginBottom: 16, fontSize: 12.5, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", marginBottom: 16, fontSize: 13.5, flexWrap: "wrap" }}>
             {requiredMissing.length === 0 ? (
               <span style={{ color: "#5fd08a" }}>{t("setup.allGood")}</span>
             ) : !brewOk ? (
               <>
                 <span style={{ color: "#f0b352" }}>{t("setup.needBrewFirst")}</span>
-                <code style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 11, background: "var(--raise)", padding: "3px 7px", borderRadius: 6, color: "var(--text)" }}>{BREW_INSTALL_CMD}</code>
+                <code style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 12.5, background: "var(--raise)", padding: "3px 7px", borderRadius: 6, color: "var(--text)" }}>{BREW_INSTALL_CMD}</code>
                 <CopyButton text={BREW_INSTALL_CMD} />
-                <a href="https://brew.sh" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 12 }}>brew.sh</a>
+                <a href="https://brew.sh" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 13 }}>brew.sh</a>
               </>
             ) : missingFormulae.length > 0 ? (
               <>
                 <button
                   onClick={install}
                   disabled={installing}
-                  style={{ fontSize: 12, fontWeight: 700, padding: "6px 13px", borderRadius: 8, cursor: installing ? "default" : "pointer", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e" }}
+                  style={{ fontSize: 13, fontWeight: 700, padding: "6px 13px", borderRadius: 8, cursor: installing ? "default" : "pointer", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e" }}
                 >
                   {installing ? t("setup.installing") : `${t("setup.installMissing")} (brew install ${missingFormulae.join(" ")})`}
                 </button>
@@ -102,7 +102,7 @@ export function Setup({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
               <span style={{ color: "#5fd08a" }}>{t("setup.allGood")}</span>
             )}
             <span style={{ flex: 1 }} />
-            <button onClick={refresh} style={{ fontSize: 11.5, padding: "5px 11px", borderRadius: 8, cursor: "pointer", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)" }}>
+            <button onClick={refresh} style={{ fontSize: 12.5, padding: "5px 11px", borderRadius: 8, cursor: "pointer", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)" }}>
               {t("setup.recheck")}
             </button>
           </div>
@@ -110,28 +110,28 @@ export function Setup({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
           {/* Check list */}
           <div style={{ background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" }}>
             {checks.map((c) => (
-              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
-                <span style={{ width: 18, color: c.ok ? "#5fd08a" : c.required ? "#ff8c8c" : "#f0b352", fontWeight: 700 }}>{c.ok ? "✓" : "✗"}</span>
+              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
+                <span style={{ width: 24, fontSize: 17, lineHeight: 1, color: c.ok ? "#5fd08a" : c.required ? "#ff8c8c" : "#f0b352", fontWeight: 700, textAlign: "center" }}>{c.ok ? "✓" : "✗"}</span>
                 <span style={{ minWidth: 170 }}>{t(`setup.check.${c.id}`)}</span>
-                <span style={{ fontSize: 11, color: "var(--muted)" }}>{c.required ? t("setup.required") : t("setup.optional")}</span>
+                <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{c.required ? t("setup.required") : t("setup.optional")}</span>
                 <span style={{ flex: 1 }} />
                 {c.ok ? (
-                  <span style={{ fontSize: 11, color: "#5fd08a" }}>{t("setup.ok")}</span>
+                  <span style={{ fontSize: 12.5, color: "#5fd08a" }}>{t("setup.ok")}</span>
                 ) : c.id === "age-key" ? (
-                  <button onClick={() => onOpenSettings?.()} style={{ fontSize: 10.5, fontWeight: 600, padding: "3px 11px", borderRadius: 7, cursor: "pointer", background: "transparent", border: "1px solid #b79af0", color: "#b79af0" }}>
+                  <button onClick={() => onOpenSettings?.()} style={{ fontSize: 12, fontWeight: 600, padding: "3px 11px", borderRadius: 7, cursor: "pointer", background: "transparent", border: "1px solid #b79af0", color: "#b79af0" }}>
                     {t("setup.openSettingsForKey")}
                   </button>
                 ) : c.id === "repo" ? (
-                  <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono, monospace)" }}>{t("setup.repoHint")}</span>
+                  <span style={{ fontSize: 12.5, color: "var(--muted)", fontFamily: "var(--font-mono, monospace)" }}>{t("setup.repoHint")}</span>
                 ) : (
-                  <span style={{ fontSize: 11, color: c.required ? "#ff8c8c" : "#f0b352" }}>{t("setup.missing")}</span>
+                  <span style={{ fontSize: 12.5, color: c.required ? "#ff8c8c" : "#f0b352" }}>{t("setup.missing")}</span>
                 )}
               </div>
             ))}
           </div>
 
           {installOut ? (
-            <pre style={{ marginTop: 12, padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", fontSize: 11, fontFamily: "var(--font-mono, monospace)", whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto", color: "var(--muted)" }}>
+            <pre style={{ marginTop: 12, padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", fontSize: 12.5, fontFamily: "var(--font-mono, monospace)", whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto", color: "var(--muted)" }}>
               {installOut}
             </pre>
           ) : null}
