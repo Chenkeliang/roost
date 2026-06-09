@@ -357,7 +357,11 @@ non-fast-forward 报错。
 - Web:`Sync Review` 视图(基调条 + 计数 + 自动就绪 + 三类例外 + 默认锚右 +
   可点 resolve)。
 
-**有意延后(需视觉迭代或属增强,非阻塞):** 两栏 local|repo diff 与 appconfig
-逐键展开 UI;基调旋钮交互重算;blocked 例外的"去设置"修复入口跳转;基于
-recorded-head 的推送门变体(当前用 non-ff 提示已覆盖 §6.4);dotfiles/skills
-逐项三方;capture 侧 `lastSyncedCommit` 记录。
+**后续补齐(均已实现):** 两栏 local|repo diff(`/api/item-diff` + 展开面板)、
+appconfig 逐键展开(整域处置不变)、基调切换 + 「全部应用基调」批量、blocked
+例外的「去设置」跳转 + env 在"有加密密钥但无 age 私钥"时产出 blocked、dotfiles
+逐文件方向(`chezmoi status`)、capture 保留基线 + `lastSeen`。
+
+**仍延后(真·可选 / 范围外):** 基于 recorded-head 的推送门变体(现用 non-ff
+提示已覆盖 §6.4);skills 逐项三方(skills 自有冲突 UI,ADR-0014);capture 推送
+后回写 `lastSyncedCommit`。
