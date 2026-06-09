@@ -336,3 +336,28 @@ non-fast-forward 报错。
 2. 同名主机撞 key(§4)。
 3. appconfig 处置整域级,不逐键挑(§6.6)。
 4. 非自动同步:推拉仍需用户显式触发(范围冻结)。
+
+## 13. 实现状态(2026-06-08)
+
+在 `feat_sync_state` 分支,全程 TDD。**已实现并测试:**
+
+- 同步状态模型:`classifyDirection` / `classifyException` / `computeSyncState` /
+  `classifyPushSafety`(`sync-state.ts`)。
+- 三方哈希助手 + 基线读写:`sync-baseline.ts`(`hashContent` /
+  `loadModuleBaseline` / `recordModuleBaseline`);`MachineState` v2(`state.ts`)。
+- 模块三方 `status`:appconfig、env(env.sh)、packages、projects(后两者纯加法→
+  Behind)。**dotfiles / skills 仍走 legacy 安全降级**(方向不可知时浮现为决策)。
+- 编排:`syncStateAll`;`loadAll` 真实 apply 后写基线。
+- onboarding:`cloneRepo` / `remoteHead` / `checkPushSafety`;`roost clone` 命令。
+- 推送安全:`classifyGitError` 把 non-fast-forward 归类为 `pull-first` 提示。
+- 预检硬门:`Health.blocking` + `preflight()`;`/api/load apply` 与 `roost load
+  --apply` 均被 gate;`GET /api/preflight`。
+- API:`GET /api/sync-state`、`POST /api/resolve`(take-repo / keep-local)、
+  `GET /api/preflight`。
+- Web:`Sync Review` 视图(基调条 + 计数 + 自动就绪 + 三类例外 + 默认锚右 +
+  可点 resolve)。
+
+**有意延后(需视觉迭代或属增强,非阻塞):** 两栏 local|repo diff 与 appconfig
+逐键展开 UI;基调旋钮交互重算;blocked 例外的"去设置"修复入口跳转;基于
+recorded-head 的推送门变体(当前用 non-ff 提示已覆盖 §6.4);dotfiles/skills
+逐项三方;capture 侧 `lastSyncedCommit` 记录。
