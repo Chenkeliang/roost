@@ -95,3 +95,64 @@ describe("backupFiles", () => {
     expect(fs.readFileSync(destB, "utf8")).toBe("content-from-b");
   });
 });
+
+describe("backupFiles — special files", () => {
+  let tmp: string;
+  let bk: string;
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-bk-special-"));
+    bk = path.join(tmp, "backup");
+  });
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("skips a unix socket instead of throwing ENOTSUP", async () => {
+    const { createServer } = await import("node:net");
+    const sockPath = path.join(tmp, ".cc-switch");
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(sockPath, resolve));
+    try {
+      const result = backupFiles([sockPath], bk);
+      expect(result).toEqual([]); // socket skipped, no throw
+      expect(fs.existsSync(destFor(sockPath, bk))).toBe(false);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("copies a directory recursively", () => {
+    const dir = path.join(tmp, ".config", "zed");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "settings.json"), "{}", "utf8");
+    const result = backupFiles([dir], bk);
+    expect(result).toEqual([dir]);
+    expect(fs.readFileSync(path.join(destFor(dir, bk), "settings.json"), "utf8")).toBe("{}");
+  });
+
+  it("recreates a symlink as a link", () => {
+    const link = path.join(tmp, "link");
+    fs.symlinkSync("/some/target", link);
+    const result = backupFiles([link], bk);
+    expect(result).toEqual([link]);
+    expect(fs.lstatSync(destFor(link, bk)).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(destFor(link, bk))).toBe("/some/target");
+  });
+
+  it("skips a socket nested inside a backed-up directory", async () => {
+    const { createServer } = await import("node:net");
+    const dir = path.join(tmp, "dir");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "keep.txt"), "x", "utf8");
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(path.join(dir, "sock"), resolve));
+    try {
+      const result = backupFiles([dir], bk);
+      expect(result).toEqual([dir]);
+      expect(fs.existsSync(path.join(destFor(dir, bk), "keep.txt"))).toBe(true);
+      expect(fs.existsSync(path.join(destFor(dir, bk), "sock"))).toBe(false);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});

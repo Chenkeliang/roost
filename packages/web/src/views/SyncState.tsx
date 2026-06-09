@@ -146,6 +146,7 @@ export function SyncState() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -166,8 +167,16 @@ export function SyncState() {
     (item: SyncItem, action: ResolveAction) => {
       const key = `${item.module}:${item.id}`;
       setBusyId(key);
+      setError(null);
       postResolve(item.module, item.id, action)
-        .then(() => refresh())
+        .then(() => {
+          setNotice(
+            action === "keep-local"
+              ? `已保留本地:${item.id}(该项仍与仓库不同,直到你 capture 上传)`
+              : `已取仓库:${item.id}(覆盖前已备份)`,
+          );
+          refresh();
+        })
         .catch((e) => setError(e instanceof Error ? e.message : String(e)))
         .finally(() => setBusyId(null));
     },
@@ -212,6 +221,22 @@ export function SyncState() {
           }}
         >
           {error}
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div
+          style={{
+            padding: "8px 14px",
+            background: "var(--surface)",
+            border: "1px solid var(--border-soft)",
+            borderRadius: "var(--rc)",
+            color: "#5fd08a",
+            fontSize: 12.5,
+            marginBottom: 12,
+          }}
+        >
+          {notice}
         </div>
       ) : null}
 
