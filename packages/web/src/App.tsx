@@ -196,8 +196,8 @@ export function App() {
         @keyframes roost-hud { from { opacity: 0; transform: translate(-50%, 8px) } to { opacity: 1; transform: translateX(-50%) } }
       `}</style>
 
-      <div style={{ display: "flex" }}>
-        {/* Left grouped sidebar */}
+      <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+        {/* Left grouped sidebar — fixed full-height column; scrolls internally if long */}
         <aside
           aria-label="Main navigation"
           style={{
@@ -205,9 +205,8 @@ export function App() {
             flexDirection: "column",
             width: 220,
             flexShrink: 0,
-            minHeight: "100vh",
-            position: "sticky",
-            top: 0,
+            height: "100vh",
+            overflowY: "auto",
             background: "var(--surface)",
             borderRight: "1px solid var(--border-soft)",
             // Bottom padding clears the fixed 44px ActionBar footer so the
@@ -282,55 +281,53 @@ export function App() {
             />
           ))}
 
-          {/* Bottom */}
+          {/* Bottom — two tidy left-aligned rows */}
           <div
             style={{
               marginTop: "auto",
               display: "flex",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: 8,
-              rowGap: 8,
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 10,
               padding: "12px 10px 2px",
               color: "var(--muted)",
               fontSize: 13,
             }}
           >
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "3px 9px",
-                border: "1px solid var(--border)",
-                borderRadius: 999,
-                fontSize: 13,
-                flexShrink: 0,
-              }}
-            >
-              <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
-              local
-            </span>
-            <a
-              href={DOCS_URL}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                void openExternal(DOCS_URL);
-              }}
-              style={{ color: "var(--muted)", textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
-            >
-              {t("app.docs")}
-            </a>
-            <span style={{ marginLeft: "auto" }}>
-              <LanguageSwitcher locale={locale} setLocale={setLocale} />
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "3px 9px",
+                  border: "1px solid var(--border)",
+                  borderRadius: 999,
+                  fontSize: 13,
+                }}
+              >
+                <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
+                local
+              </span>
+              <a
+                href={DOCS_URL}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void openExternal(DOCS_URL);
+                }}
+                style={{ color: "var(--muted)", textDecoration: "none", whiteSpace: "nowrap" }}
+              >
+                {t("app.docs")}
+              </a>
+            </div>
+            <LanguageSwitcher locale={locale} setLocale={setLocale} />
           </div>
         </aside>
 
         {/* Main content */}
-        <main style={{ flex: 1, minWidth: 0, paddingTop: 28, paddingBottom: 60 }}>
+        <main style={{ flex: 1, minWidth: 0, height: "100vh", overflowY: "auto", paddingTop: 28, paddingBottom: 60 }}>
           {activeTab === "overview" && (
             <Overview
               showHud={showHud}
