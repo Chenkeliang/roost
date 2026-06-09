@@ -108,7 +108,7 @@ export type {
   SyncStateReport,
   PushSafety,
 } from "./sync-state.js";
-export { hashContent, loadModuleBaseline } from "./sync-baseline.js";
+export { hashContent, loadModuleBaseline, recordModuleBaseline } from "./sync-baseline.js";
 export { cloneRepo, remoteHead, checkPushSafety } from "./onboarding.js";
 export { readBaseline, writeBaseline } from "./state.js";
 export type { ModuleBaseline } from "./state.js";
