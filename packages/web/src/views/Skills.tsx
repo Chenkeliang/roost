@@ -4,8 +4,8 @@ import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
-import { getSkills, discoverSkills, captureSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict, postSkillsImportGit, postSkillsImportZip } from "../api";
-import type { SkillImportResponse } from "../api";
+import { getSkills, discoverSkills, captureSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict, postSkillsImportScan, postSkillsImportApply } from "../api";
+import type { SkillImportResponse, SkillScanResponse } from "../api";
 import type { SkillsView, SkillRow, SkillMethod } from "../api";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
@@ -129,28 +129,25 @@ export function Skills() {
     }
   }, []);
 
-  // ── import (zip / git) ──────────────────────────────────────────────────────
+  // ── import (scan → select → apply) ──────────────────────────────────────────
   const [gitUrl, setGitUrl] = useState("");
   const [importBusy, setImportBusy] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [scanResult, setScanResult] = useState<SkillScanResponse | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const afterImport = useCallback(
-    async (r: SkillImportResponse) => {
-      const parts: string[] = [];
-      if (r.imported.length) parts.push(`${t("skills.import.done")}: ${r.imported.join(", ")}`);
-      if (r.blocked.length) parts.push(`${t("skills.import.blocked")}: ${r.blocked.map((b) => b.id).join(", ")}`);
-      setImportMsg(parts.join("  ·  ") || t("skills.import.none"));
-      await refetch();
-      await scan();
-    },
-    [refetch, scan, t],
-  );
+  const onScanned = useCallback((r: SkillScanResponse) => {
+    setScanResult(r);
+    // default-select everything importable (not blocked)
+    setSelected(new Set(r.skills.filter((s) => !s.blocked).map((s) => s.name)));
+    if (r.skills.length === 0) setImportMsg(t("skills.import.none"));
+  }, [t]);
 
-  const importZipFile = useCallback(
+  const scanZipFile = useCallback(
     async (file: File) => {
       if (!/\.zip$/i.test(file.name)) { setImportMsg(t("skills.import.zipOnly")); return; }
-      setImportBusy(true); setImportMsg(null);
+      setImportBusy(true); setImportMsg(null); setScanResult(null);
       try {
         const dataUrl = await new Promise<string>((res, rej) => {
           const fr = new FileReader();
@@ -158,30 +155,49 @@ export function Skills() {
           fr.onerror = () => rej(fr.error);
           fr.readAsDataURL(file);
         });
-        const b64 = dataUrl.split(",")[1] ?? "";
-        await afterImport(await postSkillsImportZip(file.name, b64));
+        onScanned(await postSkillsImportScan({ filename: file.name, dataBase64: dataUrl.split(",")[1] ?? "" }));
       } catch (e) {
         setImportMsg(e instanceof Error ? e.message : String(e));
       } finally {
         setImportBusy(false);
       }
     },
-    [afterImport, t],
+    [onScanned, t],
   );
 
-  const importGit = useCallback(async () => {
+  const scanGit = useCallback(async () => {
     const url = gitUrl.trim();
     if (!url) return;
-    setImportBusy(true); setImportMsg(null);
+    setImportBusy(true); setImportMsg(null); setScanResult(null);
     try {
-      await afterImport(await postSkillsImportGit(url));
-      setGitUrl("");
+      onScanned(await postSkillsImportScan({ url }));
     } catch (e) {
       setImportMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setImportBusy(false);
     }
-  }, [gitUrl, afterImport]);
+  }, [gitUrl, onScanned]);
+
+  const applyImport = useCallback(async () => {
+    if (!scanResult || selected.size === 0) return;
+    setImportBusy(true); setImportMsg(null);
+    try {
+      const r: SkillImportResponse = await postSkillsImportApply(scanResult.token, [...selected]);
+      const parts: string[] = [];
+      if (r.imported.length) parts.push(`${t("skills.import.done")}: ${r.imported.join(", ")}`);
+      if (r.blocked.length) parts.push(`${t("skills.import.blocked")}: ${r.blocked.map((b) => b.id).join(", ")}`);
+      setImportMsg(parts.join("  ·  ") || t("skills.import.none"));
+      setScanResult(null);
+      setSelected(new Set());
+      setGitUrl("");
+      await refetch();
+      await scan();
+    } catch (e) {
+      setImportMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImportBusy(false);
+    }
+  }, [scanResult, selected, refetch, scan, t]);
 
   const onTab = useCallback((id: string) => {
     const next = id as "managed" | "discovered";
@@ -371,24 +387,57 @@ export function Skills() {
               <label
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) void importZipFile(f); }}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) void scanZipFile(f); }}
                 style={{ flex: 1, minWidth: 220, border: `1px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`, borderRadius: 10, padding: "16px", textAlign: "center", cursor: importBusy ? "default" : "pointer", color: "var(--muted)", fontSize: 13, background: dragOver ? "var(--raise)" : "transparent" }}
               >
                 <UploadSimple size={18} style={{ display: "block", margin: "0 auto 6px" }} />
                 {t("skills.import.zipHint")}
                 <input type="file" accept=".zip" style={{ display: "none" }} disabled={importBusy}
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void importZipFile(f); e.currentTarget.value = ""; }} />
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void scanZipFile(f); e.currentTarget.value = ""; }} />
               </label>
               <div style={{ flex: 1, minWidth: 240, display: "flex", flexDirection: "column", gap: 6, justifyContent: "center" }}>
                 <input value={gitUrl} onChange={(e) => setGitUrl(e.target.value)} placeholder={t("skills.import.gitPlaceholder")} disabled={importBusy}
-                  onKeyDown={(e) => { if (e.key === "Enter") void importGit(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") void scanGit(); }}
                   style={{ ...ic, width: "100%", padding: "7px 10px" }} />
-                <button onClick={() => void importGit()} disabled={importBusy || !gitUrl.trim()}
+                <button onClick={() => void scanGit()} disabled={importBusy || !gitUrl.trim()}
                   style={{ ...ic, justifyContent: "center", color: "var(--accent)", borderColor: "var(--accent)" }}>
-                  {importBusy ? t("skills.import.importing") : t("skills.import.fromGit")}
+                  {importBusy ? t("skills.import.scanning") : t("skills.import.scan")}
                 </button>
               </div>
             </div>
+
+            {scanResult && (
+              <div style={{ marginTop: 12, border: "1px solid var(--border-soft)", borderRadius: 10, overflow: "hidden" }}>
+                {scanResult.skills.length === 0 ? (
+                  <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--muted)" }}>{t("skills.import.none")}</div>
+                ) : (
+                  scanResult.skills.map((s) => (
+                    <label key={s.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: "1px solid var(--border-soft)", fontSize: 13, opacity: s.blocked ? 0.6 : 1 }}>
+                      <input type="checkbox" disabled={!!s.blocked || importBusy} checked={selected.has(s.name)}
+                        onChange={() => setSelected((set) => { const n = new Set(set); if (n.has(s.name)) n.delete(s.name); else n.add(s.name); return n; })}
+                        style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: s.blocked ? "default" : "pointer" }} />
+                      <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
+                      {s.blocked && (
+                        <span style={{ fontSize: 12, color: s.blocked === "secret" ? "var(--accent)" : "#f0b352" }}>
+                          {s.blocked === "secret" ? t("skills.import.flagSecret") : t("skills.import.flagLarge")}{s.detail ? ` (${s.detail})` : ""}
+                        </span>
+                      )}
+                    </label>
+                  ))
+                )}
+                {scanResult.skills.some((s) => !s.blocked) && (
+                  <div style={{ display: "flex", gap: 8, padding: "10px 12px", alignItems: "center" }}>
+                    <button onClick={() => void applyImport()} disabled={importBusy || selected.size === 0}
+                      style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
+                      {importBusy ? t("skills.import.importing") : `${t("skills.import.importSelected")} (${selected.size})`}
+                    </button>
+                    <button onClick={() => { setScanResult(null); setSelected(new Set()); }} disabled={importBusy} style={{ ...ic }}>
+                      {t("skills.resolve.cancel")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {importMsg && <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--muted)", wordBreak: "break-word" }}>{importMsg}</div>}
           </div>
           {cands === null ? (

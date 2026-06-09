@@ -385,6 +385,29 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("import-scan lists skills, then import-apply ingests only the selected ones", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec: fakeImportExec }) });
+    const scan = await server.inject({ method: "POST", url: "/api/skills/import-scan", payload: { url: "https://github.com/me/pack.git" } });
+    expect(scan.statusCode).toBe(200);
+    const sb = scan.json() as { token: string; skills: { name: string }[] };
+    expect(sb.token).toBeTruthy();
+    expect(sb.skills.map((s) => s.name)).toContain("remote-skill");
+    const apply = await server.inject({ method: "POST", url: "/api/skills/import-apply", payload: { token: sb.token, names: ["remote-skill"] } });
+    expect(apply.statusCode).toBe(200);
+    expect((apply.json() as { imported: string[] }).imported).toContain("remote-skill");
+    expect(fs.existsSync(path.join(tmpDir, "skills", "remote-skill", "SKILL.md"))).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/skills/import-apply → 400 on unknown token", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/skills/import-apply", payload: { token: "nope", names: [] } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+
   it("POST /api/resolve take-repo → applies just that item", async () => {
     const reg = new ModuleRegistry();
     const applied: string[] = [];

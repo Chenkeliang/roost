@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import * as crypto from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import type { FastifyInstance } from "fastify";
@@ -23,6 +24,10 @@ import {
   brewInstall,
   importFromZip,
   importFromGit,
+  stageZip,
+  stageGit,
+  scanStaged,
+  importStaged,
   discoverAll,
   defaultRegistry,
   createExec,
@@ -141,6 +146,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // Short-TTL response cache for the expensive read fan-outs (status/discover).
   // Slow once, then instant for ~25s; wiped on any state-changing mutation below.
   const cache = createTtlCache(25_000);
+  // Staged skill-import sources awaiting a select-then-apply (token → temp dir).
+  const importStaging = new Map<string, { dir: string; at: number }>();
+  const pruneStaging = () => {
+    const now = Date.now();
+    for (const [tok, s] of importStaging) {
+      if (now - s.at > 10 * 60_000) {
+        fs.rmSync(s.dir, { recursive: true, force: true });
+        importStaging.delete(tok);
+      }
+    }
+  };
 
   // ── /api/health ─────────────────────────────────────────────────────────────
   server.get("/api/health", async (_req, reply) => {
@@ -885,6 +901,64 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       }
     },
   );
+
+  // ── POST /api/skills/import-scan ─────────────────────────────────────────────
+  // Step 1 of select-import: stage a zip/git source, list the skills found (with
+  // a pre-flag for ones the secret/size gate would block). Returns a token the
+  // apply step references; the staged dir is kept until apply or TTL cleanup.
+  server.post<{ Body: { url?: string; filename?: string; dataBase64?: string } }>(
+    "/api/skills/import-scan",
+    { bodyLimit: 64 * 1024 * 1024 },
+    async (req, reply) => {
+      pruneStaging();
+      const { url, filename, dataBase64 } = req.body ?? {};
+      try {
+        let dir: string;
+        let fallback: string;
+        if (url && url.trim()) {
+          if (!/^(https?:\/\/|git@)/.test(url.trim())) return reply.status(400).send({ error: "a git/https URL is required" });
+          dir = await stageGit(makeCtx(false), url.trim());
+          fallback = url.trim().replace(/\.git$/i, "").split("/").pop() || "skill";
+        } else if (dataBase64) {
+          const safe = (filename && /\.zip$/i.test(filename) ? filename : "import.zip").replace(/[^\w.-]/g, "_");
+          const tmpZip = path.join(os.tmpdir(), `roost-skill-${process.pid}-${Date.now()}-${safe}`);
+          fs.writeFileSync(tmpZip, Buffer.from(dataBase64, "base64"));
+          try {
+            dir = await stageZip(makeCtx(false), tmpZip);
+          } finally {
+            fs.rmSync(tmpZip, { force: true });
+          }
+          fallback = safe.replace(/\.zip$/i, "");
+        } else {
+          return reply.status(400).send({ error: "url or dataBase64 is required" });
+        }
+        const skills = scanStaged(dir, fallback);
+        const token = crypto.randomUUID();
+        importStaging.set(token, { dir, at: Date.now() });
+        return reply.send({ token, skills });
+      } catch (err) {
+        return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+  );
+
+  // ── POST /api/skills/import-apply ────────────────────────────────────────────
+  // Step 2: ingest the selected skills from a previously-scanned staging dir.
+  server.post<{ Body: { token?: string; names?: string[] } }>("/api/skills/import-apply", async (req, reply) => {
+    const { token, names } = req.body ?? {};
+    const staged = token ? importStaging.get(token) : undefined;
+    if (!token || !staged) return reply.status(400).send({ error: "unknown or expired import token — scan again" });
+    try {
+      const result = importStaged(makeCtx(false), staged.dir, { names: Array.isArray(names) ? names : undefined });
+      cache.invalidateAll();
+      return reply.send(result);
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      fs.rmSync(staged.dir, { recursive: true, force: true });
+      importStaging.delete(token);
+    }
+  });
 
   // ── POST /api/skills/toggle ──────────────────────────────────────────────────
   server.post<{ Body: { skill?: string; target?: string; enabled?: boolean } }>(

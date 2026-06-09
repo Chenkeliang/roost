@@ -81,13 +81,37 @@ export async function gitShallowClone(exec: Exec, url: string, destDir: string):
   if (r.code !== 0) throw new Error(r.stderr.trim() || `git clone failed (code ${r.code})`);
 }
 
-// Ingest every skill root found under stagedDir into source + repo, gating each
-// on the secret/size scan. `.git` is never copied.
-export function importStaged(ctx: ModuleContext, stagedDir: string, fallbackName?: string): SkillImportResult {
+export interface ScannedSkill {
+  name: string;
+  blocked?: "secret" | "too-large";
+  detail?: string;
+}
+
+// Scan a staged dir: list the skills found + pre-flag those that the secret/size
+// gate would block. Does NOT copy anything (used for the preview/select step).
+export function scanStaged(stagedDir: string, fallbackName?: string): ScannedSkill[] {
+  return findSkillRoots(stagedDir, fallbackName).map((r) => {
+    const scan = scanPathForSecrets(r.path);
+    if (scan.tooLarge) return { name: r.name, blocked: "too-large", detail: `${(scan.bytes / 1024 / 1024) | 0}MB / ${scan.files} files` };
+    if (scan.secretFiles.length > 0) return { name: r.name, blocked: "secret", detail: `${scan.secretFiles.length} file(s)` };
+    return { name: r.name };
+  });
+}
+
+// Ingest skill roots found under stagedDir into source + repo, gating each on the
+// secret/size scan. `.git` is never copied. `opts.names` (when given) restricts
+// to those skills; `opts.fallbackName` names a single root that holds SKILL.md.
+export function importStaged(
+  ctx: ModuleContext,
+  stagedDir: string,
+  opts?: { names?: string[]; fallbackName?: string },
+): SkillImportResult {
   const cfg = loadSkillsConfig(ctx.repoDir);
   const sourceRoot = expandHome(ctx.home, cfg.sourceDir);
   const repoSkills = path.join(ctx.repoDir, "skills");
-  const roots = findSkillRoots(stagedDir, fallbackName);
+  const all = findSkillRoots(stagedDir, opts?.fallbackName);
+  const want = opts?.names ? new Set(opts.names) : null;
+  const roots = want ? all.filter((r) => want.has(r.name)) : all;
   const imported: string[] = [];
   const blocked: BlockedItem[] = [];
 
@@ -113,23 +137,42 @@ export function importStaged(ctx: ModuleContext, stagedDir: string, fallbackName
   return { imported, blocked };
 }
 
+function newStagingDir(home: string): string {
+  return fs.mkdtempSync(path.join(home, ".roost-skill-import-"));
+}
+export function fallbackFromZip(zipPath: string): string {
+  return path.basename(zipPath).replace(/\.zip$/i, "");
+}
+export function fallbackFromGit(url: string): string {
+  return path.basename(url).replace(/\.git$/i, "");
+}
+
+// Stage (no cleanup) — extract / clone into a fresh dir and return it. The caller
+// owns cleanup. Used by the scan→select→apply flow.
+export async function stageZip(ctx: ModuleContext, zipPath: string): Promise<string> {
+  const dir = newStagingDir(ctx.home);
+  await extractZip(ctx.exec, zipPath, dir);
+  return dir;
+}
+export async function stageGit(ctx: ModuleContext, url: string): Promise<string> {
+  const dir = newStagingDir(ctx.home);
+  await gitShallowClone(ctx.exec, url, dir);
+  return dir;
+}
+
+// One-shot convenience (CLI): stage → import all → cleanup.
 export async function importFromZip(ctx: ModuleContext, zipPath: string): Promise<SkillImportResult> {
-  const tmp = fs.mkdtempSync(path.join(ctx.home, ".roost-skill-import-"));
+  const tmp = await stageZip(ctx, zipPath);
   try {
-    await extractZip(ctx.exec, zipPath, tmp);
-    const fallback = path.basename(zipPath).replace(/\.zip$/i, "");
-    return importStaged(ctx, tmp, fallback);
+    return importStaged(ctx, tmp, { fallbackName: fallbackFromZip(zipPath) });
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 }
-
 export async function importFromGit(ctx: ModuleContext, url: string): Promise<SkillImportResult> {
-  const tmp = fs.mkdtempSync(path.join(ctx.home, ".roost-skill-import-"));
+  const tmp = await stageGit(ctx, url);
   try {
-    await gitShallowClone(ctx.exec, url, tmp);
-    const fallback = path.basename(url).replace(/\.git$/i, "");
-    return importStaged(ctx, tmp, fallback);
+    return importStaged(ctx, tmp, { fallbackName: fallbackFromGit(url) });
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

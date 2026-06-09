@@ -158,18 +158,29 @@ export interface SkillImportResponse {
   imported: string[];
   blocked: { id: string; reason: string; detail?: string }[];
 }
-export function postSkillsImportGit(url: string): Promise<SkillImportResponse> {
-  return apiFetch<SkillImportResponse>("/api/skills/import-git", {
+export interface ScannedSkill {
+  name: string;
+  blocked?: "secret" | "too-large";
+  detail?: string;
+}
+export interface SkillScanResponse {
+  token: string;
+  skills: ScannedSkill[];
+}
+// Step 1: scan a zip/git source for importable skills (no copy).
+export function postSkillsImportScan(body: { url?: string; filename?: string; dataBase64?: string }): Promise<SkillScanResponse> {
+  return apiFetch<SkillScanResponse>("/api/skills/import-scan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify(body),
   });
 }
-export function postSkillsImportZip(filename: string, dataBase64: string): Promise<SkillImportResponse> {
-  return apiFetch<SkillImportResponse>("/api/skills/import-zip", {
+// Step 2: import the selected skills from a scanned source.
+export function postSkillsImportApply(token: string, names: string[]): Promise<SkillImportResponse> {
+  return apiFetch<SkillImportResponse>("/api/skills/import-apply", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, dataBase64 }),
+    body: JSON.stringify({ token, names }),
   });
 }
 

@@ -116,8 +116,19 @@ export { itemDiff } from "./item-diff.js";
 export type { ItemDiff } from "./item-diff.js";
 export { checkEnvironment, brewInstall } from "./environment.js";
 export type { EnvCheck } from "./environment.js";
-export { importFromZip, importFromGit, importStaged, findSkillRoots, skillName } from "./skills-import.js";
-export type { SkillImportResult } from "./skills-import.js";
+export {
+  importFromZip,
+  importFromGit,
+  importStaged,
+  scanStaged,
+  stageZip,
+  stageGit,
+  fallbackFromZip,
+  fallbackFromGit,
+  findSkillRoots,
+  skillName,
+} from "./skills-import.js";
+export type { SkillImportResult, ScannedSkill } from "./skills-import.js";
 export { readBaseline, writeBaseline } from "./state.js";
 export type { ModuleBaseline } from "./state.js";
 export {
