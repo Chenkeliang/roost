@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import type { ModuleContext, ApplyResult } from "@roost/shared";
-import { defaultRegistry, loadAll, loadSelection } from "@roost/core";
+import { defaultRegistry, loadAll, loadSelection, preflight } from "@roost/core";
 
 export interface LoadDeps {
   repoDir: string;
@@ -16,6 +16,19 @@ export async function runLoad(deps: LoadDeps): Promise<ApplyResult[]> {
 
   const reg = defaultRegistry();
   const sel = loadSelection(repoDir);
+
+  // Preflight hard-gate (ADR-0016 §5): refuse a real apply when a required tool
+  // is missing. Dry-run still previews.
+  if (apply) {
+    const pf = await preflight(reg, ctx);
+    if (!pf.ok) {
+      ctx.log.error(
+        `Preflight failed — fix these before applying:\n` +
+          pf.blockers.map((b) => `  • ${b.name}: ${b.detail ?? "missing"}`).join("\n"),
+      );
+      return [];
+    }
+  }
 
   const results = await loadAll(reg, ctx, sel, { dryRun, backupDir });
 

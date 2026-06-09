@@ -54,11 +54,17 @@ describe("runLoad", () => {
     sel = addItem(sel, "dotfiles", zshrcPath);
     saveSelection(repoDir, sel);
 
-    // chezmoi managed returns relative path ".zshrc", then chezmoi apply runs
-    const { exec } = makeFakeExec([
-      { code: 0, stdout: ".zshrc\n", stderr: "" }, // chezmoi managed
-      { code: 0, stdout: "", stderr: "" },          // chezmoi apply
-    ]);
+    // Command-aware exec: runLoad now runs preflight (doctor version checks)
+    // before applying, so a fixed response sequence no longer works. All
+    // version checks succeed (preflight passes); `chezmoi managed` lists .zshrc.
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        if (cmd === "chezmoi" && args.includes("managed")) {
+          return { code: 0, stdout: ".zshrc\n", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
     const ctx = makeCtx({ exec, home, repoDir });
 
     const results = await runLoad({ repoDir, ctx, apply: true });
@@ -100,5 +106,28 @@ describe("runLoad", () => {
     // packages should be skipped in dry-run
     const pkgResult = results.find((r) => r.module === "packages");
     expect(pkgResult?.skipped).toContain("Brewfile");
+  });
+
+  it("apply=true is blocked (returns []) when a required tool is missing", async () => {
+    const repoDir = path.join(tmpDir, "repo");
+    const home = path.join(tmpDir, "home");
+    fs.mkdirSync(repoDir, { recursive: true });
+    fs.mkdirSync(home, { recursive: true });
+    let sel = emptySelection();
+    sel = addItem(sel, "dotfiles", path.join(home, ".zshrc"));
+    saveSelection(repoDir, sel);
+
+    // chezmoi --version fails → dotfiles' blocking doctor check fails → gate.
+    const exec: Exec = {
+      async run(cmd: string): Promise<ExecResult> {
+        if (cmd === "chezmoi") return { code: 127, stdout: "", stderr: "not found" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, home, repoDir });
+    const results = await runLoad({ repoDir, ctx, apply: true });
+    expect(results).toEqual([]);
+    // No backup dir should be created since nothing applied.
+    expect(fs.existsSync(path.join(home, ".roost-backups", "load"))).toBe(false);
   });
 });
