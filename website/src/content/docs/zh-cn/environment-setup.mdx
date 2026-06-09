@@ -1,0 +1,28 @@
+---
+title: 环境检查
+description: 检查 Roost 所需工具,缺失的一键安装。
+---
+
+**环境检查**页(侧栏:*Setup*)在你恢复到新 Mac 前,核验 Roost 依赖的工具。
+
+## 检查项
+
+| 检查 | 必需? | 缺失时 |
+|---|---|---|
+| **Homebrew** | 是 | 给出官方安装命令(到终端运行) |
+| **git** | 是 | 一键 `brew install git` |
+| **chezmoi** | 是 | 一键 `brew install chezmoi` |
+| **age** | 是 | 一键 `brew install age` |
+| **mise** | 可选 | 一键 `brew install mise` |
+| **age 私钥** | 可选 | 跳转**设置**生成或导入 |
+| **配置仓库** | 可选 | 用 `roost clone <地址>` 克隆 |
+
+## 一键安装
+
+每个缺失且可用 Homebrew 安装的工具都带**安装**按钮,会在你本机运行 `brew install <formula>` 并自动重新检查;顶部还有**安装缺失工具**一次性装齐。
+
+**Homebrew 本身不能一键装** —— 它的安装是交互式 `curl … | bash`,需要终端和密码。复制 Homebrew 行给出的命令,到终端跑一次,再重新检查;之后其它工具就能一键安装了。
+
+## 为什么重要
+
+真正的恢复(`roost load --apply`,或桌面端**同步复核**)以必需工具就位为**前置硬门** —— 于是你会看到清晰的"请先装 X",而不是 apply 中途的晦涩报错。

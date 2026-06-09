@@ -1,0 +1,27 @@
+---
+title: Skills
+description: Back up and distribute cross-IDE agent skills, and import skills from a zip or git repo.
+---
+
+The **skills** module backs up your agent *skills* and distributes them across IDEs (Claude Code, Codex, Gemini CLI, OpenCode).
+
+## How it works
+
+- Your canonical skills live in a source dir (default `~/.agents/skills/`); each skill is a folder (conventionally containing `SKILL.md`).
+- Roost copies managed skills into your repo under `skills/`, and **distributes** them to each enabled IDE by **symlink** (default) or **copy**.
+- A skill can be enabled per IDE; the matrix shows one indicator per cell — a coral check when linked, a warning on a conflict, an empty circle when off.
+
+## Importing skills
+
+Open **Skills → Discover** and use the import panel:
+
+- **From a `.zip`** — drag it onto the dropzone, or click to choose a file.
+- **From a git URL** — paste a GitHub (or any git) URL.
+
+Roost **scans** the source first and lists the skills it finds — a single skill (a folder with `SKILL.md`) or a whole pack (it searches a few levels deep). Pick which to import, then apply.
+
+Imports go through the same **safety gate** as capture: a Secret Scanner and a size limit block anything risky, and **files are only ever copied, never executed** (third-party skills can contain scripts). `.git` is never copied.
+
+## Conflicts
+
+If an IDE's skills folder already holds your own (non-Roost) directory, Roost won't overwrite it. **Back up & take over** moves your folder into `~/.roost-backups/` and links Roost's copy in its place.

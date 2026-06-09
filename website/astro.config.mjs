@@ -44,6 +44,7 @@ export default defineConfig({
           items: [
             { label: "Introduction", slug: "introduction" },
             { label: "Installation", slug: "installation" },
+            { label: "Environment Check", slug: "environment-setup", translations: { "zh-CN": "环境检查" } },
             { label: "Quick Start", slug: "quick-start" },
           ],
         },
@@ -53,6 +54,7 @@ export default defineConfig({
           items: [
             { label: "Core Concepts", slug: "core-concepts" },
             { label: "Modules", slug: "modules" },
+            { label: "Skills", slug: "skills", translations: { "zh-CN": "Skills 技能" } },
             { label: "Projects", slug: "projects" },
             { label: "Aliases & Env", slug: "aliases-and-env" },
             { label: "Secrets", slug: "secrets" },
@@ -63,6 +65,7 @@ export default defineConfig({
           translations: { "zh-CN": "使用 Roost" },
           items: [
             { label: "Dashboard", slug: "dashboard" },
+            { label: "Sync Review", slug: "sync-review", translations: { "zh-CN": "同步复核" } },
             { label: "Drift & Snapshots", slug: "drift-and-snapshots" },
             { label: "Safety & FAQ", slug: "safety-and-faq" },
           ],

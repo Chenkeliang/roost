@@ -1,0 +1,28 @@
+---
+title: Environment Check
+description: Check the tools Roost needs and install missing ones in one click.
+---
+
+The **Environment Check** page (sidebar: *Setup*) verifies the tools Roost relies on before you restore onto a new Mac.
+
+## What it checks
+
+| Check | Required? | If missing |
+|---|---|---|
+| **Homebrew** | yes | shows the official install command (run it in a terminal) |
+| **git** | yes | one-click `brew install git` |
+| **chezmoi** | yes | one-click `brew install chezmoi` |
+| **age** | yes | one-click `brew install age` |
+| **mise** | optional | one-click `brew install mise` |
+| **age key** | optional | link to **Settings** to generate or import it |
+| **config repo** | optional | clone it with `roost clone <url>` |
+
+## One-click install
+
+Every missing Homebrew-installable tool has an **Install** button that runs `brew install <formula>` on your machine, then re-checks. There's also a top **Install missing tools** button to do them all at once.
+
+**Homebrew itself can't be one-click installed** — its installer is an interactive `curl … | bash` that needs a terminal and your password. Copy the command shown on the Homebrew row, run it in Terminal once, then re-check; the other tools become one-click installable afterward.
+
+## Why it matters
+
+A real restore (`roost load --apply`, or the desktop **Sync Review**) is **gated** on the required tools being present — so you get a clear "install X first" instead of a cryptic mid-apply error.

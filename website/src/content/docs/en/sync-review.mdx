@@ -1,0 +1,35 @@
+---
+title: Sync Review
+description: A git-like view of how this Mac differs from your config repo, with automation-first conflict resolution.
+---
+
+The **Sync Review** page shows how the current Mac differs from your config repo and lets you reconcile the two — safely.
+
+## How state is derived
+
+Roost compares three things per item: your **local** copy, the **repo** copy, and the **baseline** (what they were at your last sync). From that it derives a direction:
+
+| State | Meaning | What happens |
+|---|---|---|
+| **In sync** | local == repo | nothing to do |
+| **Repo newer** | only the repo changed | auto-applied (with backup) |
+| **Local newer** | only you changed it | captured on your next backup |
+| **Conflict** | both changed | you decide |
+
+Direction is computed from **content**, never from commit history — so unrelated commits never create false "behind" noise.
+
+## Automation-first
+
+Confident changes resolve automatically; only things that genuinely need a human surface as one of three exceptions:
+
+- **Conflict — both changed.** Default action is set by the *basis* (e.g. "use repo"); you can change it per item.
+- **Needs setup.** A prerequisite is missing (e.g. an age key for encrypted env vars). Never silently skipped.
+- **Removed in repo.** A delete that would touch local content — never automatic; you confirm.
+
+A **default basis** selector and an **Apply to all** button let you clear the common case in one click. Every "use repo" backs up the existing file first.
+
+## Per-item review
+
+Expand any row to see a two-column **Local | Repo** diff. App preferences (`appconfig`) show a per-key table of just the changed keys. Then choose **Use repo** or **Keep local** — resolution is whole-domain for app config (since `defaults import` writes the whole domain).
+
+> Everything is reversible: overwrites are backed up under `~/.roost-backups/`.
