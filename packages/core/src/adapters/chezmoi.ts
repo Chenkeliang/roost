@@ -31,8 +31,12 @@ export function createChezmoi(exec: Exec, opts: { sourceDir: string }): Chezmoi 
     },
 
     async apply(applyOpts?: { dryRun?: boolean; paths?: string[] }): Promise<string> {
+      // --force: apply non-interactively. chezmoi otherwise prompts (needs a TTY)
+      // before overwriting a locally-modified target — which fails in the
+      // headless sidecar. Safe because Roost backs up every target first (I7).
       const args = [
         "apply",
+        "--force",
         ...(applyOpts?.dryRun ? ["--dry-run"] : []),
         ...(applyOpts?.paths ?? []),
       ];

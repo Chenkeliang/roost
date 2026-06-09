@@ -52,7 +52,7 @@ describe("createChezmoi", () => {
     const result = await chezmoi.apply();
     expect(calls[0]).toEqual({
       cmd: "chezmoi",
-      args: ["--source", sourceDir, "apply"],
+      args: ["--source", sourceDir, "apply", "--force"],
     });
     expect(result).toBe("applied!\n");
   });
@@ -63,7 +63,7 @@ describe("createChezmoi", () => {
     await chezmoi.apply({ paths: ["/home/u/.zshrc", "/home/u/.gitconfig"] });
     expect(calls[0]).toEqual({
       cmd: "chezmoi",
-      args: ["--source", sourceDir, "apply", "/home/u/.zshrc", "/home/u/.gitconfig"],
+      args: ["--source", sourceDir, "apply", "--force", "/home/u/.zshrc", "/home/u/.gitconfig"],
     });
   });
 
@@ -73,7 +73,7 @@ describe("createChezmoi", () => {
     const result = await chezmoi.apply({ dryRun: true });
     expect(calls[0]).toEqual({
       cmd: "chezmoi",
-      args: ["--source", sourceDir, "apply", "--dry-run"],
+      args: ["--source", sourceDir, "apply", "--force", "--dry-run"],
     });
     expect(result).toBe("dry run output\n");
   });
