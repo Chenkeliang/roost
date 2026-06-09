@@ -112,6 +112,25 @@ export function getSyncState(): Promise<SyncStateResponse> {
   return apiFetch<SyncStateResponse>("/api/sync-state");
 }
 
+export type ResolveAction = "take-repo" | "keep-local";
+export interface ResolveResponse {
+  ok: boolean;
+  action: ResolveAction;
+  applied: string[];
+  backedUp?: string[];
+}
+export function postResolve(
+  module: string,
+  id: string,
+  action: ResolveAction,
+): Promise<ResolveResponse> {
+  return apiFetch<ResolveResponse>("/api/resolve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ module, id, action }),
+  });
+}
+
 export function getMachines(): Promise<MachinesResponse> {
   return apiFetch<MachinesResponse>("/api/machines");
 }

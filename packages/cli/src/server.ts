@@ -191,6 +191,41 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  // ── POST /api/resolve ──────────────────────────────────────────────────────
+  // Resolve one reviewed item (ADR-0016 §6.2). "take-repo" applies just that
+  // item (backing up first, recording baseline — via loadAll on a sub-selection);
+  // "keep-local" is a deliberate no-op (the item stays until pushed/changed).
+  interface ResolveBody {
+    module: string;
+    id: string;
+    action: "take-repo" | "keep-local";
+  }
+  server.post<{ Body: ResolveBody }>("/api/resolve", async (req, reply) => {
+    const body = req.body ?? ({} as ResolveBody);
+    const { module: mod, id, action } = body;
+    if (!mod || !id || !action) {
+      return reply.status(400).send({ error: "module, id and action are required" });
+    }
+    cache.invalidateAll();
+    if (action === "keep-local") {
+      return reply.send({ ok: true, action, applied: [] as string[] });
+    }
+    if (action === "take-repo") {
+      try {
+        const ctx = makeCtx(false);
+        const backupDir = path.join(ctx.home, ".roost-backups", "resolve");
+        const subSel = { modules: { [mod]: [id] } };
+        const results = await loadAll(registry, ctx, subSel, { dryRun: false, backupDir });
+        const r = results.find((x) => x.module === mod);
+        return reply.send({ ok: true, action, applied: r?.applied ?? [], backedUp: r?.backedUp ?? [] });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return reply.status(500).send({ error: msg });
+      }
+    }
+    return reply.status(400).send({ error: `unknown action: ${String(action)}` });
+  });
+
   // ── /api/index ───────────────────────────────────────────────────────────────
   server.get("/api/index", async (_req, reply) => {
     try {

@@ -234,6 +234,68 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("POST /api/resolve take-repo → applies just that item", async () => {
+    const reg = new ModuleRegistry();
+    const applied: string[] = [];
+    reg.register(
+      makeFakeModule({
+        name: "appconfig",
+        statusFn: async () => ({ module: "appconfig", items: [] }),
+        applyFn: async (_ctx, plan) => {
+          for (const a of plan.actions) applied.push(a.id);
+          return { module: "appconfig", applied: plan.actions.map((a) => a.id), backedUp: [], skipped: [] };
+        },
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/resolve",
+      payload: { module: "appconfig", id: "domain:x", action: "take-repo" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { ok: boolean; applied: string[] };
+    expect(body.ok).toBe(true);
+    expect(body.applied).toContain("domain:x");
+    expect(applied).toEqual(["domain:x"]);
+    await server.close();
+  });
+
+  it("POST /api/resolve keep-local → no-op, applies nothing", async () => {
+    const reg = new ModuleRegistry();
+    let applyCalled = false;
+    reg.register(
+      makeFakeModule({
+        name: "appconfig",
+        statusFn: async () => ({ module: "appconfig", items: [] }),
+        applyFn: async () => {
+          applyCalled = true;
+          return { module: "appconfig", applied: [], backedUp: [], skipped: [] };
+        },
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/resolve",
+      payload: { module: "appconfig", id: "domain:x", action: "keep-local" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { applied: string[] }).applied).toEqual([]);
+    expect(applyCalled).toBe(false);
+    await server.close();
+  });
+
+  it("POST /api/resolve → 400 when fields missing", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/resolve", payload: { module: "x" } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+
   it("GET /api/machines → 200 { hosts: string[], states: Record<string, unknown> }", async () => {
     // Write a fake state file
     const stateDir = path.join(tmpDir, "state");
