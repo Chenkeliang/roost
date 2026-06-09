@@ -129,7 +129,10 @@ export function Setup({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
                     {installing ? t("setup.installing") : `${t("setup.install")} (brew install ${c.brewFormula})`}
                   </button>
                 ) : c.id === "brew" ? (
-                  <span style={{ fontSize: 12.5, color: "#f0b352" }}>{t("setup.missing")}</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <CopyButton text={BREW_INSTALL_CMD} />
+                    <a href="https://brew.sh" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 12.5 }}>brew.sh</a>
+                  </span>
                 ) : (
                   <span style={{ fontSize: 12.5, color: c.required ? "#ff8c8c" : "#f0b352" }}>{t("setup.needBrewFirst")}</span>
                 )}
