@@ -108,6 +108,14 @@ function Row({
   const summaryText = (code: string | undefined): string =>
     code === "dir-or-binary" ? t("sync.summary.dirOrBinary") : t("sync.summary.noText");
 
+  // Localize known detail codes (e.g. "needs-age-key"); pass other details through.
+  const detailText = (() => {
+    if (!item.detail) return null;
+    const key = `sync.detail.${item.detail}`;
+    const tr = t(key);
+    return tr === key ? item.detail : tr;
+  })();
+
   return (
     <>
       <div
@@ -123,7 +131,7 @@ function Row({
       >
         <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 72 }}>{item.module}</span>
         <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{item.id}</span>
-        {item.detail ? <span style={{ color: "var(--muted)", fontSize: 11 }}>{item.detail}</span> : null}
+        {detailText ? <span style={{ color: "var(--muted)", fontSize: 11 }}>{detailText}</span> : null}
         <span style={{ flex: 1 }} />
         <button
           onClick={toggleDiff}

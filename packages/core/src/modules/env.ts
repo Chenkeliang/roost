@@ -556,7 +556,9 @@ export const envModule: SyncModule = {
         id: "env-secrets",
         state: "drift",
         blocked: true,
-        detail: "需要 age 私钥才能恢复加密的环境变量(去设置导入)",
+        // A stable code the UI localizes (server has no locale). Unknown detail
+        // strings pass through verbatim.
+        detail: "needs-age-key",
       });
     }
 

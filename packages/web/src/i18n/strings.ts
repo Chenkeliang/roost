@@ -70,6 +70,10 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     en: "Per-key view is for clarity only; resolution stays whole-domain.",
     zh: "逐键仅供查看;处置仍为整域(采用仓库 / 保留本地)。",
   },
+  "sync.detail.needs-age-key": {
+    en: "age key required to restore encrypted env vars — import it in Settings",
+    zh: "需 age 私钥才能恢复加密环境变量 — 去设置导入",
+  },
   "sync.summary.dirOrBinary": { en: "Directory or non-text entry — no line diff.", zh: "目录或非文本条目,无法逐行对比。" },
   "sync.summary.noText": { en: "No text diff for this type.", zh: "该类型无文本逐行对比。" },
   // notices
