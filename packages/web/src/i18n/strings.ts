@@ -38,6 +38,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "setup.loading": { en: "Checking…", zh: "检查中…" },
   "setup.allGood": { en: "All set — required tools are installed.", zh: "一切就绪 —— 必需工具都已安装。" },
   "setup.installMissing": { en: "Install missing tools", zh: "安装缺失工具" },
+  "setup.install": { en: "Install", zh: "安装" },
   "setup.installing": { en: "Installing…", zh: "安装中…" },
   "setup.needBrewFirst": { en: "Install Homebrew first, then re-check.", zh: "请先安装 Homebrew,再重新检查。" },
   "setup.recheck": { en: "Re-check", zh: "重新检查" },
