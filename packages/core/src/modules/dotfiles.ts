@@ -336,10 +336,31 @@ export const dotfilesModule: SyncModule = {
       return { module: "dotfiles", items: [] };
     }
     const chezmoi = createChezmoi(ctx.exec, { sourceDir: ctx.repoDir });
-    const ok = await chezmoi.verify();
+    // Per-file (coarse three-way is out of scope, §7.3): mark only the dotfiles
+    // that actually differ as drift, not the whole set. A change inside a managed
+    // directory marks that directory id too (prefix match). Falls back to the
+    // verify boolean if `chezmoi status` is unavailable.
+    let changedAbs: string[] | null = null;
+    try {
+      const rels = await chezmoi.changedPaths();
+      changedAbs = rels.map((rel) => path.join(ctx.home, rel));
+    } catch {
+      changedAbs = null;
+    }
+    if (changedAbs === null) {
+      const ok = await chezmoi.verify();
+      return {
+        module: "dotfiles",
+        items: ids.map((id) => ({ id, state: ok ? "synced" : "drift" })),
+      };
+    }
+    const changed = changedAbs;
     return {
       module: "dotfiles",
-      items: ids.map((id) => ({ id, state: ok ? "synced" : "drift" })),
+      items: ids.map((id) => {
+        const isChanged = changed.some((abs) => abs === id || abs.startsWith(id + path.sep));
+        return { id, state: isChanged ? "drift" : "synced" };
+      }),
     };
   },
 

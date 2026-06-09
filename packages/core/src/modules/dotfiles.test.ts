@@ -503,6 +503,40 @@ describe("dotfilesModule.status guard", () => {
     expect(report.module).toBe("dotfiles");
     expect(report.items).toHaveLength(0);
   });
+
+  it("marks only the dotfiles that actually changed (per-file via chezmoi status)", async () => {
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        if (cmd === "chezmoi" && args.includes("status")) {
+          return { code: 0, stdout: " M .zshrc\n", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/home/u" });
+    const report = await dotfilesModule.status(ctx, {
+      modules: { dotfiles: ["/home/u/.zshrc", "/home/u/.gitconfig"] },
+    });
+    const byId = Object.fromEntries(report.items.map((i) => [i.id, i.state]));
+    expect(byId["/home/u/.zshrc"]).toBe("drift");
+    expect(byId["/home/u/.gitconfig"]).toBe("synced");
+  });
+
+  it("a change inside a managed directory marks that directory id (prefix match)", async () => {
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        if (cmd === "chezmoi" && args.includes("status")) {
+          return { code: 0, stdout: " M .config/zed/settings.json\n", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/home/u" });
+    const report = await dotfilesModule.status(ctx, {
+      modules: { dotfiles: ["/home/u/.config/zed"] },
+    });
+    expect(report.items[0]?.state).toBe("drift");
+  });
 });
 
 // ── index ─────────────────────────────────────────────────────────────────────

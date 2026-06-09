@@ -97,6 +97,16 @@ describe("createChezmoi", () => {
     expect(await chezmoi.verify()).toBe(false);
   });
 
+  it("changedPaths: parses `chezmoi status` lines to target paths", async () => {
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: " M .zshrc\nA  .config/foo\n M Library/Application Support/App/x\n\n", stderr: "" },
+    ]);
+    const chezmoi = createChezmoi(exec, { sourceDir });
+    const result = await chezmoi.changedPaths();
+    expect(calls[0]?.args).toContain("status");
+    expect(result).toEqual([".zshrc", ".config/foo", "Library/Application Support/App/x"]);
+  });
+
   it("managed: splits stdout on newlines and filters empty strings", async () => {
     const { exec, calls } = makeFakeExec([{ code: 0, stdout: "/home/user/.zshrc\n/home/user/.vimrc\n\n", stderr: "" }]);
     const chezmoi = createChezmoi(exec, { sourceDir });

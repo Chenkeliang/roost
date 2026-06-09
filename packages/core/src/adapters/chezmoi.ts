@@ -5,6 +5,9 @@ export interface Chezmoi {
   apply(opts?: { dryRun?: boolean }): Promise<string>;
   diff(): Promise<string>;
   verify(): Promise<boolean>;
+  // Target-relative paths (relative to home) that differ from the source — i.e.
+  // the per-file equivalent of `verify` (parses `chezmoi status`).
+  changedPaths(): Promise<string[]>;
   managed(): Promise<string[]>;
   forget(path: string): Promise<void>;
 }
@@ -38,6 +41,20 @@ export function createChezmoi(exec: Exec, opts: { sourceDir: string }): Chezmoi 
     async verify(): Promise<boolean> {
       const r = await exec.run("chezmoi", ["--source", sourceDir, "verify"]);
       return r.code === 0;
+    },
+
+    async changedPaths(): Promise<string[]> {
+      // `chezmoi status` is git-status-like: two status columns, a space, then
+      // the target path (relative to home). Any non-blank line = a change.
+      const { stdout } = await runChecked(["status"]);
+      return stdout
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        .map((line) => {
+          const m = /^..\s(.*)$/.exec(line);
+          return (m ? m[1]! : line.trim()).trim();
+        })
+        .filter((p) => p.length > 0);
     },
 
     async managed(): Promise<string[]> {
