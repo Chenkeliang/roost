@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, ApplyPlan } from "@roost/shared";
 import { classifyDomain, appconfigModule, SENSITIVE_DOMAIN_HINTS } from "./appconfig.js";
+import { hashContent } from "../sync-baseline.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -686,5 +687,35 @@ describe("appconfigModule.index", () => {
     const idx = await appconfigModule.index!(ctx);
     expect(idx.available).toBe(true);
     expect(idx.managed).toBe(0);
+  });
+});
+
+describe("appconfig status three-way", () => {
+  it("sets repoHash from the stored plist and localHash from defaults export", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ac-"));
+    try {
+      const repoPlist = "<plist>STORED</plist>";
+      const dir = path.join(tmp, "roost", "appconfig");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "com.example.app.plist"), repoPlist, "utf8");
+      const ctx = {
+        repoDir: tmp,
+        home: tmp,
+        profile: "base",
+        dryRun: true,
+        exec: { async run() { return { code: 0, stdout: "<plist>LIVE</plist>", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} },
+        t: (k: string) => k,
+      } as never;
+      const sel = { modules: { appconfig: ["domain:com.example.app"] } };
+      const report = await appconfigModule.status(ctx, sel);
+      const item = report.items[0]!;
+      expect(item.repoHash).toBe(hashContent(repoPlist));
+      expect(item.localHash).toBe(hashContent("<plist>LIVE</plist>"));
+      expect(item.baselineHash).toBeNull();
+      expect(item.state).toBe("drift");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

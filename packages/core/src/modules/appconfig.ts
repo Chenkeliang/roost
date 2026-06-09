@@ -12,6 +12,7 @@ import type {
   Health,
 } from "@roost/shared";
 import { scanForSecrets } from "../secrets/scanner.js";
+import { hashContent, loadModuleBaseline } from "../sync-baseline.js";
 
 // ── classifyDomain ────────────────────────────────────────────────────────────
 
@@ -170,23 +171,22 @@ export const appconfigModule: SyncModule = {
   async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {
     const ids = sel.modules["appconfig"] ?? [];
     const items: DriftReport["items"] = [];
+    const baseline = loadModuleBaseline(ctx.repoDir, "appconfig");
 
     for (const id of ids) {
       const domain = stripPrefix(id);
       const storedFile = plistPath(ctx.repoDir, domain);
-
-      if (!fs.existsSync(storedFile)) {
-        items.push({ id, state: "drift", detail: "not captured yet" });
-        continue;
-      }
-
-      const stored = fs.readFileSync(storedFile, "utf8");
+      const stored = fs.existsSync(storedFile) ? fs.readFileSync(storedFile, "utf8") : null;
       const r = await ctx.exec.run("defaults", ["export", domain, "-"]);
-      const current = r.code === 0 ? r.stdout : "";
-
+      const current = r.code === 0 ? r.stdout : null;
+      const synced = stored !== null && stored === current;
       items.push({
         id,
-        state: stored === current ? "synced" : "drift",
+        state: stored === null ? "drift" : synced ? "synced" : "drift",
+        detail: stored === null ? "not captured yet" : undefined,
+        localHash: hashContent(current),
+        repoHash: hashContent(stored),
+        baselineHash: baseline[id] ?? null,
       });
     }
 
