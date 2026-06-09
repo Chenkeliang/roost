@@ -815,3 +815,40 @@ describe("projectsModule.doctor", () => {
     expect(git?.ok).toBe(false);
   });
 });
+
+describe("projects status three-way", () => {
+  it("behind (localHash null) when the project dir is missing", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-pr3-"));
+    try {
+      const missing = path.join(tmp, "no-such-project");
+      const ctx = { repoDir: tmp, home: tmp, profile: "base", dryRun: true,
+        exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} }, t: (k: string) => k } as never;
+      const report = await projectsModule.status(ctx, { modules: { projects: [missing] } });
+      const item = report.items[0]!;
+      expect(item.state).toBe("drift");
+      expect(item.localHash).toBeNull();
+      expect(item.repoHash).toBe("present");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("synced (present) when the project dir exists", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-pr3b-"));
+    try {
+      const present = path.join(tmp, "proj");
+      fs.mkdirSync(present, { recursive: true });
+      const ctx = { repoDir: tmp, home: tmp, profile: "base", dryRun: true,
+        exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} }, t: (k: string) => k } as never;
+      const report = await projectsModule.status(ctx, { modules: { projects: [present] } });
+      const item = report.items[0]!;
+      expect(item.state).toBe("synced");
+      expect(item.localHash).toBe("present");
+      expect(item.repoHash).toBe("present");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});

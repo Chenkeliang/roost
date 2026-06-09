@@ -13,6 +13,7 @@ import type {
   Exec,
 } from "@roost/shared";
 import { loadProjects, saveProjects } from "../projects.js";
+import { loadModuleBaseline } from "../sync-baseline.js";
 
 // ── remote parsing ──────────────────────────────────────────────────────────
 
@@ -299,11 +300,21 @@ export const projectsModule: SyncModule = {
 
   async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {
     const ids = sel.modules["projects"] ?? [];
-    const items = ids.map((id) => ({
-      id,
-      state: (fs.existsSync(id) ? "synced" : "drift") as "synced" | "drift",
-      detail: fs.existsSync(id) ? undefined : "untracked",
-    }));
+    const baseline = loadModuleBaseline(ctx.repoDir, "projects");
+    // Cloning a missing project is purely additive (take-repo) → Behind, not a
+    // two-sided conflict. "present" is a placeholder hash: we track presence, not
+    // contents (per-project git history is the source of truth for contents).
+    const items = ids.map((id) => {
+      const exists = fs.existsSync(id);
+      return {
+        id,
+        state: (exists ? "synced" : "drift") as "synced" | "drift",
+        detail: exists ? undefined : "untracked",
+        localHash: exists ? "present" : null,
+        repoHash: "present",
+        baselineHash: baseline[id] ?? null,
+      };
+    });
     return { module: "projects", items };
   },
 

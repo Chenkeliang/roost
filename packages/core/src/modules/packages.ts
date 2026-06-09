@@ -12,6 +12,8 @@ import type {
   Health,
 } from "@roost/shared";
 
+import { hashContent, loadModuleBaseline } from "../sync-baseline.js";
+
 const BREWFILE_ID = "Brewfile"; // legacy whole-Brewfile sentinel (back-compat)
 const BREWFILE_PATH = "roost/Brewfile";
 
@@ -227,15 +229,26 @@ export const packagesModule: SyncModule = {
     if (!selected) {
       return { module: "packages", items: [] };
     }
-    const r = await ctx.exec.run("brew", [
-      "bundle",
-      "check",
-      "--file",
-      brewfilePath(ctx.repoDir),
-    ]);
+    const file = brewfilePath(ctx.repoDir);
+    const repoContent = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
+    const repoHash = hashContent(repoContent);
+    const baseline = loadModuleBaseline(ctx.repoDir, "packages");
+    const r = await ctx.exec.run("brew", ["bundle", "check", "--file", file]);
+    const ok = r.code === 0;
+    // Installing packages is purely additive — when the Brewfile is not satisfied
+    // the resolution is always "install" (take-repo), so this is Behind, not a
+    // two-sided conflict. localHash === repoHash when satisfied (synced).
     return {
       module: "packages",
-      items: [{ id: BREWFILE_ID, state: r.code === 0 ? "synced" : "drift" }],
+      items: [
+        {
+          id: BREWFILE_ID,
+          state: ok ? "synced" : "drift",
+          localHash: ok ? repoHash : null,
+          repoHash,
+          baselineHash: baseline[BREWFILE_ID] ?? null,
+        },
+      ],
     };
   },
 

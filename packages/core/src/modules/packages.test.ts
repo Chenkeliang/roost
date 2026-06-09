@@ -518,3 +518,46 @@ describe("packagesModule.index", () => {
     expect(idx.managed).toBe(0);
   });
 });
+
+describe("packages status three-way", () => {
+  it("behind (localHash null) when brew bundle check fails", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-pk3-"));
+    try {
+      const dir = path.join(tmp, "roost");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "Brewfile"), 'brew "git"\n', "utf8");
+      const ctx = {
+        repoDir: tmp, home: tmp, profile: "base", dryRun: true,
+        exec: { async run() { return { code: 1, stdout: "", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} }, t: (k: string) => k,
+      } as never;
+      const report = await packagesModule.status(ctx, { modules: { packages: ["Brewfile"] } });
+      const item = report.items[0]!;
+      expect(item.state).toBe("drift");
+      expect(item.localHash).toBeNull();
+      expect(item.repoHash).not.toBeNull();
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("synced (local==repo) when brew bundle check passes", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-pk3b-"));
+    try {
+      const dir = path.join(tmp, "roost");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "Brewfile"), 'brew "git"\n', "utf8");
+      const ctx = {
+        repoDir: tmp, home: tmp, profile: "base", dryRun: true,
+        exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} }, t: (k: string) => k,
+      } as never;
+      const report = await packagesModule.status(ctx, { modules: { packages: ["Brewfile"] } });
+      const item = report.items[0]!;
+      expect(item.state).toBe("synced");
+      expect(item.localHash).toBe(item.repoHash);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
