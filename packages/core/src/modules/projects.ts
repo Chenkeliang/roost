@@ -362,6 +362,7 @@ export const projectsModule: SyncModule = {
         name: "git",
         ok: gitResult.code === 0,
         detail: gitResult.code === 0 ? undefined : "git not found",
+        blocking: true,
       },
       {
         name: "mise",

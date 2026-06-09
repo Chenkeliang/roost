@@ -17,6 +17,7 @@ import {
   loadAll,
   statusAll,
   syncStateAll,
+  preflight,
   discoverAll,
   defaultRegistry,
   createExec,
@@ -184,6 +185,18 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         const sel = loadSelection(repoDir);
         return syncStateAll(registry, makeCtx(true), sel);
       });
+      return reply.send(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── GET /api/preflight ─────────────────────────────────────────────────────
+  // Doctor checks + which failing ones would block a load (ADR-0016 §5).
+  server.get("/api/preflight", async (_req, reply) => {
+    try {
+      const result = await preflight(registry, makeCtx(true));
       return reply.send(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -392,6 +405,14 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       cache.invalidateAll();
       const apply = req.body?.apply === true;
       const dryRun = !apply;
+      // Preflight hard-gate (ADR-0016 §5): a real apply is refused if a required
+      // tool is missing. Dry-run still previews so the user can see the plan.
+      if (apply) {
+        const pf = await preflight(registry, makeCtx(true));
+        if (!pf.ok) {
+          return reply.send({ results: [], blocked: true, blockers: pf.blockers });
+        }
+      }
       const backupDir = path.join(os.homedir(), ".roost-backups", "load");
       const sel = loadSelection(repoDir);
       const results = await loadAll(registry, makeCtx(dryRun), sel, { dryRun, backupDir });

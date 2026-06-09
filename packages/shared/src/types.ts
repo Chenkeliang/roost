@@ -55,7 +55,10 @@ export type ApplyKind = "create" | "update" | "delete" | "skip";
 export interface ApplyAction { id: string; kind: ApplyKind; target: string; backup?: string; }
 export interface ApplyPlan { module: string; actions: ApplyAction[]; }
 export interface ApplyResult { module: string; applied: string[]; backedUp: string[]; skipped: string[]; }
-export interface Health { name: string; ok: boolean; detail?: string; }
+// `blocking: true` marks a check that must pass before a load can proceed
+// (a required external tool / reachable repo / present age key). Optional +
+// additive: unmarked checks are advisory (warnings), never gate the load.
+export interface Health { name: string; ok: boolean; detail?: string; blocking?: boolean; }
 
 // ── env module ("Aliases & Env") ───────────────────────────────────────────────
 // Portable aliases / env vars / PATH entries / shell functions that Roost manages

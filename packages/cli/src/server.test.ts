@@ -59,6 +59,7 @@ function makeFakeModule(opts: {
   statusFn?: (ctx: ModuleContext, sel: Selection) => Promise<DriftReport>;
   captureFn?: (ctx: ModuleContext, sel: Selection) => Promise<ChangeSet>;
   applyFn?: (ctx: ModuleContext, plan: ApplyPlan) => Promise<ApplyResult>;
+  doctorFn?: (ctx: ModuleContext) => Promise<Health[]>;
 }): SyncModule {
   return {
     name: opts.name,
@@ -79,7 +80,10 @@ function makeFakeModule(opts: {
     },
     async diff(): Promise<string> { return ""; },
     async unmanage(): Promise<ApplyResult> { return { module: opts.name, applied: [], backedUp: [], skipped: [] }; },
-    async doctor(): Promise<Health[]> { return []; },
+    async doctor(ctx: ModuleContext): Promise<Health[]> {
+      if (opts.doctorFn) return opts.doctorFn(ctx);
+      return [];
+    },
   };
 }
 
@@ -293,6 +297,65 @@ describe("buildServer", () => {
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
     const res = await server.inject({ method: "POST", url: "/api/resolve", payload: { module: "x" } });
     expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+
+  it("POST /api/load apply=true is BLOCKED when a required tool is missing", async () => {
+    let applied = false;
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        doctorFn: async () => [{ name: "chezmoi", ok: false, blocking: true, detail: "not installed" }],
+        applyFn: async () => {
+          applied = true;
+          return { module: "dotfiles", applied: [], backedUp: [], skipped: [] };
+        },
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/load", payload: { apply: true } });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { blocked?: boolean; blockers?: { name: string }[] };
+    expect(body.blocked).toBe(true);
+    expect(body.blockers?.[0]?.name).toBe("chezmoi");
+    expect(applied).toBe(false);
+    await server.close();
+  });
+
+  it("POST /api/load dry-run still previews even with a blocking failure", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        doctorFn: async () => [{ name: "chezmoi", ok: false, blocking: true }],
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/load", payload: { apply: false } });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { blocked?: boolean; results?: unknown[] };
+    expect(body.blocked).toBeUndefined();
+    expect(Array.isArray(body.results)).toBe(true);
+    await server.close();
+  });
+
+  it("GET /api/preflight → 200 { ok, blockers, checks }", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "packages",
+        doctorFn: async () => [{ name: "brew", ok: false, blocking: true }],
+      }),
+    );
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/preflight" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { ok: boolean; blockers: { name: string }[] };
+    expect(body.ok).toBe(false);
+    expect(body.blockers[0]?.name).toBe("brew");
     await server.close();
   });
 

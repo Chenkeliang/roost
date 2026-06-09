@@ -110,6 +110,8 @@ export type {
 } from "./sync-state.js";
 export { hashContent, loadModuleBaseline, recordModuleBaseline } from "./sync-baseline.js";
 export { cloneRepo, remoteHead, checkPushSafety } from "./onboarding.js";
+export { preflight } from "./preflight.js";
+export type { PreflightResult } from "./preflight.js";
 export { readBaseline, writeBaseline } from "./state.js";
 export type { ModuleBaseline } from "./state.js";
 export {

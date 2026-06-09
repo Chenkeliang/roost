@@ -311,6 +311,7 @@ export const packagesModule: SyncModule = {
         name: "brew",
         ok: brewResult.code === 0,
         detail: brewResult.code === 0 ? undefined : "brew not found – install Homebrew first",
+        blocking: true,
       },
       {
         name: "mas",

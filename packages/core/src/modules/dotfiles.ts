@@ -387,6 +387,7 @@ export const dotfilesModule: SyncModule = {
         name: "chezmoi",
         ok: r.code === 0,
         detail: r.code === 0 ? undefined : "chezmoi not found",
+        blocking: true,
       },
     ];
   },
