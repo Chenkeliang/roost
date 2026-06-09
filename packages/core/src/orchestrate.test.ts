@@ -5,6 +5,7 @@ import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection, SyncModule, DriftReport } from "@roost/shared";
 import { defaultRegistry, discoverAll, captureAll, gateSecrets, statusAll, loadAll, indexAll, syncStateAll } from "./orchestrate.js";
 import { ModuleRegistry } from "./registry.js";
+import { readState } from "./state.js";
 
 // ── fake exec ─────────────────────────────────────────────────────────────────
 
@@ -291,5 +292,62 @@ describe("syncStateAll", () => {
     expect(out.counts.auto).toBe(1); // x is behind
     expect(out.counts.diverged).toBe(1); // y is diverged
     expect(out.overall).toBe("diverged");
+  });
+});
+
+describe("loadAll baseline recording", () => {
+  function ctxFor(tmp: string, dryRun: boolean): ModuleContext {
+    return {
+      repoDir: tmp,
+      home: tmp,
+      profile: "base",
+      dryRun,
+      exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+      log: { info() {}, warn() {}, error() {} },
+      t: (k: string) => k,
+    } as unknown as ModuleContext;
+  }
+
+  it("records baseline for synced (local==repo) items after a real apply", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      fakeModule("appconfig", {
+        module: "appconfig",
+        items: [
+          { id: "domain:x", state: "synced", localHash: "h", repoHash: "h", baselineHash: null },
+          { id: "domain:y", state: "drift", localHash: "a", repoHash: "b", baselineHash: null },
+        ],
+      }),
+    );
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-load-bl-"));
+    try {
+      const sel: Selection = { modules: { appconfig: ["domain:x", "domain:y"] } };
+      await loadAll(reg, ctxFor(tmp, false), sel, { dryRun: false, backupDir: path.join(tmp, "bk") });
+      const st = readState(tmp, os.hostname())!;
+      expect(st).not.toBeNull();
+      expect((st.modules["appconfig"] as { baseline: Record<string, string> }).baseline).toEqual({
+        "domain:x": "h",
+      });
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("dry-run does NOT write a baseline", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(
+      fakeModule("appconfig", {
+        module: "appconfig",
+        items: [{ id: "domain:x", state: "synced", localHash: "h", repoHash: "h", baselineHash: null }],
+      }),
+    );
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roost-load-dr-"));
+    try {
+      const sel: Selection = { modules: { appconfig: ["domain:x"] } };
+      await loadAll(reg, ctxFor(tmp, true), sel, { dryRun: true, backupDir: path.join(tmp, "bk") });
+      expect(readState(tmp, os.hostname())).toBeNull();
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

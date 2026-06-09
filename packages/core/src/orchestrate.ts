@@ -1,6 +1,9 @@
 import * as path from "node:path";
+import * as os from "node:os";
 import type { ModuleContext, Candidate, ChangeSet, DriftReport, ApplyResult, Selection, ModuleIndex } from "@roost/shared";
 import { ModuleRegistry } from "./registry.js";
+import { recordModuleBaseline } from "./sync-baseline.js";
+import type { ModuleBaseline } from "./state.js";
 import { dotfilesModule } from "./modules/dotfiles.js";
 import { packagesModule } from "./modules/packages.js";
 import { appconfigModule } from "./modules/appconfig.js";
@@ -116,8 +119,36 @@ export async function loadAll(
     const modCtx: ModuleContext = { ...ctx, dryRun: opts.dryRun };
     const result = await mod.apply(modCtx, plan);
 
+    // After a REAL apply, persist the baseline so the next status() can tell
+    // Ahead from Behind (ADR-0016/0018). Items now in sync (local == repo) define
+    // the baseline; modules that don't emit hashes simply record nothing.
+    if (!opts.dryRun) {
+      await recordSyncBaseline(mod, modCtx, sel, ctx.repoDir);
+    }
+
     results.push({ ...result, backedUp: [...result.backedUp, ...backedUpFiles] });
   }
 
   return results;
+}
+
+// Re-read a module's status post-apply and record baseline hashes for items that
+// are now synced (localHash === repoHash). No-op for modules without hashes.
+async function recordSyncBaseline(
+  mod: { name: string; status: (ctx: ModuleContext, sel: Selection) => Promise<DriftReport> },
+  modCtx: ModuleContext,
+  sel: Selection,
+  repoDir: string,
+): Promise<void> {
+  const report = await mod.status(modCtx, sel);
+  const baseline: ModuleBaseline = {};
+  for (const item of report.items) {
+    if (item.localHash != null && item.localHash === item.repoHash) {
+      baseline[item.id] = item.localHash;
+    }
+  }
+  if (Object.keys(baseline).length === 0) return;
+  recordModuleBaseline(repoDir, os.hostname(), mod.name, baseline, {
+    lastSeen: new Date().toISOString(),
+  });
 }
