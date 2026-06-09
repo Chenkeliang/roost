@@ -58,7 +58,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: "var(--rt)",
   color: "var(--text)",
   fontFamily: "var(--mono)",
-  fontSize: 12,
+  fontSize: 13,
   padding: "5px 9px",
   outline: "none",
   width: "100%",
@@ -79,7 +79,7 @@ function iconButton(color: string): React.CSSProperties {
     background: "var(--raise)",
     color,
     fontFamily: "var(--font)",
-    fontSize: 11,
+    fontSize: 12.5,
     padding: "4px 6px",
     borderRadius: 6,
     cursor: "pointer",
@@ -439,7 +439,7 @@ function FunctionEditor({
             minHeight: 150,
             lineHeight: 1.6,
             resize: "vertical",
-            fontSize: 12.5,
+            fontSize: 13.5,
           }}
         />
       </Field>
@@ -457,7 +457,7 @@ const editorGridStyle: React.CSSProperties = {
 
 const hintStyle: React.CSSProperties = {
   color: "var(--faint)",
-  fontSize: 11,
+  fontSize: 12.5,
   margin: "8px 0 0",
 };
 
@@ -470,7 +470,7 @@ const lockBadgeStyle: React.CSSProperties = {
   background: "rgba(255,99,99,.12)",
   border: "1px solid var(--accent)",
   color: "var(--accent)",
-  fontSize: 11,
+  fontSize: 12.5,
   fontWeight: 540,
   flexShrink: 0,
 };
@@ -492,7 +492,7 @@ function Field({
         display: "flex",
         flexDirection: "column",
         gap: 4,
-        fontSize: 11,
+        fontSize: 12.5,
         color: "var(--muted)",
         letterSpacing: ".03em",
         width: width ?? undefined,
@@ -543,15 +543,15 @@ function ImportPicker({
   return (
     <div style={{ ...cardStyle, marginBottom: 16 }}>
       <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-soft)" }}>
-        <div style={{ fontWeight: 540, fontSize: 13 }}>Import from your shell</div>
-        <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 3 }}>
+        <div style={{ fontWeight: 540, fontSize: 14 }}>Import from your shell</div>
+        <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 3 }}>
           Best-effort scan of simple top-level <span className="mono">alias</span> /{" "}
           <span className="mono">export</span> lines in your rc files. Values aren&apos;t copied —
           fill them in after importing.
         </div>
       </div>
       {candidates.length === 0 ? (
-        <div style={{ padding: "14px", color: "var(--muted)", fontSize: 12 }}>
+        <div style={{ padding: "14px", color: "var(--muted)", fontSize: 13 }}>
           Nothing importable found in your shell rc files.
         </div>
       ) : (
@@ -564,7 +564,7 @@ function ImportPicker({
               gap: 10,
               padding: "8px 14px",
               borderBottom: "1px solid var(--border-soft)",
-              fontSize: 12,
+              fontSize: 13,
               cursor: "pointer",
             }}
           >
@@ -577,7 +577,7 @@ function ImportPicker({
             <span className="mono" style={{ flex: 1, color: "var(--text)" }}>
               {c.id.replace(/^import:/, "")}
             </span>
-            <span style={{ color: "var(--muted)", fontSize: 11 }}>{c.note}</span>
+            <span style={{ color: "var(--muted)", fontSize: 12.5 }}>{c.note}</span>
           </label>
         ))
       )}
@@ -831,7 +831,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             border: "1px solid var(--red)",
             borderRadius: "var(--rr)",
             color: "var(--red)",
-            fontSize: 13,
+            fontSize: 14,
           }}
         >
           {error ?? "Could not load env data."} —{" "}
@@ -843,7 +843,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
               color: "var(--accent)",
               cursor: "pointer",
               fontFamily: "var(--font)",
-              fontSize: 13,
+              fontSize: 14,
               padding: 0,
             }}
           >
@@ -894,7 +894,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
       <p
         style={{
           color: "var(--muted)",
-          fontSize: 12.5,
+          fontSize: 13.5,
           lineHeight: 1.55,
           margin: "0 0 14px",
           maxWidth: 720,
@@ -968,7 +968,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                   background: active ? "rgba(255,99,99,.13)" : "transparent",
                   color: active ? "var(--accent)" : "var(--muted)",
                   fontFamily: "var(--font)",
-                  fontSize: 12.5,
+                  fontSize: 13.5,
                   padding: "5px 11px",
                   borderRadius: 999,
                   cursor: "pointer",
@@ -979,7 +979,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                 }}
               >
                 {c.label}
-                <span style={{ fontSize: 11, opacity: 0.7 }}>{counts[c.id]}</span>
+                <span style={{ fontSize: 12.5, opacity: 0.7 }}>{counts[c.id]}</span>
               </button>
             );
           })}
@@ -1015,7 +1015,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                 borderRadius: 999,
                 border: "1px solid var(--amber)",
                 color: "var(--amber)",
-                fontSize: 11,
+                fontSize: 12.5,
                 fontWeight: 540,
               }}
             >
@@ -1031,7 +1031,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
               background: dirty ? "var(--accent)" : "var(--raise)",
               color: dirty ? "#0b0b0d" : "var(--muted)",
               fontFamily: "var(--font)",
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 560,
               padding: "6px 13px",
               borderRadius: "var(--rr)",
@@ -1072,7 +1072,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             border: "1px solid var(--border)",
             borderRadius: "var(--rr)",
             background: "var(--raise)",
-            fontSize: 12.5,
+            fontSize: 13.5,
           }}
         >
           <div style={{ color: "var(--muted)", marginBottom: 8 }}>
@@ -1083,7 +1083,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
               style={{
                 flex: 1,
                 fontFamily: "var(--mono)",
-                fontSize: 12,
+                fontSize: 13,
                 color: "var(--text)",
                 background: "var(--surface)",
                 border: "1px solid var(--border-soft)",
@@ -1115,7 +1115,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
       )}
 
       {/* result count */}
-      <div style={{ color: "var(--faint)", fontSize: 11.5, margin: "0 2px 8px" }}>
+      <div style={{ color: "var(--faint)", fontSize: 12.5, margin: "0 2px 8px" }}>
         {shown.length} of {counts.all} item{counts.all === 1 ? "" : "s"}
         {query ? ` matching “${query}”` : ""}
         {chip !== "all" ? ` · ${CHIPS.find((c) => c.id === chip)!.label}` : ""}
@@ -1125,7 +1125,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
       <div style={cardStyle}>
         {shown.length === 0 ? (
           <div
-            style={{ padding: "34px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}
+            style={{ padding: "34px", textAlign: "center", color: "var(--muted)", fontSize: 14 }}
           >
             {counts.all === 0
               ? t("env.emptyManaged")
@@ -1157,7 +1157,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                   <span
                     style={{
                       flexShrink: 0,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: 600,
                       letterSpacing: ".04em",
                       textTransform: "uppercase",
@@ -1174,7 +1174,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                   <span
                     className="mono"
                     style={{
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: 500,
                       flexShrink: 0,
                       minWidth: 150,
@@ -1189,7 +1189,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                   <span
                     className="mono"
                     style={{
-                      fontSize: 12.5,
+                      fontSize: 13.5,
                       color: "var(--muted)",
                       flex: 1,
                       overflow: "hidden",

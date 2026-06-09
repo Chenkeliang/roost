@@ -12,7 +12,7 @@ interface ProjectsProps { showHud?: (m: HudMessage) => void; }
 type TestState = Record<string, "ok" | "fail" | "testing">;
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
-const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
+const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
 
 export function Projects({ showHud }: ProjectsProps) {
   const { t } = useT();
@@ -123,12 +123,12 @@ export function Projects({ showHud }: ProjectsProps) {
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-      <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
+      <p style={{ color: "var(--muted)", fontSize: 13.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
         {t("projects.explainer")} {t("common.selected")}: {saved.size} · {t("common.managed")}: {loading ? "…" : managed}.
       </p>
 
       {!available && (
-        <div role="alert" style={{ padding: "10px 14px", background: "rgba(242,85,90,.1)", border: "1px solid var(--red)", borderRadius: "var(--rr)", color: "var(--red)", fontSize: 13, marginBottom: 14 }}>
+        <div role="alert" style={{ padding: "10px 14px", background: "rgba(242,85,90,.1)", border: "1px solid var(--red)", borderRadius: "var(--rr)", color: "var(--red)", fontSize: 14, marginBottom: 14 }}>
           {reason ?? "git not available"}
         </div>
       )}
@@ -142,7 +142,7 @@ export function Projects({ showHud }: ProjectsProps) {
             { id: "discovered", label: t("common.discoveredTab"), count: cands === null ? undefined : cands.length },
           ]}
         />
-        <button onClick={() => void scan()} disabled={scanning || !available} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13, marginLeft: "auto" }}>
+        <button onClick={() => void scan()} disabled={scanning || !available} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14, marginLeft: "auto" }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
           {scanning ? t("projects.scanning") : t("projects.scan")}
         </button>
@@ -154,7 +154,7 @@ export function Projects({ showHud }: ProjectsProps) {
         ) : (
           <div style={card}>
             {[...saved].sort().map((id) => (
-              <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+              <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                 <GitBranch size={14} style={{ color: "var(--muted)" }} />
                 <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{id}</span>
                 <button onClick={() => void remove(id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${id}`}><X size={11} />{t("common.remove")}</button>
@@ -186,7 +186,7 @@ export function Projects({ showHud }: ProjectsProps) {
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>
               <input
                 type="checkbox"
                 aria-label="select all shown"
@@ -197,7 +197,7 @@ export function Projects({ showHud }: ProjectsProps) {
             </label>
             {checked.size > 0 && (
               <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <span style={{ color: "var(--muted)", fontSize: 12 }}>{checked.size} {t("common.selected")}</span>
+                <span style={{ color: "var(--muted)", fontSize: 13 }}>{checked.size} {t("common.selected")}</span>
                 <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
                   <FloppyDisk size={11} />{t("common.addSelected")}
                 </button>
@@ -209,10 +209,10 @@ export function Projects({ showHud }: ProjectsProps) {
           </div>
           <div style={card}>
             {shown.map((c) => (
-              <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+              <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                 <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
                 <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
-                <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 150, fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.remote ?? "no remote"}</span>
+                <span style={{ color: "var(--muted)", fontSize: 12.5, minWidth: 150, fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.remote ?? "no remote"}</span>
                 {tested[c.id] === "ok" && <CheckCircle size={14} weight="fill" style={{ color: "var(--green)" }} />}
                 {tested[c.id] === "fail" && <XCircle size={14} weight="fill" style={{ color: "var(--red)" }} />}
                 <button onClick={() => void test(c)} disabled={!c.remote || tested[c.id] === "testing"} style={ic} aria-label={`test ${c.path}`}>Test</button>

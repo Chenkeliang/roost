@@ -75,14 +75,14 @@ export function ItemRow({ id, module, status, encrypted, selected }: ItemRowProp
           {icon}
         </Tile>
       )}
-      <span className="mono" style={{ fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <span className="mono" style={{ fontSize: 14, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {id}
       </span>
       <StatusDot status={status} />
       <span
         style={{
           color: encrypted ? "var(--accent)" : "var(--muted)",
-          fontSize: 12,
+          fontSize: 13,
           fontFamily: "var(--mono)",
           marginLeft: 4,
         }}
@@ -98,7 +98,7 @@ export function ItemRow({ id, module, status, encrypted, selected }: ItemRowProp
               background: "var(--raise)",
               color: "var(--muted)",
               fontFamily: "var(--font)",
-              fontSize: 11,
+              fontSize: 12.5,
               padding: "3px 8px",
               borderRadius: 6,
               cursor: "pointer",
@@ -113,7 +113,7 @@ export function ItemRow({ id, module, status, encrypted, selected }: ItemRowProp
               background: "var(--raise)",
               color: "var(--muted)",
               fontFamily: "var(--font)",
-              fontSize: 11,
+              fontSize: 12.5,
               padding: "3px 8px",
               borderRadius: 6,
               cursor: "pointer",

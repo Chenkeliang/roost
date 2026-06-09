@@ -53,7 +53,7 @@ export function ModuleSection({ name, status, items, icon, note }: ModuleSection
         {icon}
         <span>{name}</span>
         {items !== undefined && (
-          <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 12 }}>
+          <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 13 }}>
             {items.length}
           </span>
         )}
@@ -62,7 +62,7 @@ export function ModuleSection({ name, status, items, icon, note }: ModuleSection
             style={{
               marginLeft: "auto",
               color: "var(--amber)",
-              fontSize: 12,
+              fontSize: 13,
               fontFamily: "var(--mono)",
             }}
           >

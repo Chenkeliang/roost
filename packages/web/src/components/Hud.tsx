@@ -37,7 +37,7 @@ export function Hud({ message, onDismiss }: HudProps) {
         border: `1px solid ${isError ? "var(--red)" : "#313137"}`,
         borderRadius: 999,
         padding: "7px 14px 7px 8px",
-        fontSize: 13,
+        fontSize: 14,
         boxShadow: "0 14px 30px -12px rgba(0,0,0,.6)",
         zIndex: 40,
         animation: "roost-hud .18s cubic-bezier(.16,1,.3,1)",

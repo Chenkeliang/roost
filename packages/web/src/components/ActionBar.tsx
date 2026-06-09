@@ -21,7 +21,7 @@ export function ActionBar({ onApply, onOpenPalette }: ActionBarProps) {
         alignItems: "center",
         gap: 20,
         padding: "0 20px",
-        fontSize: 12,
+        fontSize: 13,
         color: "var(--muted)",
         zIndex: 30,
       }}
@@ -35,7 +35,7 @@ export function ActionBar({ onApply, onOpenPalette }: ActionBarProps) {
             border: "none",
             color: "var(--muted)",
             font: "inherit",
-            fontSize: 12,
+            fontSize: 13,
             cursor: "pointer",
             padding: 0,
           }}
@@ -51,7 +51,7 @@ export function ActionBar({ onApply, onOpenPalette }: ActionBarProps) {
             border: "none",
             color: "var(--muted)",
             font: "inherit",
-            fontSize: 12,
+            fontSize: 13,
             cursor: "pointer",
             padding: 0,
           }}

@@ -29,7 +29,7 @@ function SnapshotRow({ entry }: { entry: TimelineEntry }) {
         gap: 12,
         padding: "10px 14px",
         borderBottom: "1px solid var(--border-soft)",
-        fontSize: 13,
+        fontSize: 14,
       }}
     >
       <span
@@ -45,7 +45,7 @@ function SnapshotRow({ entry }: { entry: TimelineEntry }) {
         className="mono"
         style={{
           color: "var(--accent)",
-          fontSize: 11,
+          fontSize: 12.5,
           flexShrink: 0,
           minWidth: 64,
           letterSpacing: ".02em",
@@ -67,7 +67,7 @@ function SnapshotRow({ entry }: { entry: TimelineEntry }) {
       <span
         style={{
           color: "var(--muted)",
-          fontSize: 12,
+          fontSize: 13,
           flexShrink: 0,
           minWidth: 70,
           textAlign: "right",
@@ -100,7 +100,7 @@ export function Timeline() {
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <div
         style={{
-          fontSize: 11,
+          fontSize: 12.5,
           letterSpacing: ".08em",
           textTransform: "uppercase",
           color: "var(--muted)",
@@ -146,7 +146,7 @@ export function Timeline() {
             border: "1px solid var(--red)",
             borderRadius: "var(--rr)",
             color: "var(--red)",
-            fontSize: 13,
+            fontSize: 14,
           }}
         >
           {error}
@@ -173,7 +173,7 @@ export function Timeline() {
               gap: 12,
               padding: "9px 14px",
               borderBottom: "1px solid var(--border-soft)",
-              fontSize: 11,
+              fontSize: 12.5,
               letterSpacing: ".06em",
               textTransform: "uppercase",
               color: "var(--muted)",

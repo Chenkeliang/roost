@@ -8,8 +8,8 @@ import { getSkills, discoverSkills, captureSkills, toggleSkill, linkSkills, save
 import type { SkillsView, SkillRow, SkillMethod } from "../api";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
-const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
-const cellPad: React.CSSProperties = { padding: "9px 12px", borderBottom: "1px solid var(--border-soft)", fontSize: 13, verticalAlign: "middle" };
+const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
+const cellPad: React.CSSProperties = { padding: "9px 12px", borderBottom: "1px solid var(--border-soft)", fontSize: 14, verticalAlign: "middle" };
 
 type Candidate = { id: string; note?: string };
 
@@ -153,15 +153,15 @@ export function Skills() {
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       {/* Recipe bar: source dir, default method/targets, apply links */}
       <div style={{ ...card, padding: "12px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5 }}>
           <Stack size={14} style={{ color: "var(--accent)" }} />
           <span style={{ color: "var(--muted)" }}>{t("skills.sourceDir")}:</span>
           <span className="mono" style={{ color: "var(--text)" }}>{config.sourceDir}</span>
         </span>
-        <span style={{ color: "var(--muted)", fontSize: 12.5 }}>
+        <span style={{ color: "var(--muted)", fontSize: 13.5 }}>
           {t(`skills.method.${config.method}`)} · {config.targets.join(", ") || "—"}
         </span>
-        <button onClick={() => void onApplyLinks()} disabled={busy} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
+        <button onClick={() => void onApplyLinks()} disabled={busy} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
           <LinkIcon size={14} />{t("skills.link")}
         </button>
       </div>
@@ -175,7 +175,7 @@ export function Skills() {
             { id: "discovered", label: t("skills.tab.discovered"), count: cands === null ? undefined : newCands.length },
           ]}
         />
-        <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
+        <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
           {scanning ? t("dotfiles.scanning") : t("common.discoveredTab")}
         </button>
@@ -188,7 +188,7 @@ export function Skills() {
           <div style={{ ...card, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ textAlign: "left", color: "var(--muted)", fontSize: 11 }}>
+                <tr style={{ textAlign: "left", color: "var(--muted)", fontSize: 12.5 }}>
                   <th style={{ ...cellPad, fontWeight: 600 }}>Skill</th>
                   <th style={{ ...cellPad, fontWeight: 600 }}>{t("skills.enabled")}</th>
                   {targets.map((tg) => (
@@ -276,7 +276,7 @@ export function Skills() {
           <div>
             {checked.size > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
-                <span style={{ color: "var(--muted)", fontSize: 12 }}>{checked.size} {t("common.selected")}</span>
+                <span style={{ color: "var(--muted)", fontSize: 13 }}>{checked.size} {t("common.selected")}</span>
                 <button onClick={() => void onBackup()} disabled={busy} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)" }}>
                   <FloppyDisk size={11} />{t("skills.capture")}
                 </button>
@@ -286,12 +286,12 @@ export function Skills() {
               {newCands.map((c) => {
                 const conflict = c.note ? /conflict/i.test(c.note) : false;
                 return (
-                  <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                  <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                     <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} style={{ accentColor: "var(--accent)" }} />
                     <Stack size={14} style={{ color: "var(--muted)" }} />
                     <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.id}</span>
                     {c.note && (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: conflict ? "var(--accent)" : "var(--muted)" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, color: conflict ? "var(--accent)" : "var(--muted)" }}>
                         {conflict && <Warning size={11} weight="fill" />}{c.note}
                       </span>
                     )}
@@ -314,12 +314,12 @@ export function Skills() {
               <Warning size={16} weight="fill" style={{ color: "var(--accent)" }} />
               <span style={{ fontSize: 14, fontWeight: 600 }}>{t("skills.resolve.action")}</span>
             </div>
-            <p style={{ margin: "0 0 16px", fontSize: 13, lineHeight: 1.5, color: "var(--muted)" }}>{t("skills.resolve.confirm")}</p>
+            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.5, color: "var(--muted)" }}>{t("skills.resolve.confirm")}</p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => setPending(null)} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 13 }}>
+              <button onClick={() => setPending(null)} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 14 }}>
                 {t("skills.resolve.cancel")}
               </button>
-              <button onClick={() => void confirmResolve()} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 13, color: "#fff", background: "var(--accent)", borderColor: "var(--accent)" }}>
+              <button onClick={() => void confirmResolve()} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 14, color: "#fff", background: "var(--accent)", borderColor: "var(--accent)" }}>
                 {t("skills.resolve.confirmAction")}
               </button>
             </div>

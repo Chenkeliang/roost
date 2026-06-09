@@ -29,7 +29,7 @@ export function TabSwitch({
               border: 0,
               cursor: "pointer",
               fontFamily: "var(--font)",
-              fontSize: 12.5,
+              fontSize: 13.5,
               fontWeight: 540,
               padding: "5px 12px",
               borderRadius: 999,
@@ -43,7 +43,7 @@ export function TabSwitch({
           >
             {t.label}
             {t.count !== undefined && (
-              <span style={{ fontSize: 11, color: on ? "var(--muted)" : "var(--border)", fontFamily: "var(--mono)" }}>{t.count}</span>
+              <span style={{ fontSize: 12.5, color: on ? "var(--muted)" : "var(--border)", fontFamily: "var(--mono)" }}>{t.count}</span>
             )}
           </button>
         );

@@ -11,7 +11,7 @@ import { getIndex, getAppConfig, getDiscoverModule, addSelection, removeSelectio
 interface AppConfigProps { showHud?: (m: HudMessage) => void; }
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
-const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
+const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
 
 // Candidate ids are `domain:<name>`; managed domains are bare names. Strip to compare.
 function candidateDomain(id: string): string {
@@ -132,7 +132,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-      <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
+      <p style={{ color: "var(--muted)", fontSize: 13.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
         {t("appconfig.explainer")} {t("common.selected")}: {selected.size} · {t("common.managed")}: {managed?.length ?? 0}.
       </p>
 
@@ -151,10 +151,10 @@ export function AppConfig({ showHud }: AppConfigProps) {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter domains…"
-            style={{ width: "100%", appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--font)", fontSize: 13, padding: "6px 10px 6px 28px", borderRadius: 6, boxSizing: "border-box" }}
+            style={{ width: "100%", appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--font)", fontSize: 14, padding: "6px 10px 6px 28px", borderRadius: 6, boxSizing: "border-box" }}
           />
         </div>
-        <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
+        <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
           {scanning ? t("appconfig.scanning") : t("appconfig.scan")}
         </button>
@@ -173,10 +173,10 @@ export function AppConfig({ showHud }: AppConfigProps) {
               const domain = candidateDomain(id);
               const captured = (managed ?? []).includes(domain);
               return (
-                <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                   <AppWindow size={14} style={{ color: "var(--muted)" }} />
                   <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{domain}</span>
-                  <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("common.captured") : t("common.pending")}</span>
+                  <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 12.5 }}>{captured ? t("common.captured") : t("common.pending")}</span>
                   <button onClick={() => void remove(id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${domain}`}><X size={11} />{t("common.remove")}</button>
                 </div>
               );
@@ -194,7 +194,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
         <div>
           {checked.size > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>
                 <input
                   type="checkbox"
                   aria-label="select all discovered"
@@ -218,7 +218,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
               const domain = candidateDomain(c.id);
               const isAdded = selected.has(c.id);
               return (
-                <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                   <input type="checkbox" aria-label={`select ${domain}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
                   <AppWindow size={14} style={{ color: "var(--muted)" }} />
                   <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{domain}</span>

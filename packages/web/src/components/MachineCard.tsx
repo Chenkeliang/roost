@@ -50,12 +50,12 @@ export function MachineCard({
             </>
           ) : (
             <>
-              <div style={{ fontWeight: 560, fontSize: 13 }}>
+              <div style={{ fontWeight: 560, fontSize: 14 }}>
                 {isPrimary ? "Primary" : "Follower"} · {name ?? "—"}
               </div>
               <div
                 className="mono"
-                style={{ color: "var(--muted)", fontSize: 12 }}
+                style={{ color: "var(--muted)", fontSize: 13 }}
               >
                 {hostname ?? "—"}
               </div>
@@ -89,7 +89,7 @@ export function MachineCard({
               >
                 {tracked ?? "—"}
               </span>
-              <span style={{ color: "var(--muted)", fontSize: 13 }}>tracked</span>
+              <span style={{ color: "var(--muted)", fontSize: 14 }}>tracked</span>
             </div>
             <div>
               <span
@@ -102,14 +102,14 @@ export function MachineCard({
               >
                 {drift ?? 0}
               </span>
-              <span style={{ color: "var(--muted)", fontSize: 13 }}>drift</span>
+              <span style={{ color: "var(--muted)", fontSize: 14 }}>drift</span>
             </div>
           </>
         )}
       </div>
 
       {!loading && lastAction && (
-        <div style={{ color: "var(--muted)", fontSize: 12 }}>
+        <div style={{ color: "var(--muted)", fontSize: 13 }}>
           {lastActionLabel ?? "last action"}{" "}
           <span className="mono">{lastAction}</span>
         </div>

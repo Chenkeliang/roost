@@ -39,7 +39,7 @@ function DiffLine({ line }: { line: string }) {
         whiteSpace: "pre",
         minHeight: "1.4em",
         fontFamily: "var(--mono)",
-        fontSize: 12,
+        fontSize: 13,
         lineHeight: 1.55,
       }}
     >
@@ -72,7 +72,7 @@ function DiffPane({ moduleName, diffs, loading }: DiffPaneProps) {
         style={{
           padding: "10px 14px",
           color: "var(--muted)",
-          fontSize: 12,
+          fontSize: 13,
           fontStyle: "italic",
         }}
       >
@@ -97,7 +97,7 @@ function DiffPane({ moduleName, diffs, loading }: DiffPaneProps) {
           margin: 0,
           padding: "8px 0",
           fontFamily: "var(--mono)",
-          fontSize: 12,
+          fontSize: 13,
         }}
       >
         {lines.map((line, i) => (
@@ -141,7 +141,7 @@ function DriftedModuleRow({
           alignItems: "center",
           gap: 10,
           padding: "10px 14px",
-          fontSize: 13,
+          fontSize: 14,
         }}
       >
         <span
@@ -151,7 +151,7 @@ function DriftedModuleRow({
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 90 }}>
           <StatusDot status={derivedStatus} />
-          <span style={{ color: "var(--muted)", fontSize: 12 }}>{derivedStatus}</span>
+          <span style={{ color: "var(--muted)", fontSize: 13 }}>{derivedStatus}</span>
         </span>
         <button
           onClick={handleToggleDiff}
@@ -161,7 +161,7 @@ function DriftedModuleRow({
             background: showDiff ? "var(--raise)" : "transparent",
             color: showDiff ? "var(--text)" : "var(--muted)",
             fontFamily: "var(--font)",
-            fontSize: 11,
+            fontSize: 12.5,
             padding: "3px 9px",
             borderRadius: 6,
             cursor: "pointer",
@@ -226,7 +226,7 @@ export function Drift() {
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <div
         style={{
-          fontSize: 11,
+          fontSize: 12.5,
           letterSpacing: ".08em",
           textTransform: "uppercase",
           color: "var(--muted)",
@@ -271,7 +271,7 @@ export function Drift() {
             border: "1px solid var(--red)",
             borderRadius: "var(--rr)",
             color: "var(--red)",
-            fontSize: 13,
+            fontSize: 14,
           }}
         >
           {error}
@@ -298,7 +298,7 @@ export function Drift() {
               gap: 10,
               padding: "9px 14px",
               borderBottom: "1px solid var(--border-soft)",
-              fontSize: 11,
+              fontSize: 12.5,
               letterSpacing: ".06em",
               textTransform: "uppercase",
               color: "var(--muted)",

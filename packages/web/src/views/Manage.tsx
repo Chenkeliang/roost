@@ -89,7 +89,7 @@ function AddPanel({ moduleName, selectedIds, discover, onAdd }: AddPanelProps) {
           background: "transparent",
           color: "var(--muted)",
           fontFamily: "var(--font)",
-          fontSize: 12,
+          fontSize: 13,
           padding: "5px 10px",
           borderRadius: "var(--rr)",
           cursor: "pointer",
@@ -117,7 +117,7 @@ function AddPanel({ moduleName, selectedIds, discover, onAdd }: AddPanelProps) {
               style={{
                 padding: "10px 14px",
                 color: "var(--muted)",
-                fontSize: 12,
+                fontSize: 13,
               }}
             >
               {candidates.length === 0
@@ -134,7 +134,7 @@ function AddPanel({ moduleName, selectedIds, discover, onAdd }: AddPanelProps) {
                   gap: 10,
                   padding: "8px 14px",
                   borderBottom: "1px solid var(--border-soft)",
-                  fontSize: 12,
+                  fontSize: 13,
                 }}
               >
                 <span
@@ -143,7 +143,7 @@ function AddPanel({ moduleName, selectedIds, discover, onAdd }: AddPanelProps) {
                 >
                   {c.id}
                 </span>
-                <span style={{ color: "var(--muted)", fontSize: 11, minWidth: 54 }}>
+                <span style={{ color: "var(--muted)", fontSize: 12.5, minWidth: 54 }}>
                   {c.category}
                 </span>
                 <button
@@ -154,7 +154,7 @@ function AddPanel({ moduleName, selectedIds, discover, onAdd }: AddPanelProps) {
                     background: "var(--raise)",
                     color: "var(--accent)",
                     fontFamily: "var(--font)",
-                    fontSize: 11,
+                    fontSize: 12.5,
                     padding: "3px 8px",
                     borderRadius: 6,
                     cursor: "pointer",
@@ -201,7 +201,7 @@ function ItemRowWithRemove({ item, moduleName, onRemove }: ItemRowWithRemoveProp
         background: hovered ? "var(--surface-2)" : "transparent",
         transition: "background .12s",
         cursor: "default",
-        fontSize: 13,
+        fontSize: 14,
       }}
     >
       <span
@@ -211,7 +211,7 @@ function ItemRowWithRemove({ item, moduleName, onRemove }: ItemRowWithRemoveProp
         {item.id}
       </span>
       <StatusDot status={item.state} />
-      <span style={{ color: "var(--muted)", fontSize: 12, fontFamily: "var(--mono)", minWidth: 54 }}>
+      <span style={{ color: "var(--muted)", fontSize: 13, fontFamily: "var(--mono)", minWidth: 54 }}>
         {item.state}
       </span>
       {hovered && (
@@ -224,7 +224,7 @@ function ItemRowWithRemove({ item, moduleName, onRemove }: ItemRowWithRemoveProp
             background: "var(--raise)",
             color: "var(--red)",
             fontFamily: "var(--font)",
-            fontSize: 11,
+            fontSize: 12.5,
             padding: "3px 8px",
             borderRadius: 6,
             cursor: "pointer",
@@ -287,7 +287,7 @@ function ModuleSectionWithActions({
         {expanded ? <CaretDown size={12} style={{ color: "var(--muted)", flexShrink: 0 }} /> : <CaretRight size={12} style={{ color: "var(--muted)", flexShrink: 0 }} />}
         {getModuleIcon(name)}
         <span>{name}</span>
-        <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 12 }}>
+        <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 13 }}>
           {items.length}
         </span>
         <span style={{ marginLeft: "auto" }}>
@@ -427,7 +427,7 @@ export function Manage({ showHud }: ManageProps) {
             border: "1px solid var(--red)",
             borderRadius: "var(--rr)",
             color: "var(--red)",
-            fontSize: 13,
+            fontSize: 14,
           }}
         >
           {error} —{" "}
@@ -439,7 +439,7 @@ export function Manage({ showHud }: ManageProps) {
               color: "var(--accent)",
               cursor: "pointer",
               fontFamily: "var(--font)",
-              fontSize: 13,
+              fontSize: 14,
               padding: 0,
             }}
           >
@@ -462,7 +462,7 @@ export function Manage({ showHud }: ManageProps) {
       >
         <div
           style={{
-            fontSize: 11,
+            fontSize: 12.5,
             letterSpacing: ".08em",
             textTransform: "uppercase",
             color: "var(--muted)",

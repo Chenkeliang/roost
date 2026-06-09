@@ -35,8 +35,8 @@ export function EmptyState({ icon, title, subtitle, action }: EmptyStateProps) {
       >
         {icon}
       </div>
-      <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12 }}>{subtitle}</div>}
+      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 13 }}>{subtitle}</div>}
       {action && <div style={{ marginTop: 4 }}>{action}</div>}
     </div>
   );

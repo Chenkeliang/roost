@@ -73,7 +73,7 @@ function ModuleHealthChip({ report }: ModuleHealthProps) {
         background: "var(--surface)",
         border: "1px solid var(--border-soft)",
         borderRadius: "var(--rr)",
-        fontSize: 12,
+        fontSize: 13,
       }}
     >
       <Tile color={moduleTileColor(report.module)} size={20}>
@@ -210,7 +210,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
             border: "1px solid #4a3a1e",
             borderRadius: "var(--rc)",
             marginBottom: 14,
-            fontSize: 12.5,
+            fontSize: 13.5,
           }}
         >
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#f0b352", flexShrink: 0 }} />
@@ -218,7 +218,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           <span style={{ flex: 1 }} />
           <button
             onClick={() => onOpenSetup?.()}
-            style={{ fontSize: 11.5, fontWeight: 600, padding: "5px 12px", borderRadius: 8, cursor: "pointer", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e" }}
+            style={{ fontSize: 12.5, fontWeight: 600, padding: "5px 12px", borderRadius: 8, cursor: "pointer", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e" }}
           >
             {t("overview.depsFix")}
           </button>
@@ -234,7 +234,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
             border: "1px solid var(--red)",
             borderRadius: "var(--rr)",
             color: "var(--red)",
-            fontSize: 13,
+            fontSize: 14,
           }}
         >
           {error} —{" "}
@@ -246,7 +246,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
               color: "var(--accent)",
               cursor: "pointer",
               fontFamily: "var(--font)",
-              fontSize: 13,
+              fontSize: 14,
               padding: 0,
             }}
           >
@@ -300,7 +300,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
             }}
           >
             <Desktop size={18} style={{ flexShrink: 0 }} />
-            <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, lineHeight: 1.5 }}>
               {t("overview.noOtherMachine")}
             </div>
           </article>
@@ -315,7 +315,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           style={{
             appearance: "none",
             fontFamily: "var(--font)",
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: 540,
             cursor: capturing ? "not-allowed" : "pointer",
             display: "inline-flex",
@@ -343,7 +343,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           style={{
             appearance: "none",
             fontFamily: "var(--font)",
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: 540,
             cursor: "pointer",
             display: "inline-flex",
@@ -363,7 +363,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           {t("overview.review")}
         </button>
 
-        <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 12 }}>
+        <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 13 }}>
           ↵ to capture · <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>⌘K actions</span>
         </span>
       </div>
@@ -374,14 +374,14 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
         <section style={{ border: "1px solid var(--amber)", borderRadius: "var(--rc)", padding: "13px 14px", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <Lock size={14} style={{ color: "var(--amber)" }} />
-            <span style={{ fontSize: 13, fontWeight: 540, color: "var(--text)" }}>
+            <span style={{ fontSize: 14, fontWeight: 540, color: "var(--text)" }}>
               {blockedDetail.length} {t("overview.blockedTitle")}
             </span>
             {blockedDetail.some((b) => b.reason === "secret") && (
               <button
                 onClick={() => void handleEncryptRetry(blockedDetail.filter((b) => b.reason === "secret").map((b) => b.id))}
                 disabled={retrying}
-                style={{ marginLeft: "auto", appearance: "none", border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12, padding: "5px 11px", borderRadius: "var(--rr)", cursor: retrying ? "default" : "pointer" }}
+                style={{ marginLeft: "auto", appearance: "none", border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 13, padding: "5px 11px", borderRadius: "var(--rr)", cursor: retrying ? "default" : "pointer" }}
               >
                 <Lock size={12} weight="fill" style={{ marginRight: 5, verticalAlign: "-1px" }} />
                 {retrying ? t("overview.encrypting") : t("overview.encryptRetryAll")}
@@ -395,10 +395,10 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
               : item.reason === "managed" ? t("overview.blocked.managed")
               : t("overview.blocked.error");
             return (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border-soft)", fontSize: 12.5 }}>
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border-soft)", fontSize: 13.5 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{item.id}</div>
-                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                  <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
                     {reasonLabel}{item.detail ? ` · ${item.detail}` : ""}
                     {item.reason === "too-large" ? ` · ${t("overview.blocked.raiseLimit")}` : ""}
                   </div>
@@ -407,7 +407,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
                   <button
                     onClick={() => void handleEncryptRetry([item.id])}
                     disabled={retrying}
-                    style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 9px", borderRadius: 6, cursor: retrying ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                    style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 9px", borderRadius: 6, cursor: retrying ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
                   >
                     <Lock size={11} />{t("overview.encryptRetry")}
                   </button>
@@ -415,7 +415,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
                 {item.reason === "too-large" && (
                   <button
                     onClick={() => void handleRemoveBlocked(item.id)}
-                    style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 9px", borderRadius: 6, cursor: "pointer" }}
+                    style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 9px", borderRadius: 6, cursor: "pointer" }}
                   >
                     {t("overview.blocked.remove")}
                   </button>
@@ -428,26 +428,26 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
         <section style={{ border: "1px solid var(--amber)", borderRadius: "var(--rc)", padding: "13px 14px", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <Lock size={14} style={{ color: "var(--amber)" }} />
-            <span style={{ fontSize: 13, fontWeight: 540, color: "var(--text)" }}>
+            <span style={{ fontSize: 14, fontWeight: 540, color: "var(--text)" }}>
               {blocked.length} {t("overview.blockedTitle")}
             </span>
             <button
               onClick={() => void handleEncryptRetry(blocked)}
               disabled={retrying}
-              style={{ marginLeft: "auto", appearance: "none", border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12, padding: "5px 11px", borderRadius: "var(--rr)", cursor: retrying ? "default" : "pointer" }}
+              style={{ marginLeft: "auto", appearance: "none", border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 13, padding: "5px 11px", borderRadius: "var(--rr)", cursor: retrying ? "default" : "pointer" }}
             >
               <Lock size={12} weight="fill" style={{ marginRight: 5, verticalAlign: "-1px" }} />
               {retrying ? t("overview.encrypting") : t("overview.encryptRetryAll")}
             </button>
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>{t("overview.blockedHint")}</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>{t("overview.blockedHint")}</div>
           {blocked.map((p) => (
-            <div key={p} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border-soft)", fontSize: 12.5 }}>
+            <div key={p} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border-soft)", fontSize: 13.5 }}>
               <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{p}</span>
               <button
                 onClick={() => void handleEncryptRetry([p])}
                 disabled={retrying}
-                style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 9px", borderRadius: 6, cursor: retrying ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 9px", borderRadius: 6, cursor: retrying ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
               >
                 <Lock size={11} />{t("overview.encryptRetry")}
               </button>
@@ -468,7 +468,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
       >
         <div
           style={{
-            fontSize: 11,
+            fontSize: 12.5,
             letterSpacing: ".08em",
             textTransform: "uppercase",
             color: "var(--muted)",
@@ -491,7 +491,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
             ))}
           </div>
         ) : (
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>
+          <div style={{ color: "var(--muted)", fontSize: 14 }}>
             {t("overview.noStatus")}
           </div>
         )}

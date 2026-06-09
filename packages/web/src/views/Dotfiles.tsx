@@ -12,7 +12,7 @@ interface DotfilesProps { showHud?: (m: HudMessage) => void; }
 type Category = "shell" | "git" | "editor" | "other";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
-const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
+const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
 
 function categorize(path: string): Category {
   const f = path.toLowerCase();
@@ -162,7 +162,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-      <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
+      <p style={{ color: "var(--muted)", fontSize: 13.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
         {t("dotfiles.explainer")} {t("common.selected")}: {selected.size} · {t("common.managed")}: {managed?.length ?? 0}.
       </p>
 
@@ -181,10 +181,10 @@ export function Dotfiles({ showHud }: DotfilesProps) {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter dotfiles…"
-            style={{ width: "100%", appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--font)", fontSize: 13, padding: "6px 10px 6px 28px", borderRadius: 6, boxSizing: "border-box" }}
+            style={{ width: "100%", appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--font)", fontSize: 14, padding: "6px 10px 6px 28px", borderRadius: 6, boxSizing: "border-box" }}
           />
         </div>
-        <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}>
+        <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
           {scanning ? t("dotfiles.scanning") : t("dotfiles.scan")}
         </button>
@@ -198,9 +198,9 @@ export function Dotfiles({ showHud }: DotfilesProps) {
               onChange={(e) => setCustomPath(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void addCustomPath(); }}
               placeholder={t("dotfiles.customPathPlaceholder")}
-              style={{ flex: 1, maxWidth: 560, appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 12.5, padding: "6px 10px", borderRadius: 6, boxSizing: "border-box" }}
+              style={{ flex: 1, maxWidth: 560, appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 13.5, padding: "6px 10px", borderRadius: 6, boxSizing: "border-box" }}
             />
-            <button onClick={() => void addCustomPath()} disabled={!customPath.trim()} style={{ ...ic, color: "var(--accent)", padding: "6px 12px", fontSize: 13, opacity: customPath.trim() ? 1 : 0.5 }}>
+            <button onClick={() => void addCustomPath()} disabled={!customPath.trim()} style={{ ...ic, color: "var(--accent)", padding: "6px 12px", fontSize: 14, opacity: customPath.trim() ? 1 : 0.5 }}>
               <FloppyDisk size={14} />{t("dotfiles.addPath")}
             </button>
           </div>
@@ -213,10 +213,10 @@ export function Dotfiles({ showHud }: DotfilesProps) {
                 const cat = categorize(p);
                 const captured = (managed ?? []).some((m) => p.endsWith(m) || m.endsWith(p));
                 return (
-                  <div key={p} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                  <div key={p} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                     <CategoryIcon category={cat} />
                     <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                    <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 11 }}>{captured ? t("common.captured") : t("common.pending")}</span>
+                    <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 12.5 }}>{captured ? t("common.captured") : t("common.pending")}</span>
                     <button onClick={() => void remove(p)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${p}`}><X size={11} />{t("common.remove")}</button>
                   </div>
                 );
@@ -235,7 +235,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
           <div>
             {checked.size > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
-                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>
                   <input
                     type="checkbox"
                     aria-label="select all discovered"
@@ -258,7 +258,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
               {newCands.map((c) => {
                 const isAdded = selected.has(c.id);
                 return (
-                  <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                  <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                     <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
                     <CategoryIcon category={categorize(c.path)} />
                     <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>

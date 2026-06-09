@@ -99,7 +99,7 @@ function NavButton({
         background: active ? "var(--raise)" : "transparent",
         color: active ? "var(--text)" : "var(--muted)",
         fontFamily: "var(--font)",
-        fontSize: 13,
+        fontSize: 14,
         textAlign: "left",
         // Module-group items are indented so they read as members of MODULES.
         padding: indent ? "7px 12px 7px 24px" : "7px 12px",
@@ -148,7 +148,7 @@ function LanguageSwitcher({
               background: active ? "var(--raise)" : "transparent",
               color: active ? "var(--text)" : "var(--muted)",
               fontFamily: "var(--font)",
-              fontSize: 11,
+              fontSize: 12.5,
               padding: "3px 9px",
               cursor: "pointer",
             }}
@@ -247,7 +247,7 @@ export function App() {
             style={{
               textTransform: "uppercase",
               letterSpacing: ".06em",
-              fontSize: 10.5,
+              fontSize: 12,
               fontWeight: 600,
               color: "var(--muted)",
               padding: "14px 12px 6px",
@@ -291,7 +291,7 @@ export function App() {
               gap: 10,
               padding: "12px 10px 2px",
               color: "var(--muted)",
-              fontSize: 12,
+              fontSize: 13,
             }}
           >
             <span
@@ -302,7 +302,7 @@ export function App() {
                 padding: "3px 9px",
                 border: "1px solid var(--border)",
                 borderRadius: 999,
-                fontSize: 12,
+                fontSize: 13,
               }}
             >
               <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />

@@ -114,7 +114,7 @@ export function Settings() {
   }
 
   const sectionLabel: React.CSSProperties = {
-    fontSize: 11,
+    fontSize: 12.5,
     letterSpacing: ".08em",
     textTransform: "uppercase" as const,
     color: "var(--muted)",
@@ -131,14 +131,14 @@ export function Settings() {
     background: "var(--surface)",
     border: "1px solid var(--border-soft)",
     borderRadius: "var(--rr)",
-    fontSize: 13,
+    fontSize: 14,
   };
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       <div
         style={{
-          fontSize: 11,
+          fontSize: 12.5,
           letterSpacing: ".08em",
           textTransform: "uppercase",
           color: "var(--muted)",
@@ -160,7 +160,7 @@ export function Settings() {
           ) : (
             <span
               className="mono"
-              style={{ color: "var(--text)", fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              style={{ color: "var(--text)", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
             >
               {repoDir ?? "—"}
             </span>
@@ -175,7 +175,7 @@ export function Settings() {
             <span
               style={{
                 color: ageKey ? "var(--green)" : "var(--muted)",
-                fontSize: 12,
+                fontSize: 13,
               }}
             >
               {ageKey === null ? "—" : ageKey ? "present" : "not found"}
@@ -213,7 +213,7 @@ export function Settings() {
                   idx < (modules.modules.length - 1)
                     ? "1px solid var(--border-soft)"
                     : "none",
-                fontSize: 13,
+                fontSize: 14,
               }}
             >
               <Cube size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
@@ -221,7 +221,7 @@ export function Settings() {
             </div>
           ))
         ) : (
-          <div style={{ padding: "11px 14px", color: "var(--muted)", fontSize: 13 }}>
+          <div style={{ padding: "11px 14px", color: "var(--muted)", fontSize: 14 }}>
             No modules registered. Is the server running?
           </div>
         )}
@@ -237,11 +237,11 @@ export function Settings() {
           {loading ? (
             <Skeleton width={260} height={13} />
           ) : gitStatus?.remote ? (
-            <span className="mono" style={{ color: "var(--text)", fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span className="mono" style={{ color: "var(--text)", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {gitStatus.remote}
             </span>
           ) : (
-            <span style={{ color: "var(--muted)", fontSize: 12 }}>{t("settings.git.noRemote")}</span>
+            <span style={{ color: "var(--muted)", fontSize: 13 }}>{t("settings.git.noRemote")}</span>
           )}
         </div>
 
@@ -250,10 +250,10 @@ export function Settings() {
           <div style={row}>
             <GitBranch size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
             <span style={{ color: "var(--muted)", minWidth: 80 }}>Branch</span>
-            <span className="mono" style={{ color: "var(--text)", fontSize: 12 }}>
+            <span className="mono" style={{ color: "var(--text)", fontSize: 13 }}>
               {gitStatus.branch ?? "—"}
             </span>
-            <span style={{ color: "var(--muted)", fontSize: 12, marginLeft: "auto" }}>
+            <span style={{ color: "var(--muted)", fontSize: 13, marginLeft: "auto" }}>
               {gitStatus.ahead === 0 && gitStatus.behind === 0 && gitStatus.clean
                 ? t("settings.git.inSync")
                 : `↑${gitStatus.ahead} ↓${gitStatus.behind}`}
@@ -271,7 +271,7 @@ export function Settings() {
               background: "var(--surface)",
               border: "1px solid var(--border-soft)",
               borderRadius: "var(--rr)",
-              fontSize: 13,
+              fontSize: 14,
               cursor: !gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null ? "not-allowed" : "pointer",
               opacity: !gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null ? 0.5 : 1,
             }}
@@ -286,7 +286,7 @@ export function Settings() {
               background: "var(--surface)",
               border: "1px solid var(--border-soft)",
               borderRadius: "var(--rr)",
-              fontSize: 13,
+              fontSize: 14,
               cursor: !gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null ? "not-allowed" : "pointer",
               opacity: !gitStatus?.isRepo || !gitStatus?.remote || gitBusy !== null ? 0.5 : 1,
             }}
@@ -297,7 +297,7 @@ export function Settings() {
 
         {/* Result: small green line on success; prominent bordered block on failure */}
         {gitResult && (gitResult.ok ? (
-          <div style={{ fontSize: 12, color: "var(--green)", padding: "4px 2px" }}>
+          <div style={{ fontSize: 13, color: "var(--green)", padding: "4px 2px" }}>
             {gitResult.kind === "push" ? t("settings.git.pushed") : t("settings.git.pulled")}
           </div>
         ) : (
@@ -316,7 +316,7 @@ export function Settings() {
               className="mono"
               style={{
                 margin: 0,
-                fontSize: 12,
+                fontSize: 13,
                 color: "var(--destructive)",
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
@@ -328,7 +328,7 @@ export function Settings() {
               {gitResult.output || "Failed"}
             </pre>
             {gitResult.hint === "auth" && (
-              <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>
                 {t("settings.git.authHint")}
                 <code
                   className="mono"
@@ -339,7 +339,7 @@ export function Settings() {
                     background: "var(--bg)",
                     border: "1px solid var(--border-soft)",
                     borderRadius: "var(--rr)",
-                    fontSize: 12,
+                    fontSize: 13,
                     userSelect: "text",
                     wordBreak: "break-all",
                   }}
@@ -361,14 +361,14 @@ export function Settings() {
           {loading ? (
             <Skeleton width={260} height={13} />
           ) : keyStatus?.recipient ? (
-            <span className="mono" style={{ color: "var(--text)", fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span className="mono" style={{ color: "var(--text)", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {keyStatus.recipient}
             </span>
           ) : (
-            <span style={{ color: "var(--muted)", fontSize: 12 }}>{t("settings.key.none")}</span>
+            <span style={{ color: "var(--muted)", fontSize: 13 }}>{t("settings.key.none")}</span>
           )}
           {keyStatus && (
-            <span style={{ color: "var(--muted)", fontSize: 12, marginLeft: "auto" }}>
+            <span style={{ color: "var(--muted)", fontSize: 13, marginLeft: "auto" }}>
               {keyStatus.encryptedFiles} {t("settings.key.encryptedFiles")}
             </span>
           )}
@@ -379,7 +379,7 @@ export function Settings() {
             <button
               onClick={() => { void handleGenerateKey(); }}
               disabled={keyBusy !== null}
-              style={{ padding: "7px 16px", background: "var(--accent)", color: "#0b0b0d", border: 0, borderRadius: "var(--rr)", fontSize: 13, fontWeight: 560, cursor: keyBusy ? "default" : "pointer", opacity: keyBusy ? 0.6 : 1 }}
+              style={{ padding: "7px 16px", background: "var(--accent)", color: "#0b0b0d", border: 0, borderRadius: "var(--rr)", fontSize: 14, fontWeight: 560, cursor: keyBusy ? "default" : "pointer", opacity: keyBusy ? 0.6 : 1 }}
             >
               {keyBusy === "generate" ? "…" : t("settings.key.generate")}
             </button>
@@ -387,19 +387,19 @@ export function Settings() {
             <button
               onClick={() => { void handleRotateKey(); }}
               disabled={keyBusy !== null}
-              style={{ padding: "7px 16px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rr)", fontSize: 13, cursor: keyBusy ? "default" : "pointer", opacity: keyBusy ? 0.6 : 1 }}
+              style={{ padding: "7px 16px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rr)", fontSize: 14, cursor: keyBusy ? "default" : "pointer", opacity: keyBusy ? 0.6 : 1 }}
             >
               {keyBusy === "rotate" ? "…" : t("settings.key.rotate")}
             </button>
           )}
         </div>
 
-        <div style={{ fontSize: 12, color: "var(--amber)", padding: "2px 2px", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: "var(--amber)", padding: "2px 2px", lineHeight: 1.5 }}>
           ⚠️ {t("settings.key.backupWarning")}
         </div>
 
         {keyResult && (
-          <div style={{ fontSize: 12, color: keyResult.ok ? "var(--green)" : "var(--destructive)", padding: "4px 2px", wordBreak: "break-all" }}>
+          <div style={{ fontSize: 13, color: keyResult.ok ? "var(--green)" : "var(--destructive)", padding: "4px 2px", wordBreak: "break-all" }}>
             {keyResult.text}
           </div>
         )}
@@ -423,11 +423,11 @@ export function Settings() {
               border: "1px solid var(--border-soft)",
               borderRadius: "var(--rr)",
               color: "var(--text)",
-              fontSize: 13,
+              fontSize: 14,
             }}
           />
         </div>
-        <div style={{ fontSize: 12, color: "var(--muted)", padding: "2px 2px", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: "var(--muted)", padding: "2px 2px", lineHeight: 1.5 }}>
           {t("settings.maxCapture.note")}
         </div>
       </div>
@@ -438,7 +438,7 @@ export function Settings() {
         <ShieldCheck size={16} weight="fill" style={{ color: "var(--green)", flexShrink: 0 }} />
         <div>
           <div style={{ fontWeight: 540 }}>{t("settings.privacyTitle")}</div>
-          <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>
             {t("settings.privacyBody")}
           </div>
         </div>

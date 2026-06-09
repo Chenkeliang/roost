@@ -9,7 +9,7 @@ export function Kbd({ children }: KbdProps) {
     <kbd
       style={{
         fontFamily: "var(--mono)",
-        fontSize: 11,
+        fontSize: 12.5,
         background: "var(--raise)",
         border: "1px solid var(--border)",
         borderBottomWidth: 2,

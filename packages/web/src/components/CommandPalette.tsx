@@ -188,7 +188,7 @@ export function CommandPalette({
         >
           {filtered.length === 0 && (
             <li
-              style={{ padding: "9px 10px", color: "var(--muted)", fontSize: 13 }}
+              style={{ padding: "9px 10px", color: "var(--muted)", fontSize: 14 }}
             >
               No results for &ldquo;{query}&rdquo;
             </li>
@@ -216,7 +216,7 @@ export function CommandPalette({
               <Tile color={cmd.tileColor} size={28}>
                 {cmd.icon}
               </Tile>
-              <span style={{ fontSize: 13, flex: 1 }}>{cmd.label}</span>
+              <span style={{ fontSize: 14, flex: 1 }}>{cmd.label}</span>
               {cmd.kbd && (
                 <div style={{ display: "flex", gap: 3 }}>
                   <Kbd>{cmd.kbd}</Kbd>
@@ -230,7 +230,7 @@ export function CommandPalette({
             padding: "8px 12px",
             borderTop: "1px solid var(--border-soft)",
             color: "var(--faint)",
-            fontSize: 11,
+            fontSize: 12.5,
             display: "flex",
             gap: 14,
           }}

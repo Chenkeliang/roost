@@ -11,7 +11,7 @@ import { getIndex, getBrewfile, getSelection, getDiscoverModule, addSelection, r
 interface PackagesProps { showHud?: (m: HudMessage) => void; }
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
-const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
+const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
 
 const SENTINEL = "Brewfile";
 function kindOf(id: string): string { return id.slice(0, id.indexOf(":")); }
@@ -27,7 +27,7 @@ const STATE_COLOR: Record<PackageState, string> = { installed: "var(--green)", o
 function StateBadge({ state, label }: { state: PackageState; label: string }) {
   const color = STATE_COLOR[state];
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color, fontSize: 11, whiteSpace: "nowrap" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color, fontSize: 12.5, whiteSpace: "nowrap" }}>
       <span aria-hidden style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
       {label}
     </span>
@@ -159,7 +159,7 @@ export function Packages({ showHud }: PackagesProps) {
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-      <p style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
+      <p style={{ color: "var(--muted)", fontSize: 13.5, lineHeight: 1.55, margin: "0 0 14px", maxWidth: 720 }}>
         {t("packages.explainer")} {t("common.selected")}: {selected.size} · {t("common.managed")}: {managed ?? 0}.
       </p>
 
@@ -172,7 +172,7 @@ export function Packages({ showHud }: PackagesProps) {
             { id: "discovered", label: t("common.discoveredTab"), count: cands === null ? undefined : newCands.length },
           ]}
         />
-        <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13, marginLeft: "auto" }}>
+        <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14, marginLeft: "auto" }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
           {scanning ? t("packages.importing") : t("packages.scan")}
         </button>
@@ -181,7 +181,7 @@ export function Packages({ showHud }: PackagesProps) {
       {tab === "selected" && (
         <>
           {legacy && (
-            <div role="status" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: "1px solid var(--amber)", borderRadius: "var(--rr)", marginBottom: 14, fontSize: 12.5 }}>
+            <div role="status" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: "1px solid var(--amber)", borderRadius: "var(--rr)", marginBottom: 14, fontSize: 13.5 }}>
               <span style={{ flex: 1, color: "var(--muted)" }}>{t("packages.legacyBanner")}</span>
               <button onClick={() => void expandLegacy()} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>{t("packages.expand")}</button>
             </div>
@@ -192,18 +192,18 @@ export function Packages({ showHud }: PackagesProps) {
               icon={<Package size={24} />}
               title={t("packages.emptyTitle")}
               subtitle={t("packages.emptySubtitle")}
-              action={<button onClick={() => void scan()} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 13 }}><MagnifyingGlass size={14} />{t("packages.scan")}</button>}
+              action={<button onClick={() => void scan()} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}><MagnifyingGlass size={14} />{t("packages.scan")}</button>}
             />
           ) : (
             <>
               {anyOutdated && (
-                <div role="status" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "1px solid var(--amber)", borderRadius: "var(--rr)", marginBottom: 10, fontSize: 12.5, color: "var(--muted)" }}>
+                <div role="status" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "1px solid var(--amber)", borderRadius: "var(--rr)", marginBottom: 10, fontSize: 13.5, color: "var(--muted)" }}>
                   <span aria-hidden style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--amber)", flexShrink: 0 }} />
                   {t("packages.state.outdatedSummary")}
                 </div>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>
                   <input type="checkbox" aria-label="select all selected" checked={checked.size > 0 && selectedList.every((id) => checked.has(id))} onChange={(e) => setChecked(e.target.checked ? new Set(selectedList) : new Set())} />
                   {checked.size > 0 ? `${checked.size} ${t("common.selected")}` : `${selectedList.length}`}
                 </label>
@@ -218,12 +218,12 @@ export function Packages({ showHud }: PackagesProps) {
               </div>
               <div style={card}>
                 {selectedList.map((id) => (
-                  <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                  <div key={id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                     <input type="checkbox" aria-label={`select ${id}`} checked={checked.has(id)} onChange={() => toggleCheck(id)} />
                     <KindIcon kind={kindOf(id)} />
                     <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{valOf(id)}</span>
                     {states[id] && <StateBadge state={states[id]} label={t(`packages.state.${states[id]}`)} />}
-                    <span style={{ color: "var(--muted)", fontSize: 11 }}>{kindOf(id)}</span>
+                    <span style={{ color: "var(--muted)", fontSize: 12.5 }}>{kindOf(id)}</span>
                     <button onClick={() => void remove(id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${id}`}><X size={11} />{t("common.remove")}</button>
                   </div>
                 ))}
@@ -242,7 +242,7 @@ export function Packages({ showHud }: PackagesProps) {
           <div>
             {checked.size > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12, cursor: "pointer" }}>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>
                   <input type="checkbox" aria-label="select all discovered" checked={checked.size > 0 && newCands.every((c) => checked.has(c.id))} onChange={(e) => setChecked(e.target.checked ? new Set(newCands.map((c) => c.id)) : new Set())} />
                   {checked.size} {t("common.selected")}
                 </label>
@@ -253,7 +253,7 @@ export function Packages({ showHud }: PackagesProps) {
             )}
             <div style={card}>
               {newCands.map((c) => (
-                <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
                   <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
                   <KindIcon kind={kindOf(c.id)} />
                   <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.note?.startsWith("mas") ? c.note : valOf(c.id)}</span>
