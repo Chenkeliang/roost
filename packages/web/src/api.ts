@@ -112,6 +112,31 @@ export function getSyncState(): Promise<SyncStateResponse> {
   return apiFetch<SyncStateResponse>("/api/sync-state");
 }
 
+// ── environment / setup ────────────────────────────────────────────────────────
+export interface EnvCheck {
+  id: string;
+  ok: boolean;
+  required: boolean;
+  brewFormula?: string;
+}
+export interface EnvironmentResponse {
+  checks: EnvCheck[];
+}
+export function getEnvironment(): Promise<EnvironmentResponse> {
+  return apiFetch<EnvironmentResponse>("/api/environment");
+}
+export interface BrewInstallResponse {
+  ok: boolean;
+  output: string;
+}
+export function postBrewInstall(formulae: string[]): Promise<BrewInstallResponse> {
+  return apiFetch<BrewInstallResponse>("/api/environment/install", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ formulae }),
+  });
+}
+
 export interface KeyDiff {
   key: string;
   local: string | null;

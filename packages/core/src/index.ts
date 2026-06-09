@@ -114,6 +114,8 @@ export { preflight } from "./preflight.js";
 export type { PreflightResult } from "./preflight.js";
 export { itemDiff } from "./item-diff.js";
 export type { ItemDiff } from "./item-diff.js";
+export { checkEnvironment, brewInstall } from "./environment.js";
+export type { EnvCheck } from "./environment.js";
 export { readBaseline, writeBaseline } from "./state.js";
 export type { ModuleBaseline } from "./state.js";
 export {

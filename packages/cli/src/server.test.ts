@@ -238,6 +238,74 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("GET /api/environment → reports missing required tools", async () => {
+    const reg = new ModuleRegistry();
+    // exec where only git is present
+    const exec = {
+      async run(cmd: string) {
+        return cmd === "git" ? { code: 0, stdout: "v", stderr: "" } : { code: 127, stdout: "", stderr: "nf" };
+      },
+    };
+    const server = buildServer({
+      repoDir: tmpDir,
+      registry: reg,
+      makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }),
+    });
+    const res = await server.inject({ method: "GET", url: "/api/environment" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { checks: { id: string; ok: boolean; brewFormula?: string }[] };
+    const by = Object.fromEntries(body.checks.map((c) => [c.id, c]));
+    expect(by["git"]!.ok).toBe(true);
+    expect(by["chezmoi"]!.ok).toBe(false);
+    expect(by["chezmoi"]!.brewFormula).toBe("chezmoi");
+    await server.close();
+  });
+
+  it("POST /api/environment/install runs brew install; 400 on empty", async () => {
+    const reg = new ModuleRegistry();
+    const calls: { cmd: string; args: string[] }[] = [];
+    const exec = {
+      async run(cmd: string, args: string[]) {
+        calls.push({ cmd, args });
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({
+      repoDir: tmpDir,
+      registry: reg,
+      makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }),
+    });
+    const ok = await server.inject({ method: "POST", url: "/api/environment/install", payload: { formulae: ["chezmoi", "age"] } });
+    expect(ok.statusCode).toBe(200);
+    expect(calls.find((c) => c.cmd === "brew" && c.args[0] === "install")?.args).toEqual(["install", "chezmoi", "age"]);
+    const bad = await server.inject({ method: "POST", url: "/api/environment/install", payload: { formulae: [] } });
+    expect(bad.statusCode).toBe(400);
+    await server.close();
+  });
+
+  it("POST /api/resolve take-repo is BLOCKED when a required tool is missing", async () => {
+    let applied = false;
+    const reg = new ModuleRegistry();
+    reg.register(
+      makeFakeModule({
+        name: "dotfiles",
+        doctorFn: async () => [{ name: "chezmoi", ok: false, blocking: true }],
+        applyFn: async () => {
+          applied = true;
+          return { module: "dotfiles", applied: [], backedUp: [], skipped: [] };
+        },
+      }),
+    );
+    saveSelection(tmpDir, emptySelection());
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/resolve", payload: { module: "dotfiles", id: "x", action: "take-repo" } });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { blocked?: boolean };
+    expect(body.blocked).toBe(true);
+    expect(applied).toBe(false);
+    await server.close();
+  });
+
   it("GET /api/item-diff → 200 with local/repo for an appconfig domain", async () => {
     const dir = path.join(tmpDir, "roost", "appconfig");
     fs.mkdirSync(dir, { recursive: true });

@@ -17,9 +17,10 @@ import { Dotfiles } from "./views/Dotfiles";
 import { AppConfig } from "./views/AppConfig";
 import { Skills } from "./views/Skills";
 import { SyncState } from "./views/SyncState";
+import { Setup } from "./views/Setup";
 import { openExternal } from "./openExternal";
 
-type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "skills" | "env" | "sync" | "drift" | "timeline" | "settings";
+type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "skills" | "env" | "sync" | "drift" | "timeline" | "setup" | "settings";
 
 type NavItem = { id: Tab; labelKey: string };
 
@@ -41,6 +42,7 @@ const TAIL_NAV: NavItem[] = [
   { id: "sync", labelKey: "nav.sync" },
   { id: "drift", labelKey: "nav.drift" },
   { id: "timeline", labelKey: "nav.timeline" },
+  { id: "setup", labelKey: "nav.setup" },
   { id: "settings", labelKey: "nav.settings" },
 ];
 
@@ -326,7 +328,13 @@ export function App() {
 
         {/* Main content */}
         <main style={{ flex: 1, minWidth: 0, paddingTop: 28, paddingBottom: 60 }}>
-          {activeTab === "overview" && <Overview showHud={showHud} onOpenSync={() => setActiveTab("sync")} />}
+          {activeTab === "overview" && (
+            <Overview
+              showHud={showHud}
+              onOpenSync={() => setActiveTab("sync")}
+              onOpenSetup={() => setActiveTab("setup")}
+            />
+          )}
           {activeTab === "manage" && <Manage showHud={showHud} />}
           {activeTab === "projects" && <Projects showHud={showHud} />}
           {activeTab === "packages" && <Packages showHud={showHud} />}
@@ -335,6 +343,7 @@ export function App() {
           {activeTab === "skills" && <Skills />}
           {activeTab === "env" && <AliasesEnv showHud={showHud} />}
           {activeTab === "sync" && <SyncState onOpenSettings={() => setActiveTab("settings")} />}
+          {activeTab === "setup" && <Setup onOpenSettings={() => setActiveTab("settings")} />}
           {activeTab === "drift" && <Drift />}
           {activeTab === "timeline" && <Timeline />}
           {activeTab === "settings" && <Settings />}

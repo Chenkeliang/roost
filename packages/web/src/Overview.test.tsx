@@ -7,6 +7,7 @@ import * as api from "./api";
 // Mock with realistic server shapes matching server.ts actual responses
 vi.mock("./api", () => ({
   getHealth: vi.fn().mockResolvedValue({ ok: true, name: "roost" }),
+  getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
   getMachines: vi.fn().mockResolvedValue({ hosts: ["macbook.local"], states: {} }),
   getStatus: vi.fn().mockResolvedValue({
     reports: [

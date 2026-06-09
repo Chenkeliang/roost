@@ -12,6 +12,7 @@ import {
   getMachines,
   getStatus,
   postCapture,
+  getEnvironment,
   addSelection,
   removeSelection,
   type HealthResponse,
@@ -23,6 +24,7 @@ import {
 interface OverviewProps {
   showHud: (msg: HudMessage) => void;
   onOpenSync?: () => void;
+  onOpenSetup?: () => void;
 }
 
 interface ModuleHealthProps {
@@ -83,13 +85,14 @@ function ModuleHealthChip({ report }: ModuleHealthProps) {
   );
 }
 
-export function Overview({ showHud, onOpenSync }: OverviewProps) {
+export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   const { t } = useT();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [machines, setMachines] = useState<MachinesResponse | null>(null);
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [capturing, setCapturing] = useState(false);
+  const [missingDeps, setMissingDeps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [blockedDetail, setBlockedDetail] = useState<BlockedItem[]>([]);
@@ -99,14 +102,18 @@ export function Overview({ showHud, onOpenSync }: OverviewProps) {
     setLoadingData(true);
     setError(null);
     try {
-      const [h, m, s] = await Promise.allSettled([
+      const [h, m, s, env] = await Promise.allSettled([
         getHealth(),
         getMachines(),
         getStatus(),
+        getEnvironment(),
       ]);
       if (h.status === "fulfilled") setHealth(h.value);
       if (m.status === "fulfilled") setMachines(m.value);
       if (s.status === "fulfilled") setStatusData(s.value);
+      if (env.status === "fulfilled") {
+        setMissingDeps(env.value.checks.filter((c) => c.required && !c.ok).map((c) => c.id));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -192,6 +199,31 @@ export function Overview({ showHud, onOpenSync }: OverviewProps) {
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
+      {missingDeps.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "10px 14px",
+            background: "var(--surface)",
+            border: "1px solid #4a3a1e",
+            borderRadius: "var(--rc)",
+            marginBottom: 14,
+            fontSize: 12.5,
+          }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#f0b352", flexShrink: 0 }} />
+          <span>{t("overview.depsMissing")} {missingDeps.join(" · ")}</span>
+          <span style={{ flex: 1 }} />
+          <button
+            onClick={() => onOpenSetup?.()}
+            style={{ fontSize: 11.5, fontWeight: 600, padding: "5px 12px", borderRadius: 8, cursor: "pointer", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e" }}
+          >
+            {t("overview.depsFix")}
+          </button>
+        </div>
+      )}
       {error && (
         <div
           role="alert"

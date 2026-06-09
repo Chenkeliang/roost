@@ -7,6 +7,7 @@ import { LocaleProvider } from "./i18n";
 // Mock the api module
 vi.mock("./api", () => ({
   getHealth: vi.fn().mockResolvedValue({ ok: true, name: "roost" }),
+  getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
   getMachines: vi.fn().mockResolvedValue({ hosts: [], states: {} }),
   getStatus: vi.fn().mockResolvedValue({ reports: [] }),
   getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),

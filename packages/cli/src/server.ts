@@ -19,6 +19,8 @@ import {
   syncStateAll,
   preflight,
   itemDiff,
+  checkEnvironment,
+  brewInstall,
   discoverAll,
   defaultRegistry,
   createExec,
@@ -205,6 +207,36 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  // ── GET /api/environment ───────────────────────────────────────────────────
+  // First-run dependency check for the Setup panel (deps + age key + repo).
+  server.get("/api/environment", async (_req, reply) => {
+    try {
+      const ctx = makeCtx(true);
+      const checks = await checkEnvironment(ctx.exec, { home: ctx.home, repoDir });
+      return reply.send({ checks });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
+  // ── POST /api/environment/install ──────────────────────────────────────────
+  // One-click `brew install <formulae>`. A system mutation — the UI gates this
+  // behind an explicit user click.
+  server.post<{ Body: { formulae?: string[] } }>("/api/environment/install", async (req, reply) => {
+    const formulae = (req.body?.formulae ?? []).filter((s) => typeof s === "string" && /^[\w@.+-]+$/.test(s));
+    if (formulae.length === 0) {
+      return reply.status(400).send({ error: "formulae (array of brew formula names) is required" });
+    }
+    try {
+      const result = await brewInstall(makeCtx(false).exec, formulae);
+      return reply.send(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
+    }
+  });
+
   // ── GET /api/item-diff ─────────────────────────────────────────────────────
   // Per-item local-vs-repo content for the two-column review (ADR-0016 §6.6).
   server.get<{ Querystring: { module?: string; id?: string } }>(
@@ -247,6 +279,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
     if (action === "take-repo") {
       try {
+        // Same hard-gate as load: refuse to apply when a required tool is missing,
+        // instead of failing mid-apply with a raw error.
+        const pf = await preflight(registry, makeCtx(true));
+        if (!pf.ok) {
+          return reply.send({ ok: false, action, blocked: true, blockers: pf.blockers, applied: [] });
+        }
         const ctx = makeCtx(false);
         const backupDir = path.join(ctx.home, ".roost-backups", "resolve");
         const subSel = { modules: { [mod]: [id] } };
