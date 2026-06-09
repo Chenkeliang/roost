@@ -57,6 +57,16 @@ describe("createChezmoi", () => {
     expect(result).toBe("applied!\n");
   });
 
+  it("apply with paths: scopes to the given target paths", async () => {
+    const { exec, calls } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
+    const chezmoi = createChezmoi(exec, { sourceDir });
+    await chezmoi.apply({ paths: ["/home/u/.zshrc", "/home/u/.gitconfig"] });
+    expect(calls[0]).toEqual({
+      cmd: "chezmoi",
+      args: ["--source", sourceDir, "apply", "/home/u/.zshrc", "/home/u/.gitconfig"],
+    });
+  });
+
   it("apply with dryRun: includes --dry-run flag", async () => {
     const { exec, calls } = makeFakeExec([{ code: 0, stdout: "dry run output\n", stderr: "" }]);
     const chezmoi = createChezmoi(exec, { sourceDir });

@@ -1,4 +1,3 @@
-import * as path from "node:path";
 import * as os from "node:os";
 import type { ModuleContext, Candidate, ChangeSet, DriftReport, ApplyResult, Selection, ModuleIndex } from "@roost/shared";
 import { ModuleRegistry } from "./registry.js";
@@ -11,7 +10,6 @@ import { projectsModule } from "./modules/projects.js";
 import { envModule } from "./modules/env.js";
 import { skillsModule } from "./modules/skills.js";
 import { assertNoPlaintextSecrets } from "./secrets/scanner.js";
-import { createChezmoi } from "./adapters/chezmoi.js";
 import { backupFiles } from "./apply.js";
 import { computeSyncState } from "./sync-state.js";
 import type { SyncStateReport } from "./sync-state.js";
@@ -109,11 +107,11 @@ export async function loadAll(
 
     let backedUpFiles: string[] = [];
 
-    if (!opts.dryRun && mod.name === "dotfiles") {
-      const chezmoi = createChezmoi(ctx.exec, { sourceDir: ctx.repoDir });
-      const managedRels = await chezmoi.managed();
-      const managedAbsolute = managedRels.map((rel) => path.join(ctx.home, rel));
-      backedUpFiles = backupFiles(managedAbsolute, opts.backupDir);
+    if (!opts.dryRun && mod.name === "dotfiles" && ids.length > 0) {
+      // Back up exactly the dotfiles being applied (the plan's targets), not the
+      // whole managed set — so a single-item resolve only touches that item.
+      // backupFiles handles directories and skips sockets/FIFOs.
+      backedUpFiles = backupFiles(ids, opts.backupDir);
     }
 
     const modCtx: ModuleContext = { ...ctx, dryRun: opts.dryRun };

@@ -366,7 +366,13 @@ export const dotfilesModule: SyncModule = {
 
   async apply(ctx: ModuleContext, plan: ApplyPlan): Promise<ApplyResult> {
     const chezmoi = createChezmoi(ctx.exec, { sourceDir: ctx.repoDir });
-    await chezmoi.apply({ dryRun: ctx.dryRun });
+    // Scope the apply to the planned target paths so resolving one dotfile does
+    // NOT re-apply the entire repo (which could touch unrelated encrypted/scripted
+    // entries and hang on a TTY prompt). Empty plan ⇒ apply nothing.
+    const paths = plan.actions.map((a) => a.target);
+    if (paths.length > 0) {
+      await chezmoi.apply({ dryRun: ctx.dryRun, paths });
+    }
     return {
       module: "dotfiles",
       applied: ctx.dryRun ? [] : plan.actions.map((a) => a.id),

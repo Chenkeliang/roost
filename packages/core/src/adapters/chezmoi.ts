@@ -2,7 +2,10 @@ import type { Exec } from "@roost/shared";
 
 export interface Chezmoi {
   add(path: string, opts?: { encrypt?: boolean }): Promise<void>;
-  apply(opts?: { dryRun?: boolean }): Promise<string>;
+  // `paths` (target paths) scopes the apply to just those entries; omit to apply
+  // everything. Scoping avoids touching unrelated (possibly encrypted / scripted)
+  // dotfiles when resolving a single item.
+  apply(opts?: { dryRun?: boolean; paths?: string[] }): Promise<string>;
   diff(): Promise<string>;
   verify(): Promise<boolean>;
   // Target-relative paths (relative to home) that differ from the source — i.e.
@@ -27,8 +30,12 @@ export function createChezmoi(exec: Exec, opts: { sourceDir: string }): Chezmoi 
       await runChecked(args);
     },
 
-    async apply(applyOpts?: { dryRun?: boolean }): Promise<string> {
-      const args = ["apply", ...(applyOpts?.dryRun ? ["--dry-run"] : [])];
+    async apply(applyOpts?: { dryRun?: boolean; paths?: string[] }): Promise<string> {
+      const args = [
+        "apply",
+        ...(applyOpts?.dryRun ? ["--dry-run"] : []),
+        ...(applyOpts?.paths ?? []),
+      ];
       const { stdout } = await runChecked(args);
       return stdout;
     },

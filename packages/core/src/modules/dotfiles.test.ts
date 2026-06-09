@@ -578,3 +578,24 @@ describe("dotfilesModule.index", () => {
     expect(idx.managed).toBe(0);
   });
 });
+
+describe("dotfilesModule.apply scope", () => {
+  it("applies only the plan's target paths (not the whole repo)", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push({ cmd, args });
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx = makeCtx({ exec, repoDir: "/tmp/roost-repo", home: "/home/u" });
+    const target = "/home/u/.gitconfig";
+    const result = await dotfilesModule.apply(ctx, {
+      module: "dotfiles",
+      actions: [{ id: target, kind: "update", target }],
+    });
+    const applyCall = calls.find((c) => c.cmd === "chezmoi" && c.args.includes("apply"));
+    expect(applyCall?.args).toContain(target);
+    expect(result.applied).toContain(target);
+  });
+});
