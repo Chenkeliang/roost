@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
-import { getGitStatus, gitPush } from "../../api";
+import { getGitStatus, gitPush, getSelection } from "../../api";
 import type { HudMessage } from "../../components/Hud";
 import { Setup } from "../Setup";
 import { StepRepo } from "./StepRepo";
 import { StepSelect } from "./StepSelect";
 import { StepCapture } from "./StepCapture";
+import { StepAgeKey } from "./StepAgeKey";
+import { StepRestore } from "./StepRestore";
 
-const STEP_KEYS = ["onboard.step.repo", "onboard.step.check", "onboard.step.select", "onboard.step.capture", "onboard.step.push"];
+const BUILD_STEPS = ["onboard.step.repo", "onboard.step.check", "onboard.step.select", "onboard.step.capture", "onboard.step.push"];
+const RESTORE_STEPS = ["onboard.step.repo", "onboard.step.check", "onboard.step.key", "onboard.step.restore"];
 
-export function Onboarding({ t, showHud, onComplete }: { t: (k: string) => string; showHud?: (m: HudMessage) => void; onComplete: () => void }) {
+export function Onboarding({ t, showHud, onComplete, onOpenSync }: {
+  t: (k: string) => string;
+  showHud?: (m: HudMessage) => void;
+  onComplete: () => void;
+  onOpenSync?: () => void;
+}) {
   const [step, setStep] = useState(0);
+  const [mode, setMode] = useState<"build" | "restore">("build");
   const [remote, setRemote] = useState<string | null>(null);
   const [envReady, setEnvReady] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -17,6 +26,15 @@ export function Onboarding({ t, showHud, onComplete }: { t: (k: string) => strin
 
   const refreshGit = () => { void getGitStatus().then((s) => setRemote(s.remote)).catch(() => {}); };
   useEffect(() => { refreshGit(); }, []);
+
+  // After the repo step: an existing repo (non-empty selection) → restore; else build.
+  const afterRepo = () => {
+    refreshGit();
+    void getSelection()
+      .then((s) => setMode(Object.values(s.modules).some((ids) => ids.length > 0) ? "restore" : "build"))
+      .catch(() => setMode("build"));
+    setStep(1);
+  };
 
   const push = async () => {
     setPushBusy(true); setPushErr(null);
@@ -30,13 +48,14 @@ export function Onboarding({ t, showHud, onComplete }: { t: (k: string) => strin
 
   const primary: React.CSSProperties = { appearance: "none", border: "1px solid var(--accent)", background: "var(--accent)", color: "#0b0b0d", fontFamily: "var(--font)", fontWeight: 600, fontSize: 13, padding: "7px 14px", borderRadius: 8, cursor: "pointer" };
 
+  const stepKeys = mode === "restore" ? RESTORE_STEPS : BUILD_STEPS;
+
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 24px" }}>
       <div style={{ fontSize: 16, fontWeight: 600, margin: "8px 0 14px" }}>{t("onboard.title")}</div>
 
-      {/* Step strip */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
-        {STEP_KEYS.map((k, i) => (
+        {stepKeys.map((k, i) => (
           <span key={k} style={{ fontSize: 11.5, padding: "4px 11px", borderRadius: 20, background: i === step ? "var(--accent)" : i < step ? "var(--green)" : "var(--raise)", color: i === step ? "#fff" : i < step ? "#0b0b0d" : "var(--muted)" }}>
             {i + 1} · {t(k)}
           </span>
@@ -44,7 +63,7 @@ export function Onboarding({ t, showHud, onComplete }: { t: (k: string) => strin
       </div>
 
       <div style={{ background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", padding: 18 }}>
-        {step === 0 && <StepRepo t={t} showHud={showHud} onDone={() => { refreshGit(); setStep(1); }} />}
+        {step === 0 && <StepRepo t={t} showHud={showHud} onDone={afterRepo} />}
         {step === 1 && (
           <div>
             <Setup embedded onReady={setEnvReady} />
@@ -53,9 +72,11 @@ export function Onboarding({ t, showHud, onComplete }: { t: (k: string) => strin
             </div>
           </div>
         )}
-        {step === 2 && <StepSelect t={t} showHud={showHud} onDone={() => setStep(3)} />}
-        {step === 3 && <StepCapture t={t} showHud={showHud} onDone={() => setStep(4)} />}
-        {step === 4 && (
+
+        {/* Build track */}
+        {step === 2 && mode === "build" && <StepSelect t={t} showHud={showHud} onDone={() => setStep(3)} />}
+        {step === 3 && mode === "build" && <StepCapture t={t} showHud={showHud} onDone={() => setStep(4)} />}
+        {step === 4 && mode === "build" && (
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{t("onboard.push.heading")}</div>
             {remote ? (
@@ -72,6 +93,10 @@ export function Onboarding({ t, showHud, onComplete }: { t: (k: string) => strin
             {pushErr && <div style={{ color: "var(--accent)", fontSize: 12.5, marginTop: 10 }}>{pushErr}</div>}
           </div>
         )}
+
+        {/* Restore track */}
+        {step === 2 && mode === "restore" && <StepAgeKey t={t} onDone={() => setStep(3)} />}
+        {step === 3 && mode === "restore" && <StepRestore t={t} showHud={showHud} onComplete={onComplete} onOpenSync={onOpenSync} />}
       </div>
     </div>
   );
