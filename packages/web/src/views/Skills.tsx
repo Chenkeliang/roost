@@ -17,7 +17,7 @@ const cellPad: React.CSSProperties = { padding: "9px 12px", borderBottom: "1px s
 function CoverageCell({ cov, method, onOpen, t }: { cov: Coverage; method: string; onOpen: () => void; t: (k: string) => string }) {
   const color = cov.state === "conflict" ? "var(--accent)" : cov.state === "partial" ? "#f0b352" : "var(--muted)";
   if (cov.state === "disabled") {
-    return <span style={{ color: "var(--muted)", opacity: 0.6, fontSize: 13 }}>—</span>;
+    return <span aria-label={t("skills.coverage.disabled")} style={{ color: "var(--muted)", opacity: 0.6, fontSize: 13 }}>—</span>;
   }
   const dotColor = (s: string) => (s === "conflict" ? "var(--accent)" : s === "broken" ? "#f0b352" : "var(--muted)");
   return (
@@ -57,7 +57,7 @@ function SkillTargetsPopover({ row, targets, busy, t, onToggle, onResolve, onClo
                 </button>
                 <span style={{ flex: 1 }}>{tg.label}</span>
                 {st === "conflict" ? (
-                  <button onClick={() => onResolve(tg.id)} style={{ ...ic, color: "#f0b352", borderColor: "#f0b352" }}>{t("skills.resolve.action")}</button>
+                  <button onClick={() => onResolve(tg.id)} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>{t("skills.resolve.action")}</button>
                 ) : st === "broken" ? (
                   <span style={{ color: "#f0b352", fontSize: 12 }}>{t("skills.coverage.broken")}</span>
                 ) : st === "copy" ? (
@@ -84,13 +84,13 @@ function RowMenu({ row, busy, t, onRemove, onMethod, onToggleEnabled }: {
   const [open, setOpen] = useState(false);
   return (
     <span style={{ position: "relative", display: "inline-block" }}>
-      <button aria-label={`actions ${row.name}`} disabled={busy} onClick={() => setOpen((o) => !o)} style={{ ...ic, border: 0, background: "transparent", padding: "4px 6px" }}>
+      <button aria-label={`actions ${row.name}`} aria-haspopup="menu" aria-expanded={open} disabled={busy} onClick={() => setOpen((o) => !o)} style={{ ...ic, border: 0, background: "transparent", padding: "4px 6px" }}>
         <DotsThree size={18} />
       </button>
       {open && (
         <>
-          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-          <div role="menu" style={{ position: "absolute", right: 0, top: "100%", zIndex: 91, ...card, minWidth: 160, padding: 4 }}>
+          <span aria-hidden="true" onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+          <div role="menu" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} style={{ position: "absolute", right: 0, top: "100%", zIndex: 91, ...card, minWidth: 160, padding: 4 }}>
             <button role="menuitem" onClick={() => { setOpen(false); onToggleEnabled(); }} style={{ ...ic, border: 0, width: "100%", justifyContent: "flex-start" }}>
               {row.effective.enabled ? t("skills.menu.disable") : t("skills.menu.enable")}
             </button>
@@ -360,11 +360,22 @@ export function Skills() {
           <EmptyState icon={<Stack size={24} />} title={t("skills.title")} subtitle={t("skills.tab.managed")} />
         ) : (
           <>
-            <div style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 8px" }}>
-              {skills.length} {t("skills.summary")}
-            </div>
+            {(() => {
+              const attention = skills.filter((s) => { const st = computeCoverage(s).state; return st === "partial" || st === "conflict"; }).length;
+              return (
+                <div style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 8px" }}>
+                  {skills.length} {t("skills.summary.managed")} ·{" "}
+                  {attention > 0
+                    ? <span style={{ color: "#f0b352" }}>{attention} {t("skills.summary.attention")}</span>
+                    : t("skills.summary.allHealthy")}
+                </div>
+              );
+            })()}
             <input value={managedFilter} onChange={(e) => setManagedFilter(e.target.value)} placeholder={t("skills.import.search")}
               style={{ ...ic, width: 220, padding: "5px 9px", marginBottom: 8 }} />
+            {visibleSkills.length === 0 ? (
+              <div style={{ ...card, padding: "10px 12px", fontSize: 13, color: "var(--muted)" }}>{t("skills.import.noMatch")}</div>
+            ) : (
             <div style={{ ...card, overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
@@ -397,6 +408,7 @@ export function Skills() {
                 </tbody>
               </table>
             </div>
+            )}
           </>
         )
       )}
