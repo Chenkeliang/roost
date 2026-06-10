@@ -869,6 +869,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     },
   );
 
+  // ── POST /api/skills/unadopt (forget, keep local files) ──────────────────────
+  server.post<{ Body: { names?: string[] } }>("/api/skills/unadopt", async (req, reply) => {
+    const removed = unadoptSkills(makeCtx(false), req.body?.names ?? []);
+    cache.invalidateAll();
+    return reply.send({ ok: true, removed });
+  });
+
   // ── POST /api/skills/import-git ──────────────────────────────────────────────
   // Clone a remote repo (single skill or a skills/ pack) and ingest it — gated by
   // the same secret/size scan as capture. Files only; never executed.

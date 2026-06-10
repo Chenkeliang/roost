@@ -1782,6 +1782,35 @@ describe("classifyGitError", () => {
   });
 });
 
+describe("POST /api/skills/unadopt", () => {
+  it("forgets a skill (repo entry gone) but keeps the source dir", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(skillsModule);
+    const aHome = fs.mkdtempSync(path.join(os.tmpdir(), "roost-un-home-"));
+    const aRepo = fs.mkdtempSync(path.join(os.tmpdir(), "roost-un-repo-"));
+    try {
+      fs.mkdirSync(path.join(aRepo, "skills", "y-skill"), { recursive: true });
+      fs.writeFileSync(path.join(aRepo, "skills", "y-skill", "SKILL.md"), "# x");
+      fs.mkdirSync(path.join(aHome, ".agents", "skills", "y-skill"), { recursive: true });
+      fs.writeFileSync(path.join(aHome, ".agents", "skills", "y-skill", "SKILL.md"), "# x");
+      const ctxFn = (dryRun: boolean): ModuleContext => ({
+        repoDir: aRepo, home: aHome, profile: "base", dryRun,
+        exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} }, t: (k) => k,
+      });
+      const server = buildServer({ repoDir: aRepo, registry: reg, makeCtx: ctxFn });
+      const res = await server.inject({ method: "POST", url: "/api/skills/unadopt", payload: { names: ["y-skill"] } });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().removed).toContain("y-skill");
+      expect(fs.existsSync(path.join(aRepo, "skills", "y-skill"))).toBe(false);
+      expect(fs.existsSync(path.join(aHome, ".agents", "skills", "y-skill", "SKILL.md"))).toBe(true);
+    } finally {
+      fs.rmSync(aHome, { recursive: true, force: true });
+      fs.rmSync(aRepo, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("POST /api/skills/capture (adopt + decouple)", () => {
   it("captures real content and materializes the source (decouple default on)", async () => {
     const reg = new ModuleRegistry();
