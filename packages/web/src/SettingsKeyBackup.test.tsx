@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { within } from "@testing-library/react";
 import { Settings } from "./views/Settings";
-import * as api from "./api";
 
 vi.mock("./i18n", () => ({
   useT: () => ({ t: (k: string) => k, locale: "en", setLocale: () => {} }),
