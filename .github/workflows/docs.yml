@@ -42,5 +42,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Self-enable Pages (Source: GitHub Actions) the first time, so the deploy
+      # below doesn't 404 with "Failed to create deployment" on a repo where
+      # Pages was never turned on. Needs the pages:write permission above.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - id: deployment
         uses: actions/deploy-pages@v4
