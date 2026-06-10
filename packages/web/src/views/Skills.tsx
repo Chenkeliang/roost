@@ -259,7 +259,7 @@ export function Skills() {
       if (cands) setCands(await discoverSkills().then((r) => r.candidates)); // re-scan
       await refetch();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "adopt failed");
+      setError(e instanceof Error ? e.message : String(e));
     } finally { setBusy(false); }
   }, [checked, fromChoice, decouple, cands, refetch]);
 
@@ -271,7 +271,7 @@ export function Skills() {
       await refetch();
       if (cands) setCands(await discoverSkills().then((r) => r.candidates));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "remove failed");
+      setError(e instanceof Error ? e.message : String(e));
     } finally { setBusy(false); }
   }, [refetch, cands]);
 
@@ -344,7 +344,7 @@ export function Skills() {
                     <th key={tg.id} style={{ ...cellPad, fontWeight: 600, textAlign: "center" }}>{tg.label}</th>
                   ))}
                   <th style={{ ...cellPad, fontWeight: 600 }}>{t("skills.method.symlink")}/{t("skills.method.copy")}</th>
-                  <th style={{ ...cellPad, fontWeight: 600 }}></th>
+                  <th style={{ ...cellPad, fontWeight: 600 }} aria-label={t("skills.adopt.removeTitle")}></th>
                 </tr>
               </thead>
               <tbody>
@@ -509,7 +509,10 @@ export function Skills() {
                 return acc;
               }, {}),
             ).map(([location, items]) => {
-              const linkedGroup = items.some((c) => c.origin?.linked);
+              // Hint only when the WHOLE group is symlinked from elsewhere (an
+              // external tool's dir); a group mixing direct + linked items isn't
+              // entirely "managed by another tool".
+              const linkedGroup = items.length > 0 && items.every((c) => c.origin?.linked);
               return (
                 <div key={location} style={{ marginBottom: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 0 6px", fontSize: 12.5, color: "var(--muted)" }}>

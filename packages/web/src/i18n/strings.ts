@@ -374,7 +374,6 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "skills.conflict": { en: "Conflict", zh: "冲突" },
   "skills.dangling": { en: "Broken link", zh: "断链" },
   "skills.link": { en: "Apply links", zh: "应用软链" },
-  "skills.capture": { en: "Back up selected", zh: "备份所选" },
   "skills.sourceDir": { en: "Canonical source", zh: "规范源目录" },
   "skills.remove": { en: "Remove", zh: "移除" },
   "skills.resolve.action": { en: "Resolve", zh: "解决" },

@@ -13,7 +13,8 @@ vi.mock("./api", () => ({
     skills: [{ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [], conflicts: ["claude"] }],
   }),
   discoverSkills: vi.fn().mockResolvedValue({ candidates: [] }),
-  captureSkills: vi.fn(),
+  adoptSkills: vi.fn().mockResolvedValue({ written: [], blocked: [], materialized: [] }),
+  unadoptSkills: vi.fn().mockResolvedValue({ ok: true, removed: [] }),
   toggleSkill: vi.fn().mockResolvedValue({ ok: true, config: {} }),
   linkSkills: vi.fn().mockResolvedValue({ applied: [], skipped: [] }),
   saveSkillsConfig: vi.fn(),
@@ -38,7 +39,7 @@ describe("Skills view", () => {
     const resolveBtn = await screen.findByRole("button", { name: /resolve|解决/i });
     resolveBtn.click();
     // an in-app confirm dialog appears with the move-to-backups message + a confirm action
-    const confirmBtn = await screen.findByRole("button", { name: /move|take over|接管|确认|继续/i });
+    const confirmBtn = await screen.findByRole("button", { name: /take over|接管|确认|继续/i });
     confirmBtn.click();
     await waitFor(() => expect(api.resolveSkillConflict).toHaveBeenCalledWith("foo", "claude"));
   });
