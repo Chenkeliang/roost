@@ -413,4 +413,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "skills.targets.add": { en: "Add", zh: "添加" },
   "skills.targets.save": { en: "Save", zh: "保存" },
   "skills.targets.removeNote": { en: "Removes the target from Roost. Roost-managed links into it are cleaned up on the next apply; the directory itself is never deleted.", zh: "仅从 Roost 移除该目标。其下 Roost 自建的链接在下次应用时清理;目录本身不会被删除。" },
+  "skills.targets.errEmptyName": { en: "Name is required", zh: "请填写名称" },
+  "skills.targets.errEmptyDir": { en: "Directory is required", zh: "请填写目录" },
+  "skills.targets.errDuplicate": { en: "already exists", zh: "已存在" },
 };

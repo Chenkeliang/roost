@@ -19,8 +19,9 @@ export function TargetManager({ initial, t, onClose, onSaved }: {
 
   const add = () => {
     const id = slug(name);
-    if (!id || !dir.trim()) { setErr(t("skills.targets.name")); return; }
-    if (targetsRef.current.some((x) => x.id === id)) { setErr(`${id} exists`); return; }
+    if (!id) { setErr(t("skills.targets.errEmptyName")); return; }
+    if (!dir.trim()) { setErr(t("skills.targets.errEmptyDir")); return; }
+    if (targetsRef.current.some((x) => x.id === id)) { setErr(`${id} ${t("skills.targets.errDuplicate")}`); return; }
     const next = [...targetsRef.current, { id, path: dir.trim(), label: name.trim() }];
     targetsRef.current = next;
     setTargets(next);
