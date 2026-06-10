@@ -54,7 +54,7 @@ function SkillTargetsPopover({ row, targets, busy, t, onToggle, onResolve, onClo
                 <button role="switch" aria-checked={on} aria-label={tg.label} disabled={busy || !row.effective.enabled}
                   onClick={() => onToggle(tg.id, !on)}
                   style={{ ...ic, border: 0, background: "transparent", padding: 0 }}>
-                  {on ? <CheckCircle size={18} weight="fill" style={{ color: "var(--text)" }} /> : <Circle size={18} style={{ color: "var(--border)" }} />}
+                  {on ? <CheckCircle size={18} weight="fill" style={{ color: "var(--green)" }} /> : <Circle size={18} style={{ color: "var(--border)" }} />}
                 </button>
                 <span style={{ flex: 1 }}>{tg.label}</span>
                 {st === "conflict" ? (
