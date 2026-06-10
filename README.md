@@ -47,7 +47,7 @@
 
 ### Install the desktop app
 
-Download `Roost_<version>_<arch>.dmg` from [Releases](../../releases), open it, and drag **Roost** into Applications.
+Prebuilt **Apple Silicon** `.dmg` files are published to [Releases](../../releases) — cut from version tags by CI. **If no release is listed yet, build it yourself** (below). Open the `.dmg` and drag **Roost** into Applications.
 
 **First launch** (not yet Apple-signed): right-click `Roost.app` → **Open** → **Open**, or run `xattr -dr com.apple.quarantine /Applications/Roost.app`.
 
@@ -56,6 +56,7 @@ Download `Roost_<version>_<arch>.dmg` from [Releases](../../releases), open it, 
 ```bash
 pnpm install
 pnpm build:desktop   # builds the engine sidecar, then the Tauri app
+# → packages/web/src-tauri/target/release/bundle/ (Roost.app + Roost_<version>_aarch64.dmg)
 ```
 
 ### Quick start (dev)
@@ -119,11 +120,11 @@ The engine (CLI + libraries) is open source under the **MIT** license — see [L
 
 ### 安装桌面应用
 
-从 [Releases](../../releases) 下载 `Roost_<version>_<arch>.dmg`,打开后把 **Roost** 拖进「应用程序」。
+预构建的 **Apple Silicon** `.dmg` 会发布到 [Releases](../../releases)(由 CI 按版本 tag 打包)。**若暂时还没有 release,请自行构建**(见下)。打开 `.dmg` 后把 **Roost** 拖进「应用程序」。
 
 **首次启动**(尚未 Apple 签名):右键 `Roost.app` → **打开** → **打开**,或运行 `xattr -dr com.apple.quarantine /Applications/Roost.app`。
 
-**自行构建**(需 Rust 工具链):`pnpm install && pnpm build:desktop`。
+**自行构建**(需 Rust 工具链):`pnpm install && pnpm build:desktop` —— 产物在 `packages/web/src-tauri/target/release/bundle/`(`Roost.app` + `Roost_<version>_aarch64.dmg`)。
 
 ### 两个仓库 —— 别混淆
 

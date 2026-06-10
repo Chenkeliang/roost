@@ -11,8 +11,29 @@ import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 Roost v1 **仅面向 macOS**,没有跨平台构建。
 </Aside>
 
-Roost 目前处于早期开发阶段,如今只能从源码运行。尚无发布的二进制文件,因此安装意味着
-克隆仓库并构建整个工作区。
+Roost 目前处于早期开发阶段。**桌面应用**以 macOS `.dmg` 形式发布(见下文);**CLI / 引擎**如今从源码运行。
+
+## 桌面应用
+
+预构建的 **Apple Silicon** `.dmg` 会发布到
+[Releases](https://github.com/Chenkeliang/roost/releases)(由 CI 按版本 tag 打包)。打开 `.dmg` 后把 **Roost** 拖进「应用程序」。
+
+<Aside type="note" title="暂时还没有 release?">
+自行构建(需 Rust 工具链):
+
+```sh
+pnpm install
+pnpm build:desktop
+```
+
+产物在 `packages/web/src-tauri/target/release/bundle/`(`Roost.app` + `Roost_<version>_aarch64.dmg`)。
+</Aside>
+
+<Aside type="caution" title="首次启动——未签名">
+Roost 尚未做 Apple 签名/公证,首次打开会被 Gatekeeper 拦下。
+右键 `Roost.app` →「打开」→「打开」,或运行
+`xattr -dr com.apple.quarantine /Applications/Roost.app`。
+</Aside>
 
 ## 前置依赖
 
