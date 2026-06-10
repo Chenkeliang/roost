@@ -1,18 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
-import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, LinkBreak, Copy, Circle, UploadSimple } from "@phosphor-icons/react";
+import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, LinkBreak, Copy, Circle, UploadSimple, Wrench } from "@phosphor-icons/react";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
-import { getSkills, discoverSkills, captureSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict, postSkillsImportScan, postSkillsImportApply } from "../api";
-import type { SkillImportResponse, SkillScanResponse } from "../api";
+import { getSkills, discoverSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict, postSkillsImportScan, postSkillsImportApply, adoptSkills, unadoptSkills } from "../api";
+import type { SkillImportResponse, SkillScanResponse, SkillCandidate } from "../api";
 import type { SkillsView, SkillRow, SkillMethod } from "../api";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
 const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
 const cellPad: React.CSSProperties = { padding: "9px 12px", borderBottom: "1px solid var(--border-soft)", fontSize: 14, verticalAlign: "middle" };
 
-type Candidate = { id: string; note?: string };
 
 // Per-(skill,target) status badge derived from effective state + links.
 function targetStatus(row: SkillRow, targetId: string): "linked" | "copy" | "conflict" | "broken" | "off" {
@@ -95,12 +94,16 @@ export function Skills() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"managed" | "discovered">("managed");
-  const [cands, setCands] = useState<Candidate[] | null>(null);
+  const [cands, setCands] = useState<SkillCandidate[] | null>(null);
   const [scanning, setScanning] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ skill: string; target: string } | null>(null);
   const [resolving, setResolving] = useState(false);
+  const [fromChoice, setFromChoice] = useState<Record<string, string>>({}); // conflict picker
+  const [confirmAdopt, setConfirmAdopt] = useState(false);
+  const [decouple, setDecouple] = useState(true);
+  const [removing, setRemoving] = useState<string | null>(null); // skill pending un-adopt
 
   const load = useCallback(async () => {
     const v = await getSkills();
@@ -243,18 +246,34 @@ export function Skills() {
     finally { setBusy(false); }
   }, [refetch]);
 
-  const onBackup = useCallback(async () => {
+  const applyAdopt = useCallback(async () => {
     const names = [...checked];
     if (names.length === 0) return;
     setBusy(true);
     try {
-      await captureSkills(names);
+      const from = Object.fromEntries(Object.entries(fromChoice).filter(([k]) => checked.has(k)));
+      await adoptSkills(names, { decouple, from: Object.keys(from).length ? from : undefined });
       setChecked(new Set());
-      setCands(null);
+      setFromChoice({});
+      setConfirmAdopt(false);
+      if (cands) setCands(await discoverSkills().then((r) => r.candidates)); // re-scan
       await refetch();
-      setTab("managed");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "adopt failed");
     } finally { setBusy(false); }
-  }, [checked, refetch]);
+  }, [checked, fromChoice, decouple, cands, refetch]);
+
+  const doUnadopt = useCallback(async (name: string) => {
+    setBusy(true);
+    try {
+      await unadoptSkills([name]);
+      setRemoving(null);
+      await refetch();
+      if (cands) setCands(await discoverSkills().then((r) => r.candidates));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "remove failed");
+    } finally { setBusy(false); }
+  }, [refetch, cands]);
 
   const toggleCheck = useCallback((id: string) => {
     setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -325,6 +344,7 @@ export function Skills() {
                     <th key={tg.id} style={{ ...cellPad, fontWeight: 600, textAlign: "center" }}>{tg.label}</th>
                   ))}
                   <th style={{ ...cellPad, fontWeight: 600 }}>{t("skills.method.symlink")}/{t("skills.method.copy")}</th>
+                  <th style={{ ...cellPad, fontWeight: 600 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -373,6 +393,11 @@ export function Skills() {
                         <option value="symlink">{t("skills.method.symlink")}</option>
                         <option value="copy">{t("skills.method.copy")}</option>
                       </select>
+                    </td>
+                    <td style={cellPad}>
+                      <button aria-label={`remove ${row.name}`} title={t("skills.adopt.removeTitle")} disabled={busy} onClick={() => setRemoving(row.name)} style={{ ...ic, padding: "4px 8px", color: "var(--muted)" }}>
+                        {t("skills.adopt.remove")}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -472,28 +497,59 @@ export function Skills() {
             {checked.size > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
                 <span style={{ color: "var(--muted)", fontSize: 13 }}>{checked.size} {t("common.selected")}</span>
-                <button onClick={() => void onBackup()} disabled={busy} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)" }}>
-                  <FloppyDisk size={11} />{t("skills.capture")}
+                <button onClick={() => setConfirmAdopt(true)} disabled={busy} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)" }}>
+                  <FloppyDisk size={11} />{t("skills.adopt.action")}
                 </button>
               </div>
             )}
-            <div style={card}>
-              {newCands.map((c) => {
-                const conflict = c.note ? /conflict/i.test(c.note) : false;
-                return (
-                  <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
-                    <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }} />
-                    <Stack size={14} style={{ color: "var(--muted)" }} />
-                    <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.id}</span>
-                    {c.note && (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, color: conflict ? "var(--accent)" : "var(--muted)" }}>
-                        {conflict && <Warning size={11} weight="fill" />}{c.note}
-                      </span>
-                    )}
+            {Object.entries(
+              newCands.reduce<Record<string, SkillCandidate[]>>((acc, c) => {
+                const k = c.origin?.location ?? t("skills.adopt.unknownLocation");
+                (acc[k] = acc[k] ?? []).push(c);
+                return acc;
+              }, {}),
+            ).map(([location, items]) => {
+              const linkedGroup = items.some((c) => c.origin?.linked);
+              return (
+                <div key={location} style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 0 6px", fontSize: 12.5, color: "var(--muted)" }}>
+                    <span className="mono">{location}</span>
+                    <span>· {items.length}</span>
                   </div>
-                );
-              })}
-            </div>
+                  {linkedGroup && (
+                    <div style={{ fontSize: 12, color: "var(--muted)", background: "var(--raise)", border: "1px solid var(--border-soft)", borderRadius: 8, padding: "8px 10px", marginBottom: 6 }}>
+                      {t("skills.adopt.linkedHint")}
+                    </div>
+                  )}
+                  <div style={card}>
+                    {items.map((c) => (
+                      <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
+                        <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }} />
+                        <Stack size={14} style={{ color: "var(--muted)" }} />
+                        <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.id}</span>
+                        {c.origin?.needsRepair && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#f0b352" }}>
+                            <Wrench size={11} weight="fill" />{t("skills.adopt.repair")}
+                          </span>
+                        )}
+                        {c.origin?.conflictLocations && c.origin.conflictLocations.length > 1 && (
+                          <select
+                            aria-label={`source for ${c.id}`}
+                            value={fromChoice[c.id] ?? c.origin.conflictLocations[0]}
+                            onChange={(e) => setFromChoice((m) => ({ ...m, [c.id]: e.target.value }))}
+                            style={{ ...ic, padding: "3px 6px", fontSize: 12 }}
+                          >
+                            {c.origin.conflictLocations.map((loc) => (
+                              <option key={loc} value={loc}>{loc}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
           )}
         </div>
@@ -518,6 +574,46 @@ export function Skills() {
               <button onClick={() => void confirmResolve()} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 14, color: "#fff", background: "var(--accent)", borderColor: "var(--accent)" }}>
                 {t("skills.resolve.confirmAction")}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmAdopt && (
+        <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }}>
+          <div style={{ ...card, maxWidth: 480, width: "100%", padding: 18 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{t("skills.adopt.confirmTitle")} ({checked.size})</div>
+            <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid var(--border-soft)", borderRadius: 8, marginBottom: 12 }}>
+              {(cands ?? []).filter((c) => checked.has(c.id)).map((c) => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: "1px solid var(--border-soft)", fontSize: 12.5 }}>
+                  <span className="mono" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{c.id}</span>
+                  <span style={{ color: "var(--muted)" }}>{c.origin?.location}</span>
+                  {typeof c.sizeBytes === "number" && <span style={{ color: "var(--muted)" }}>{Math.max(1, Math.round(c.sizeBytes / 1024))}KB</span>}
+                  {c.origin?.needsRepair && <span style={{ color: "#f0b352" }}>{t("skills.adopt.repair")}</span>}
+                </div>
+              ))}
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 6 }}>
+              <input type="checkbox" checked={decouple} onChange={(e) => setDecouple(e.target.checked)} style={{ accentColor: "var(--accent)", width: 16, height: 16 }} />
+              {t("skills.adopt.decouple")}
+            </label>
+            <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>{t("skills.adopt.confirmNote")}</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setConfirmAdopt(false)} disabled={busy} style={{ ...ic, padding: "6px 12px" }}>{t("skills.resolve.cancel")}</button>
+              <button onClick={() => void applyAdopt()} disabled={busy} style={{ ...ic, padding: "6px 12px", color: "#fff", background: "var(--accent)", borderColor: "var(--accent)" }}>{t("skills.adopt.confirmAction")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {removing && (
+        <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }}>
+          <div style={{ ...card, maxWidth: 420, width: "100%", padding: 18 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{t("skills.adopt.removeTitle")}</div>
+            <p style={{ margin: "0 0 16px", fontSize: 13, lineHeight: 1.5, color: "var(--muted)" }}>{t("skills.adopt.removeNote")}</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setRemoving(null)} disabled={busy} style={{ ...ic, padding: "6px 12px" }}>{t("skills.resolve.cancel")}</button>
+              <button onClick={() => void doUnadopt(removing)} disabled={busy} style={{ ...ic, padding: "6px 12px", color: "var(--accent)", borderColor: "var(--accent)" }}>{t("skills.adopt.remove")}</button>
             </div>
           </div>
         </div>
