@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, LinkBreak, Copy, Circle, UploadSimple, Wrench } from "@phosphor-icons/react";
+import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, Circle, UploadSimple, Wrench, DotsThree } from "@phosphor-icons/react";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
@@ -7,84 +7,103 @@ import { useT } from "../i18n";
 import { getSkills, discoverSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict, postSkillsImportScan, postSkillsImportApply, adoptSkills, unadoptSkills } from "../api";
 import type { SkillImportResponse, SkillScanResponse, SkillCandidate } from "../api";
 import type { SkillsView, SkillRow, SkillMethod } from "../api";
+import { computeCoverage, targetStatus } from "./skillsCoverage";
+import type { Coverage } from "./skillsCoverage";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
 const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
 const cellPad: React.CSSProperties = { padding: "9px 12px", borderBottom: "1px solid var(--border-soft)", fontSize: 14, verticalAlign: "middle" };
 
-
-// Per-(skill,target) status badge derived from effective state + links.
-function targetStatus(row: SkillRow, targetId: string): "linked" | "copy" | "conflict" | "broken" | "off" {
-  const wanted = row.effective.enabled && row.effective.targets.includes(targetId);
-  const link = row.links.find((l) => l.target === targetId);
-  if (!wanted) return "off";
-  if (row.conflicts?.includes(targetId)) return "conflict"; // real non-Roost dir occupies the dest
-  if (!link) return "broken"; // wanted but no link on disk yet
-  if (link.kind === "copy") return "copy";
-  return "linked";
+function CoverageCell({ cov, method, onOpen, t }: { cov: Coverage; method: string; onOpen: () => void; t: (k: string) => string }) {
+  const color = cov.state === "conflict" ? "var(--accent)" : cov.state === "partial" ? "#f0b352" : "var(--muted)";
+  if (cov.state === "disabled") {
+    return <span style={{ color: "var(--muted)", opacity: 0.6, fontSize: 13 }}>—</span>;
+  }
+  const dotColor = (s: string) => (s === "conflict" ? "var(--accent)" : s === "broken" ? "#f0b352" : "var(--muted)");
+  return (
+    <button onClick={onOpen} style={{ ...ic, border: 0, background: "transparent", padding: "2px 4px", gap: 8 }} aria-label={`${t("skills.coverage.title")} ${cov.healthy}/${cov.desired}`}>
+      <span style={{ display: "inline-flex", gap: 3 }}>
+        {cov.segments.map((s, i) => (
+          <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: s === "healthy" ? "var(--muted)" : "transparent", border: `1px solid ${dotColor(s)}` }} />
+        ))}
+      </span>
+      <span className="mono" style={{ color, fontSize: 13 }}>{cov.healthy}/{cov.desired}</span>
+      <span style={{ color: "var(--muted)", fontSize: 12.5 }}>· {t(`skills.method.${method}`)}</span>
+      {cov.state === "partial" && <span style={{ color: "#f0b352", fontSize: 12 }}>{cov.broken} {t("skills.coverage.broken")}</span>}
+      {cov.state === "conflict" && <span style={{ color: "var(--accent)", fontSize: 12 }}>{t("skills.coverage.conflict")}</span>}
+    </button>
+  );
 }
 
-// One indicator per (skill, IDE) cell — replaces the old checkbox + badge pair.
-// Click toggles on/off; a conflict opens the resolve dialog instead.
-function CellToggle({
-  row,
-  targetLabel,
-  status,
-  busy,
-  t,
-  onToggle,
-  onResolve,
-}: {
-  row: SkillRow;
-  targetLabel: string;
-  status: ReturnType<typeof targetStatus>;
-  busy: boolean;
-  t: (k: string) => string;
-  onToggle: (next: boolean) => void;
-  onResolve: () => void;
+function SkillTargetsPopover({ row, targets, busy, t, onToggle, onResolve, onClose }: {
+  row: SkillRow; targets: { id: string; label: string }[]; busy: boolean; t: (k: string) => string;
+  onToggle: (targetId: string, next: boolean) => void; onResolve: (targetId: string) => void; onClose: () => void;
 }) {
-  const on = status !== "off";
-  const ICON = 20;
-  const btn: React.CSSProperties = {
-    width: 34,
-    height: 30,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: 0,
-    background: "transparent",
-    borderRadius: 8,
-    cursor: busy ? "default" : "pointer",
-  };
-  if (status === "conflict") {
-    return (
-      <button disabled={busy} title={t("skills.conflict")} aria-label={t("skills.resolve.action")} onClick={onResolve} style={btn}>
-        <Warning size={ICON} weight="fill" style={{ color: "#f0b352" }} />
-      </button>
-    );
-  }
-  const glyph =
-    status === "linked" ? (
-      <CheckCircle size={ICON} weight="fill" style={{ color: "var(--accent)" }} />
-    ) : status === "copy" ? (
-      <Copy size={ICON} style={{ color: "var(--accent)" }} />
-    ) : status === "broken" ? (
-      <LinkBreak size={ICON} style={{ color: "var(--red)" }} />
-    ) : (
-      <Circle size={ICON} style={{ color: "var(--border)" }} />
-    );
-  const titleKey =
-    status === "linked" ? "skills.enabled" : status === "copy" ? "skills.method.copy" : status === "broken" ? "skills.dangling" : "skills.disabled";
   return (
-    <button
-      disabled={busy || !row.effective.enabled}
-      aria-label={`${row.name} · ${targetLabel}`}
-      title={t(titleKey)}
-      onClick={() => onToggle(!on)}
-      style={{ ...btn, opacity: row.effective.enabled ? 1 : 0.4 }}
-    >
-      {glyph}
-    </button>
+    <div role="dialog" aria-modal="true" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...card, maxWidth: 420, width: "100%", padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}><span className="mono">{row.name}</span></div>
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>{t("skills.targets.subtitle")}</div>
+        <div style={{ border: "1px solid var(--border-soft)", borderRadius: 8, overflow: "hidden" }}>
+          {targets.map((tg) => {
+            const st = targetStatus(row, tg.id);
+            const on = row.effective.enabled && row.effective.targets.includes(tg.id);
+            return (
+              <div key={tg.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: "1px solid var(--border-soft)", fontSize: 13 }}>
+                <button role="switch" aria-checked={on} aria-label={tg.label} disabled={busy || !row.effective.enabled}
+                  onClick={() => onToggle(tg.id, !on)}
+                  style={{ ...ic, border: 0, background: "transparent", padding: 0 }}>
+                  {on ? <CheckCircle size={18} weight="fill" style={{ color: "var(--accent)" }} /> : <Circle size={18} style={{ color: "var(--border)" }} />}
+                </button>
+                <span style={{ flex: 1 }}>{tg.label}</span>
+                {st === "conflict" ? (
+                  <button onClick={() => onResolve(tg.id)} style={{ ...ic, color: "#f0b352", borderColor: "#f0b352" }}>{t("skills.resolve.action")}</button>
+                ) : st === "broken" ? (
+                  <span style={{ color: "#f0b352", fontSize: 12 }}>{t("skills.coverage.broken")}</span>
+                ) : st === "copy" ? (
+                  <span style={{ color: "var(--muted)", fontSize: 12 }}>{t("skills.method.copy")}</span>
+                ) : st === "linked" ? (
+                  <span style={{ color: "var(--muted)", fontSize: 12 }}>{t("skills.method.symlink")}</span>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+          <button onClick={onClose} style={{ ...ic, padding: "6px 12px" }}>{t("skills.resolve.cancel")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RowMenu({ row, busy, t, onRemove, onMethod, onToggleEnabled }: {
+  row: SkillRow; busy: boolean; t: (k: string) => string;
+  onRemove: () => void; onMethod: (m: SkillMethod) => void; onToggleEnabled: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-block" }}>
+      <button aria-label={`actions ${row.name}`} disabled={busy} onClick={() => setOpen((o) => !o)} style={{ ...ic, border: 0, background: "transparent", padding: "4px 6px" }}>
+        <DotsThree size={18} />
+      </button>
+      {open && (
+        <>
+          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+          <div role="menu" style={{ position: "absolute", right: 0, top: "100%", zIndex: 91, ...card, minWidth: 160, padding: 4 }}>
+            <button role="menuitem" onClick={() => { setOpen(false); onToggleEnabled(); }} style={{ ...ic, border: 0, width: "100%", justifyContent: "flex-start" }}>
+              {row.effective.enabled ? t("skills.menu.disable") : t("skills.menu.enable")}
+            </button>
+            <button role="menuitem" onClick={() => { setOpen(false); onMethod(row.effective.method === "symlink" ? "copy" : "symlink"); }} style={{ ...ic, border: 0, width: "100%", justifyContent: "flex-start" }}>
+              {row.effective.method === "symlink" ? t("skills.menu.method") : t("skills.menu.methodSymlink")}
+            </button>
+            <button role="menuitem" onClick={() => { setOpen(false); onRemove(); }} style={{ ...ic, border: 0, width: "100%", justifyContent: "flex-start", color: "var(--accent)" }}>
+              {t("skills.adopt.remove")}
+            </button>
+          </div>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -104,6 +123,8 @@ export function Skills() {
   const [confirmAdopt, setConfirmAdopt] = useState(false);
   const [decouple, setDecouple] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null); // skill pending un-adopt
+  const [popover, setPopover] = useState<string | null>(null);
+  const [managedFilter, setManagedFilter] = useState("");
 
   const load = useCallback(async () => {
     const v = await getSkills();
@@ -298,6 +319,10 @@ export function Skills() {
   const { config, targets, skills } = view;
   const newCands = (cands ?? []).filter((c) => !skills.some((s) => s.name === c.id));
 
+  // Managed tab search filter
+  const q = managedFilter.trim().toLowerCase();
+  const visibleSkills = q ? skills.filter((s) => s.name.toLowerCase().includes(q)) : skills;
+
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       {/* Recipe bar: source dir, default method/targets, apply links */}
@@ -334,76 +359,45 @@ export function Skills() {
         skills.length === 0 ? (
           <EmptyState icon={<Stack size={24} />} title={t("skills.title")} subtitle={t("skills.tab.managed")} />
         ) : (
-          <div style={{ ...card, overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ textAlign: "left", color: "var(--muted)", fontSize: 12.5 }}>
-                  <th style={{ ...cellPad, fontWeight: 600 }}>Skill</th>
-                  <th style={{ ...cellPad, fontWeight: 600 }}>{t("skills.enabled")}</th>
-                  {targets.map((tg) => (
-                    <th key={tg.id} style={{ ...cellPad, fontWeight: 600, textAlign: "center" }}>{tg.label}</th>
-                  ))}
-                  <th style={{ ...cellPad, fontWeight: 600 }}>{t("skills.method.symlink")}/{t("skills.method.copy")}</th>
-                  <th style={{ ...cellPad, fontWeight: 600 }} aria-label={t("skills.adopt.removeTitle")}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {skills.map((row) => (
-                  <tr key={row.name}>
-                    <td style={cellPad}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <Stack size={14} style={{ color: "var(--muted)" }} />
-                        <span className="mono">{row.name}</span>
-                      </span>
-                    </td>
-                    <td style={cellPad}>
-                      <input
-                        type="checkbox"
-                        aria-label={`enable ${row.name}`}
-                        checked={row.effective.enabled}
-                        disabled={busy}
-                        onChange={() => void onToggleMaster(row)}
-                        style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }}
-                      />
-                    </td>
-                    {targets.map((tg) => {
-                      const status = targetStatus(row, tg.id);
-                      return (
-                        <td key={tg.id} style={{ ...cellPad, textAlign: "center" }}>
-                          <CellToggle
-                            row={row}
-                            targetLabel={tg.label}
-                            status={status}
-                            busy={busy}
-                            t={t}
-                            onToggle={(next) => void onToggleTarget(row, tg.id, next)}
-                            onResolve={() => setPending({ skill: row.name, target: tg.id })}
-                          />
-                        </td>
-                      );
-                    })}
-                    <td style={cellPad}>
-                      <select
-                        aria-label={`method for ${row.name}`}
-                        value={row.effective.method}
-                        disabled={busy}
-                        onChange={(e) => void onChangeMethod(row.name, e.target.value as SkillMethod)}
-                        style={{ ...ic, padding: "4px 6px" }}
-                      >
-                        <option value="symlink">{t("skills.method.symlink")}</option>
-                        <option value="copy">{t("skills.method.copy")}</option>
-                      </select>
-                    </td>
-                    <td style={cellPad}>
-                      <button aria-label={`remove ${row.name}`} title={t("skills.adopt.removeTitle")} disabled={busy} onClick={() => setRemoving(row.name)} style={{ ...ic, padding: "4px 8px", color: "var(--muted)" }}>
-                        {t("skills.adopt.remove")}
-                      </button>
-                    </td>
+          <>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 8px" }}>
+              {skills.length} {t("skills.summary")}
+            </div>
+            <input value={managedFilter} onChange={(e) => setManagedFilter(e.target.value)} placeholder={t("skills.import.search")}
+              style={{ ...ic, width: 220, padding: "5px 9px", marginBottom: 8 }} />
+            <div style={{ ...card, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--muted)", fontSize: 12.5 }}>
+                    <th style={{ ...cellPad, fontWeight: 600 }}>Skill</th>
+                    <th style={{ ...cellPad, fontWeight: 600 }}>{t("skills.coverage.title")}</th>
+                    <th style={{ ...cellPad, fontWeight: 600 }} aria-label="actions"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {visibleSkills.map((row) => (
+                    <tr key={row.name} style={{ opacity: row.effective.enabled ? 1 : 0.45 }}>
+                      <td style={cellPad}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <Stack size={14} style={{ color: "var(--muted)" }} />
+                          <span className="mono">{row.name}</span>
+                        </span>
+                      </td>
+                      <td style={cellPad}>
+                        <CoverageCell cov={computeCoverage(row)} method={row.effective.method} onOpen={() => setPopover(row.name)} t={t} />
+                      </td>
+                      <td style={cellPad}>
+                        <RowMenu row={row} busy={busy} t={t}
+                          onRemove={() => setRemoving(row.name)}
+                          onMethod={(m) => void onChangeMethod(row.name, m)}
+                          onToggleEnabled={() => void onToggleMaster(row)} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )
       )}
 
@@ -435,8 +429,8 @@ export function Skills() {
             </div>
 
             {scanResult && (() => {
-              const q = importFilter.trim().toLowerCase();
-              const matches = (s: { name: string }) => !q || s.name.toLowerCase().includes(q);
+              const qf = importFilter.trim().toLowerCase();
+              const matches = (s: { name: string }) => !qf || s.name.toLowerCase().includes(qf);
               const visible = scanResult.skills.filter(matches);
               const visibleImportable = visible.filter((s) => !s.blocked);
               const hasImportable = scanResult.skills.some((s) => !s.blocked);
@@ -557,6 +551,18 @@ export function Skills() {
           )}
         </div>
       )}
+
+      {/* Per-tool popover */}
+      {popover && (() => {
+        const row = skills.find((s) => s.name === popover);
+        if (!row) return null;
+        return (
+          <SkillTargetsPopover row={row} targets={targets} busy={busy} t={t}
+            onToggle={(tid, next) => void onToggleTarget(row, tid, next)}
+            onResolve={(tid) => { setPopover(null); setPending({ skill: row.name, target: tid }); }}
+            onClose={() => setPopover(null)} />
+        );
+      })()}
 
       {pending && (
         <div

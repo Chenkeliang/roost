@@ -2,15 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { Skills } from "./views/Skills";
 import * as api from "./api";
+import type { SkillsView, SkillRow } from "./api";
 
 vi.mock("./api", () => ({
   getSkills: vi.fn().mockResolvedValue({
-    config: { sourceDir: "~/.agents/skills", method: "symlink", targets: ["claude", "codex"], skills: { foo: {} } },
+    config: { sourceDir: "~/.agents/skills", method: "symlink" as const, targets: ["claude", "codex"], skills: { foo: {} } },
     targets: [
       { id: "claude", path: ".claude/skills", label: "Claude Code" },
       { id: "codex", path: ".codex/skills", label: "Codex" },
     ],
-    skills: [{ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [], conflicts: ["claude"] }],
+    skills: [{ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" as const }, links: [], conflicts: ["claude"] }],
   }),
   discoverSkills: vi.fn().mockResolvedValue({ candidates: [] }),
   adoptSkills: vi.fn().mockResolvedValue({ written: [], blocked: [], materialized: [] }),
@@ -19,16 +20,29 @@ vi.mock("./api", () => ({
   linkSkills: vi.fn().mockResolvedValue({ applied: [], skipped: [] }),
   saveSkillsConfig: vi.fn(),
   resolveSkillConflict: vi.fn().mockResolvedValue({ ok: true, backedUp: "/b", linked: "/l" }),
+  postSkillsImportScan: vi.fn().mockResolvedValue({ token: "t", skills: [] }),
+  postSkillsImportApply: vi.fn().mockResolvedValue({ imported: [], blocked: [] }),
+  saveSkillsTargets: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
-const BASE_VIEW = {
+// Typed helpers to avoid `method: string` inference issues
+const mkRow = (o: Partial<SkillRow> & { name: string }): SkillRow => ({
+  effective: { enabled: true, targets: ["claude"], method: "symlink" },
+  links: [],
+  conflicts: [],
+  ...o,
+});
+
+const BASE_VIEW: SkillsView = {
   config: { sourceDir: "~/.agents/skills", method: "symlink", targets: ["claude", "codex"], skills: { foo: {} } },
   targets: [
     { id: "claude", path: ".claude/skills", label: "Claude Code" },
     { id: "codex", path: ".codex/skills", label: "Codex" },
   ],
-  skills: [{ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [], conflicts: ["claude"] }],
+  skills: [mkRow({ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [], conflicts: ["claude"] })],
 };
+
+const mkView = (skills: SkillRow[]): SkillsView => ({ ...BASE_VIEW, skills });
 
 const TWO_CANDIDATES = [
   { id: "alpha", note: "found in ~/.agents/skills", origin: { location: "~/.agents/skills", linked: false } },
@@ -40,23 +54,29 @@ describe("Skills view", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the managed skill row with an IDE matrix (target columns)", async () => {
+  it("renders the managed skill row with coverage column instead of per-tool columns", async () => {
     vi.mocked(api.getSkills).mockResolvedValue(BASE_VIEW);
     vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
     render(<Skills />);
     expect(await screen.findByText("foo")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/Claude Code/)).toBeInTheDocument());
-    expect(screen.getByText(/Codex/)).toBeInTheDocument();
+    // coverage column header is present
+    await waitFor(() => expect(screen.getByRole("columnheader", { name: "Coverage" })).toBeInTheDocument());
+    // old per-tool column headers are gone
+    expect(screen.queryByRole("columnheader", { name: "Gemini CLI" })).not.toBeInTheDocument();
   });
 
-  it("Resolve opens an in-app confirm dialog; confirming calls the API", async () => {
+  it("Resolve opens an in-app confirm dialog via the coverage cell popover; confirming calls the API", async () => {
     vi.mocked(api.getSkills).mockResolvedValue(BASE_VIEW);
     vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
     render(<Skills />);
-    // click the Resolve button on the conflict cell
-    const resolveBtn = await screen.findByRole("button", { name: /resolve|解决/i });
+    // open the coverage cell popover (foo has a conflict on claude)
+    const coverageBtn = await screen.findByRole("button", { name: /Coverage/i });
+    coverageBtn.click();
+    // the popover opens with a Resolve button for the claude conflict
+    const dialog = await screen.findByRole("dialog");
+    const resolveBtn = within(dialog).getByRole("button", { name: /resolve|解决/i });
     resolveBtn.click();
-    // an in-app confirm dialog appears with the move-to-backups message + a confirm action
+    // dismiss popover; confirm dialog appears
     const confirmBtn = await screen.findByRole("button", { name: /take over|接管|确认|继续/i });
     confirmBtn.click();
     await waitFor(() => expect(api.resolveSkillConflict).toHaveBeenCalledWith("foo", "claude"));
@@ -66,7 +86,11 @@ describe("Skills view", () => {
     vi.mocked(api.getSkills).mockResolvedValue(BASE_VIEW);
     vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
     render(<Skills />);
-    (await screen.findByRole("button", { name: /resolve|解决/i })).click();
+    const coverageBtn = await screen.findByRole("button", { name: /Coverage/i });
+    coverageBtn.click();
+    const dialog = await screen.findByRole("dialog");
+    const resolveBtn = within(dialog).getByRole("button", { name: /resolve|解决/i });
+    resolveBtn.click();
     const cancelBtn = await screen.findByRole("button", { name: /cancel|取消/i });
     cancelBtn.click();
     expect(api.resolveSkillConflict).not.toHaveBeenCalled();
@@ -150,26 +174,60 @@ describe("Skills view", () => {
     );
   });
 
-  it("remove flow: clicking Remove on a managed row then confirming calls unadoptSkills", async () => {
+  it("remove flow: ⋯ menu → Remove → confirm calls unadoptSkills", async () => {
     vi.mocked(api.getSkills).mockResolvedValue(BASE_VIEW);
     vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
     vi.mocked(api.unadoptSkills).mockResolvedValue({ ok: true, removed: ["foo"] });
-
     render(<Skills />);
-    // the managed tab is shown by default; wait for the foo row
-    const removeBtn = await screen.findByRole("button", { name: "remove foo" });
-    removeBtn.click();
-
-    // the remove confirm dialog should appear
+    (await screen.findByRole("button", { name: "actions foo" })).click();
+    (await screen.findByRole("menuitem", { name: /Remove|移出/ })).click();
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/Remove from management\?/)).toBeInTheDocument();
+    within(dialog).getByRole("button", { name: /^Remove$/i }).click();
+    await waitFor(() => expect(api.unadoptSkills).toHaveBeenCalledWith(["foo"]));
+  });
 
-    // confirm
-    const confirmBtn = within(dialog).getByRole("button", { name: /^Remove$/i });
-    confirmBtn.click();
+  it("managed tab shows a coverage cell (n/m) instead of per-tool columns", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(mkView([
+      mkRow({ name: "alpha", effective: { enabled: true, targets: ["claude", "codex"], method: "symlink" },
+        links: [{ skill: "alpha", target: "claude", path: "/p", kind: "symlink" }, { skill: "alpha", target: "codex", path: "/p", kind: "symlink" }], conflicts: [] }),
+      mkRow({ name: "beta", effective: { enabled: true, targets: ["claude", "codex"], method: "symlink" },
+        links: [{ skill: "beta", target: "claude", path: "/p", kind: "symlink" }], conflicts: [] }),
+    ]));
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
+    render(<Skills />);
+    expect(await screen.findByText("2/2")).toBeInTheDocument(); // alpha covered
+    expect(await screen.findByText("1/2")).toBeInTheDocument(); // beta partial
+    // the old per-tool column headers are gone
+    expect(screen.queryByRole("columnheader", { name: "Gemini CLI" })).not.toBeInTheDocument();
+  });
 
-    await waitFor(() =>
-      expect(api.unadoptSkills).toHaveBeenCalledWith(["foo"])
-    );
+  it("clicking the coverage cell opens a per-tool popover; toggling a tool calls toggleSkill", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(mkView([
+      mkRow({ name: "alpha", effective: { enabled: true, targets: ["claude"], method: "symlink" },
+        links: [{ skill: "alpha", target: "claude", path: "/p", kind: "symlink" }], conflicts: [] }),
+    ]));
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
+    vi.mocked(api.toggleSkill).mockResolvedValue({ ok: true, config: {} as never });
+    render(<Skills />);
+    (await screen.findByRole("button", { name: /Coverage 1\/1/i })).click();
+    const dialog = await screen.findByRole("dialog");
+    // Codex is a catalog target but NOT in alpha's desired set → toggling it ON
+    within(dialog).getByRole("switch", { name: /Codex/ }).click();
+    await waitFor(() => expect(api.toggleSkill).toHaveBeenCalledWith("alpha", true, "codex"));
+  });
+
+  it("managed tab filters rows by the search box", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(mkView([
+      mkRow({ name: "alpha", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [{ skill: "alpha", target: "claude", path: "/p", kind: "symlink" }], conflicts: [] }),
+      mkRow({ name: "zeta", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [{ skill: "zeta", target: "claude", path: "/p", kind: "symlink" }], conflicts: [] }),
+    ]));
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
+    render(<Skills />);
+    await screen.findByText("alpha");
+    const box = screen.getByPlaceholderText(/Filter|筛选/) as HTMLInputElement;
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.change(box, { target: { value: "zet" } });
+    expect(screen.queryByText("alpha")).not.toBeInTheDocument();
+    expect(screen.getByText("zeta")).toBeInTheDocument();
   });
 });
