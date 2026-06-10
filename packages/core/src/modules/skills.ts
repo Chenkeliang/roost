@@ -16,6 +16,12 @@ function expandHome(home: string, p: string): string {
   return p;
 }
 
+function collapseHome(home: string, abs: string): string {
+  if (abs === home) return "~";
+  if (abs.startsWith(home + path.sep)) return "~/" + abs.slice(home.length + 1);
+  return abs;
+}
+
 // All scan roots on this machine: the canonical source + each catalog target dir.
 function scanRoots(ctx: ModuleContext): { id: string; dir: string }[] {
   const cfg = loadSkillsConfig(ctx.repoDir);
@@ -92,27 +98,82 @@ export const skillsModule = {
   name: "skills",
 
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
-    const managed = new Set(listSkillDirs(repoSkillsDir(ctx)));
-    // name -> set of {root, hash}
-    const found = new Map<string, { roots: string[]; hashes: Set<string> }>();
-    for (const { id, dir } of scanRoots(ctx)) {
+    const repoDir = repoSkillsDir(ctx);
+    // repo state per name: "real" (properly managed → skip), "broken" (symlink/empty → repair), "none"
+    const repoState = (name: string): "real" | "broken" | "none" => {
+      const p = path.join(repoDir, name);
+      let st: fs.Stats;
+      try { st = fs.lstatSync(p); } catch { return "none"; }
+      if (st.isSymbolicLink()) return "broken";
+      return hashSkillDir(p) ? "real" : "broken";
+    };
+    type Entry = { real: string; displayDir: string; hash: string; linked: boolean };
+    const byName = new Map<string, Entry[]>();
+    for (const { dir } of scanRoots(ctx)) {
       for (const name of listSkillDirs(dir)) {
-        if (managed.has(name)) continue;
-        const entry = found.get(name) ?? { roots: [], hashes: new Set() };
-        entry.roots.push(id);
-        entry.hashes.add(hashSkillDir(path.join(dir, name)));
-        found.set(name, entry);
+        if (name.startsWith(".")) continue; // skip dotfile / junk entries
+        const abs = path.join(dir, name);
+        let real: string;
+        try { real = fs.realpathSync(abs); } catch { continue; } // dangling link
+        if (!fs.existsSync(path.join(real, "SKILL.md"))) continue; // must be a real skill
+        let linked = false;
+        try { linked = fs.lstatSync(abs).isSymbolicLink(); } catch { /* */ }
+        // displayDir: for symlinks, the resolved parent of the target (where real content lives);
+        // for non-symlinks, the scan dir. We use the readlink target's parent to show where content lives.
+        let displayDir = dir;
+        if (linked) {
+          try {
+            const target = fs.readlinkSync(abs);
+            const resolvedTarget = path.isAbsolute(target) ? target : path.join(path.dirname(abs), target);
+            displayDir = path.dirname(resolvedTarget);
+          } catch { displayDir = path.dirname(real); }
+        }
+        const arr = byName.get(name) ?? [];
+        arr.push({ real, displayDir, hash: hashSkillDir(real), linked });
+        byName.set(name, arr);
       }
     }
+    const loc = (displayDir: string): string => {
+      // Try collapsing with the raw home first; if that works, use it.
+      const collapsed = collapseHome(ctx.home, displayDir);
+      if (collapsed !== displayDir) return collapsed; // home prefix matched without resolving
+      // On macOS, ctx.home may be /var/... while realpathSync gives /private/var/...
+      // Only attempt realpath normalization when the path might be under home.
+      try {
+        const rHome = fs.realpathSync(ctx.home);
+        const rDir = fs.realpathSync(displayDir);
+        const c2 = collapseHome(rHome, rDir);
+        if (c2 !== rDir) return c2; // collapsed under resolved home
+      } catch { /* ignore */ }
+      return displayDir; // not under home: return absolute as-is
+    };
     const out: Candidate[] = [];
-    for (const [name, e] of found) {
-      const conflict = e.hashes.size > 1;
+    for (const [name, entries] of byName) {
+      const rs = repoState(name);
+      if (rs === "real") continue; // already properly managed
+      const seen = new Map<string, Entry>();
+      for (const e of entries) if (!seen.has(e.real)) seen.set(e.real, e);
+      const distinct = [...seen.values()];
+      const conflict = new Set(distinct.map((e) => e.hash)).size > 1;
+      const rep = distinct[0]!;
+      const scan = scanPathForSecrets(rep.real);
       out.push({
         id: name,
         path: name,
         category: "skills",
         recommendation: "track",
-        note: conflict ? `conflict: differing content across ${e.roots.join(", ")}` : `found in ${e.roots.join(", ")}`,
+        sizeBytes: scan.bytes,
+        note: conflict
+          ? `conflict: differing content across ${distinct.map((e) => loc(e.displayDir)).join(", ")}`
+          : rs === "broken"
+            ? "needs repair (stored as symlink)"
+            : `found in ${loc(rep.displayDir)}`,
+        origin: {
+          location: loc(rep.displayDir),
+          linked: distinct.some((e) => e.linked),
+          ...(rs === "broken" ? { needsRepair: true } : {}),
+          ...(conflict ? { conflictLocations: distinct.map((e) => loc(e.displayDir)) } : {}),
+        },
       });
     }
     return out.sort((a, b) => a.id.localeCompare(b.id));

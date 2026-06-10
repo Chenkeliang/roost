@@ -253,6 +253,55 @@ describe("capture dereferences symlinked sources (adopt)", () => {
 // helper used above (capture is the same object; this just documents intent)
 function skillsModuleSync() { return skillsModule; }
 
+describe("discover classifies by real directory (origin)", () => {
+  it("tags a bare source skill: linked:false, location ~/.agents/skills", async () => {
+    mkSkill(path.join(home, ".agents", "skills"), "bare1", "# bare");
+    const c = (await skillsModule.discover(ctx())).find((x) => x.id === "bare1")!;
+    expect(c.origin?.linked).toBe(false);
+    expect(c.origin?.location).toBe("~/.agents/skills");
+  });
+
+  it("tags a symlinked source skill: linked:true, location = resolved dir", async () => {
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext2-"));
+    fs.mkdirSync(path.join(external, "skills"), { recursive: true });
+    mkSkill(path.join(external, "skills"), "linked1", "# x");
+    const srcDir = path.join(home, ".agents", "skills");
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.symlinkSync(path.join(external, "skills", "linked1"), path.join(srcDir, "linked1"));
+    const c = (await skillsModule.discover(ctx())).find((x) => x.id === "linked1")!;
+    expect(c.origin?.linked).toBe(true);
+    expect(c.origin?.location).toBe(path.join(external, "skills")); // absolute (not under home → not collapsed)
+    fs.rmSync(external, { recursive: true, force: true });
+  });
+
+  it("surfaces a repo entry stored as a symlink as needsRepair", async () => {
+    mkSkill(path.join(home, ".agents", "skills"), "broken1", "# real");
+    // repo holds a symlink (the bug's footprint), not real content
+    fs.mkdirSync(path.join(repo, "skills"), { recursive: true });
+    fs.symlinkSync(path.join(home, ".agents", "skills", "broken1"), path.join(repo, "skills", "broken1"));
+    const c = (await skillsModule.discover(ctx())).find((x) => x.id === "broken1");
+    expect(c?.origin?.needsRepair).toBe(true);
+  });
+
+  it("skips dirs without SKILL.md and dotfile entries", async () => {
+    const srcDir = path.join(home, ".agents", "skills");
+    fs.mkdirSync(path.join(srcDir, "not-a-skill"), { recursive: true });   // no SKILL.md
+    fs.writeFileSync(path.join(srcDir, "not-a-skill", "README.md"), "x");
+    fs.mkdirSync(path.join(srcDir, ".system"), { recursive: true });        // dotfile
+    fs.writeFileSync(path.join(srcDir, ".system", "SKILL.md"), "x");
+    const ids = (await skillsModule.discover(ctx())).map((c) => c.id);
+    expect(ids).not.toContain("not-a-skill");
+    expect(ids).not.toContain(".system");
+  });
+
+  it("fills conflictLocations when same name differs across directories", async () => {
+    mkSkill(path.join(home, ".agents", "skills"), "dup2", "# A");
+    mkSkill(path.join(home, ".claude", "skills"), "dup2", "# B");
+    const c = (await skillsModule.discover(ctx())).find((x) => x.id === "dup2")!;
+    expect((c.origin?.conflictLocations ?? []).length).toBe(2);
+  });
+});
+
 describe("resolveSkillConflict (back up & take over)", () => {
   function setupConflict(method: "symlink" | "copy" = "symlink") {
     mkSkill(path.join(repo, "skills"), "foo", "# canonical foo");
