@@ -1936,4 +1936,35 @@ describe("onboarding endpoints", () => {
     expect(res.statusCode).toBe(400);
     await server.close();
   });
+
+  it("POST /api/clone returns {ok:true} on success", async () => {
+    const reg = new ModuleRegistry();
+    const { exec, calls } = makeGitFake();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/clone", payload: { url: "git@github.com:me/dot.git" }, headers: { "content-type": "application/json" } });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { ok: boolean }).ok).toBe(true);
+    expect(calls.some((c) => c[0] === "git" && c[1] === "clone")).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/clone surfaces {ok:false,error} on failure", async () => {
+    const reg = new ModuleRegistry();
+    const { exec } = makeGitFake({ cloneFails: true });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/clone", payload: { url: "git@github.com:me/dot.git" }, headers: { "content-type": "application/json" } });
+    const body = res.json() as { ok: boolean; error?: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatch(/destination path already exists/);
+    await server.close();
+  });
+
+  it("POST /api/clone 400 when url missing", async () => {
+    const reg = new ModuleRegistry();
+    const { exec } = makeGitFake();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/clone", payload: {}, headers: { "content-type": "application/json" } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
 });

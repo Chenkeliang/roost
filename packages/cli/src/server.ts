@@ -60,6 +60,7 @@ import {
   unadoptSkills,
   loadRoostSettings,
   saveRoostSettings,
+  cloneRepo,
 } from "@roost/core";
 import type { SkillTarget, SkillsConfig, SkillLink } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -651,6 +652,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     } catch (err) {
       return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
     }
+  });
+
+  // ── POST /api/clone ───────────────────────────────────────────────────────────
+  // Clone an existing config repo into the (boot-resolved) repoDir — the second-machine path.
+  server.post<{ Body: { url?: string } }>("/api/clone", async (req, reply) => {
+    cache.invalidateAll();
+    const url = req.body?.url?.trim();
+    if (!url) return reply.status(400).send({ error: "url is required" });
+    const exec = makeCtx(false).exec;
+    const result = await cloneRepo(exec, url, repoDir);
+    return reply.send(result);
   });
 
   // ── POST /api/git/remote ──────────────────────────────────────────────────────
