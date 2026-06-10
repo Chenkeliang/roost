@@ -8,6 +8,7 @@ import {
   GitBranch,
 } from "@phosphor-icons/react";
 import { Skeleton } from "../components/Skeleton";
+import { KeyBackupConfirm } from "../components/KeyBackupConfirm";
 import { useT } from "../i18n";
 import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, getSettings, saveSettings, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
 import { openExternal } from "../openExternal";
@@ -24,6 +25,7 @@ export function Settings() {
   const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null);
   const [keyBusy, setKeyBusy] = useState<"generate" | "rotate" | null>(null);
   const [keyResult, setKeyResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [keyBackup, setKeyBackup] = useState<{ recipient: string | null; keyPath: string } | null>(null);
   const [maxCaptureMB, setMaxCaptureMB] = useState(100);
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export function Settings() {
     try {
       const r = await generateKey();
       setKeyResult({ ok: true, text: r.created ? `Generated. Recipient: ${r.recipient}` : "Key already present." });
+      if (r.created) setKeyBackup({ recipient: r.recipient, keyPath: r.keyPath });
       const s = await getKey().catch(() => null);
       if (s) { setKeyStatus(s); setAgeKey(s.exists); }
     } catch (e) {
@@ -74,6 +77,7 @@ export function Settings() {
           ? { ok: true, text: `Rotated ${r.rotated.length} file(s). New recipient: ${r.recipient}. Old key backed up — RE-BACK UP the new key.` }
           : { ok: false, text: `Aborted — ${r.failed.length} file(s) failed to re-encrypt; the key was left unchanged.` },
       );
+      if (r.swapped) setKeyBackup({ recipient: r.recipient, keyPath: keyStatus?.keyPath ?? "" });
       const s = await getKey().catch(() => null);
       if (s) setKeyStatus(s);
     } catch (e) {
@@ -475,6 +479,14 @@ export function Settings() {
         ))}
       </div>
 
+      {keyBackup && (
+        <KeyBackupConfirm
+          recipient={keyBackup.recipient}
+          keyPath={keyBackup.keyPath}
+          t={t}
+          onConfirm={() => setKeyBackup(null)}
+        />
+      )}
     </div>
   );
 }

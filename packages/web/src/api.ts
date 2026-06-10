@@ -48,9 +48,12 @@ export interface CaptureResponse {
   changes: ChangeSet[];
 }
 
-// Server POST /api/load returns { results: ApplyResult[] }
+// Server POST /api/load returns { results: ApplyResult[] }, plus { blocked, blockers }
+// when a real apply is refused by the preflight hard-gate (ADR-0016 §5).
 export interface LoadResponse {
   results: ApplyResult[];
+  blocked?: boolean;
+  blockers?: { name: string; detail?: string }[];
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -406,6 +409,35 @@ export function gitPush(): Promise<GitOpResult> {
 
 export function gitPull(): Promise<GitOpResult> {
   return apiFetch<GitOpResult>("/api/git/pull", { method: "POST" });
+}
+
+// ── First-run onboarding (init / clone / set remote) ──────────────────────────
+export interface InitResult { created: string[]; isRepo: boolean; remote: string | null; }
+export interface CloneResult { ok: boolean; error?: string; }
+export interface RemoteResult { ok: boolean; remote: string; }
+
+export function postInit(remoteUrl?: string): Promise<InitResult> {
+  return apiFetch<InitResult>("/api/init", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(remoteUrl ? { remoteUrl } : {}),
+  });
+}
+
+export function postClone(url: string): Promise<CloneResult> {
+  return apiFetch<CloneResult>("/api/clone", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+}
+
+export function setGitRemote(url: string): Promise<RemoteResult> {
+  return apiFetch<RemoteResult>("/api/git/remote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
 }
 
 // ── Skills ─────────────────────────────────────────────────────────────────────

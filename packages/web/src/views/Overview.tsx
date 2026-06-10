@@ -13,13 +13,17 @@ import {
   getStatus,
   postCapture,
   getEnvironment,
+  getGitStatus,
   addSelection,
   removeSelection,
   type HealthResponse,
   type MachinesResponse,
   type StatusResponse,
   type BlockedItem,
+  type GitStatus,
 } from "../api";
+import { Onboarding } from "./onboarding/Onboarding";
+import { RemoteWarningBanner } from "../components/RemoteWarningBanner";
 
 interface OverviewProps {
   showHud: (msg: HudMessage) => void;
@@ -97,16 +101,18 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   const [blocked, setBlocked] = useState<string[]>([]);
   const [blockedDetail, setBlockedDetail] = useState<BlockedItem[]>([]);
   const [retrying, setRetrying] = useState(false);
+  const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoadingData(true);
     setError(null);
     try {
-      const [h, m, s, env] = await Promise.allSettled([
+      const [h, m, s, env, git] = await Promise.allSettled([
         getHealth(),
         getMachines(),
         getStatus(),
         getEnvironment(),
+        getGitStatus(),
       ]);
       if (h.status === "fulfilled") setHealth(h.value);
       if (m.status === "fulfilled") setMachines(m.value);
@@ -114,6 +120,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
       if (env.status === "fulfilled") {
         setMissingDeps(env.value.checks.filter((c) => c.required && !c.ok).map((c) => c.id));
       }
+      if (git.status === "fulfilled") setGitStatus(git.value);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -197,8 +204,15 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   }).length;
   const trackedCount = statusData?.reports.reduce((n, r) => n + (r.items?.length ?? 0), 0);
 
+  if (gitStatus && !gitStatus.isRepo) {
+    return <Onboarding t={t} showHud={showHud} onComplete={() => void fetchData()} onOpenSync={onOpenSync} />;
+  }
+
+  const noRemote = !!gitStatus?.isRepo && gitStatus.remote === null;
+
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
+      {noRemote && <RemoteWarningBanner t={t} onConfigured={() => void fetchData()} />}
       {missingDeps.length > 0 && (
         <div
           style={{

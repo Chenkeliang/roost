@@ -39,6 +39,29 @@ function makeFakeExec(): Exec {
   return { async run(): Promise<ExecResult> { return ok; } };
 }
 
+// A stateful git fake: tracks origin + repo state so init/remote round-trips are testable.
+function makeGitFake(opts?: { isRepo?: boolean; origin?: string; cloneFails?: boolean }): { exec: Exec; calls: string[][] } {
+  const calls: string[][] = [];
+  let origin: string | null = opts?.origin ?? null;
+  let isRepo = opts?.isRepo ?? false;
+  const exec: Exec = {
+    async run(cmd: string, args: string[]): Promise<ExecResult> {
+      calls.push([cmd, ...args]);
+      const a = args.join(" ");
+      if (cmd !== "git") return { code: 0, stdout: "", stderr: "" };
+      if (a.includes("rev-parse --is-inside-work-tree")) return { code: isRepo ? 0 : 1, stdout: isRepo ? "true" : "", stderr: "" };
+      if (a.includes("init -b main")) { isRepo = true; return { code: 0, stdout: "", stderr: "" }; }
+      if (a.includes("rev-parse --verify HEAD")) return { code: 0, stdout: "abc123", stderr: "" };
+      if (a.includes("remote get-url origin")) return origin ? { code: 0, stdout: origin, stderr: "" } : { code: 1, stdout: "", stderr: "no origin" };
+      if (a.includes("remote add origin")) { origin = args[args.length - 1] ?? null; return { code: 0, stdout: "", stderr: "" }; }
+      if (a.includes("remote set-url origin")) { origin = args[args.length - 1] ?? null; return { code: 0, stdout: "", stderr: "" }; }
+      if (a.startsWith("clone")) return opts?.cloneFails ? { code: 1, stdout: "", stderr: "fatal: destination path already exists" } : { code: 0, stdout: "", stderr: "" };
+      return { code: 0, stdout: "", stderr: "" };
+    },
+  };
+  return { exec, calls };
+}
+
 function makeCtx(repoDir: string, dryRun = false): ModuleContext {
   return {
     repoDir,
@@ -1342,6 +1365,46 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("POST /api/git/push → sets upstream on the first push when the branch has no upstream", async () => {
+    const calls: string[][] = [];
+    function makeNoUpstreamExec(): Exec {
+      return {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          calls.push([cmd, ...args]);
+          const a = args.join(" ");
+          // No upstream yet → @{u} resolution fails. This is the locale-independent
+          // signal (git's "no upstream branch" message is translated).
+          if (a.includes("symbolic-full-name @{u}")) return { code: 1, stdout: "", stderr: "no upstream" };
+          if (a.includes("rev-parse --abbrev-ref HEAD")) return { code: 0, stdout: "main", stderr: "" };
+          if (cmd === "git" && args.includes("push")) return { code: 0, stdout: "branch 'main' set up to track 'origin/main'.", stderr: "" };
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+    }
+    function makeNoUpstreamCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makeNoUpstreamExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeNoUpstreamCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/git/push" });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { ok: boolean }).ok).toBe(true);
+    // The first push must set the upstream: `git push -u origin main`.
+    expect(
+      calls.some((c) => c[0] === "git" && c.includes("push") && c.includes("-u") && c.includes("origin") && c.includes("main")),
+    ).toBe(true);
+    await server.close();
+  });
+
   it("POST /api/git/pull → ok:true on exit 0", async () => {
     function makePullExec(): Exec {
       return {
@@ -1867,5 +1930,81 @@ describe("POST /api/skills/catalog", () => {
       expect(res.statusCode).toBe(200);
       expect(loadSkillsTargets(r).find((t) => t.id === "myproj")?.path).toBe("work/.skills");
     } finally { fs.rmSync(r, { recursive: true, force: true }); }
+  });
+});
+
+describe("onboarding endpoints", () => {
+  it("POST /api/init scaffolds the repo and reports isRepo:true, remote:null when no url", async () => {
+    const reg = new ModuleRegistry();
+    const { exec } = makeGitFake();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/init", payload: {}, headers: { "content-type": "application/json" } });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { created: string[]; isRepo: boolean; remote: string | null };
+    expect(body.isRepo).toBe(true);
+    expect(body.remote).toBeNull();
+    expect(fs.existsSync(path.join(tmpDir, "roost", "selection.yaml"))).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/init with remoteUrl sets origin and echoes it back", async () => {
+    const reg = new ModuleRegistry();
+    const { exec, calls } = makeGitFake();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/init", payload: { remoteUrl: "git@github.com:me/dot.git" }, headers: { "content-type": "application/json" } });
+    const body = res.json() as { remote: string | null };
+    expect(body.remote).toBe("git@github.com:me/dot.git");
+    expect(calls.some((c) => c.join(" ").includes("remote add origin git@github.com:me/dot.git"))).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/git/remote sets origin and returns it", async () => {
+    const reg = new ModuleRegistry();
+    const { exec } = makeGitFake({ isRepo: true });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/git/remote", payload: { url: "git@github.com:me/dot.git" }, headers: { "content-type": "application/json" } });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { remote: string }).remote).toBe("git@github.com:me/dot.git");
+    await server.close();
+  });
+
+  it("POST /api/git/remote 400 when url missing", async () => {
+    const reg = new ModuleRegistry();
+    const { exec } = makeGitFake({ isRepo: true });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/git/remote", payload: {}, headers: { "content-type": "application/json" } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+
+  it("POST /api/clone returns {ok:true} on success", async () => {
+    const reg = new ModuleRegistry();
+    const { exec, calls } = makeGitFake();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/clone", payload: { url: "git@github.com:me/dot.git" }, headers: { "content-type": "application/json" } });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { ok: boolean }).ok).toBe(true);
+    expect(calls.some((c) => c[0] === "git" && c[1] === "clone")).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/clone surfaces {ok:false,error} on failure", async () => {
+    const reg = new ModuleRegistry();
+    const { exec } = makeGitFake({ cloneFails: true });
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/clone", payload: { url: "git@github.com:me/dot.git" }, headers: { "content-type": "application/json" } });
+    const body = res.json() as { ok: boolean; error?: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatch(/destination path already exists/);
+    await server.close();
+  });
+
+  it("POST /api/clone 400 when url missing", async () => {
+    const reg = new ModuleRegistry();
+    const { exec } = makeGitFake();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "POST", url: "/api/clone", payload: {}, headers: { "content-type": "application/json" } });
+    expect(res.statusCode).toBe(400);
+    await server.close();
   });
 });
