@@ -12,24 +12,26 @@ export function targetStatus(row: SkillRow, targetId: string): "linked" | "copy"
 }
 
 export type CoverageState = "covered" | "partial" | "conflict" | "disabled";
-export type Segment = "healthy" | "broken" | "conflict";
+export type Segment = "healthy" | "broken" | "conflict" | "off";
 export interface Coverage {
   state: CoverageState;
-  desired: number; // m
-  healthy: number; // n
+  total: number; // m — ALL catalog targets (denominator)
+  healthy: number; // n — enabled + linked (numerator, the green count)
   broken: number;
   conflict: number;
-  segments: Segment[]; // one per desired target, in effective.targets order
+  segments: Segment[]; // one per CATALOG target, in catalog order ("off" = not distributed there)
 }
 
-// Coverage by the DESIRED set (effective.targets). A skill intentionally scoped
-// to 2 tools reads 2/2 (covered), never 2/4.
-export function computeCoverage(row: SkillRow): Coverage {
-  const desired = row.effective.targets;
+// Coverage over ALL catalog targets: m = total tools, n = how many the skill is
+// healthily distributed to (the green count). A skill enabled for 2 of 4 tools
+// reads 2/4 with 4 dots (2 green, 2 off).
+export function computeCoverage(row: SkillRow, allTargetIds: string[]): Coverage {
   if (!row.effective.enabled) {
-    return { state: "disabled", desired: desired.length, healthy: 0, broken: 0, conflict: 0, segments: [] };
+    return { state: "disabled", total: allTargetIds.length, healthy: 0, broken: 0, conflict: 0, segments: [] };
   }
-  const segments: Segment[] = desired.map((id) => {
+  const enabled = new Set(row.effective.targets);
+  const segments: Segment[] = allTargetIds.map((id) => {
+    if (!enabled.has(id)) return "off"; // tool exists but skill isn't distributed there
     if (row.conflicts?.includes(id)) return "conflict";
     return row.links.some((l) => l.target === id) ? "healthy" : "broken";
   });
@@ -37,5 +39,5 @@ export function computeCoverage(row: SkillRow): Coverage {
   const conflict = segments.filter((s) => s === "conflict").length;
   const broken = segments.filter((s) => s === "broken").length;
   const state: CoverageState = conflict > 0 ? "conflict" : broken > 0 ? "partial" : "covered";
-  return { state, desired: desired.length, healthy, broken, conflict, segments };
+  return { state, total: allTargetIds.length, healthy, broken, conflict, segments };
 }

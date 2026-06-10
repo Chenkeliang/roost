@@ -19,10 +19,10 @@ function CoverageCell({ cov, method, onOpen, t }: { cov: Coverage; method: strin
   if (cov.state === "disabled") {
     return <span aria-label={t("skills.coverage.disabled")} style={{ color: "var(--muted)", fontSize: 13 }}>—</span>;
   }
-  // healthy = green (the on-ratio shows as the green portion), broken = amber, conflict = coral
-  const dotColor = (s: string) => (s === "conflict" ? "var(--accent)" : s === "broken" ? "#f0b352" : "var(--green)");
+  // one dot per catalog tool: healthy = green, broken = amber, conflict = coral, off = faint gray
+  const dotColor = (s: string) => (s === "conflict" ? "var(--accent)" : s === "broken" ? "#f0b352" : s === "off" ? "var(--muted)" : "var(--green)");
   return (
-    <button onClick={onOpen} style={{ ...ic, border: 0, background: "transparent", padding: "2px 4px", gap: 8 }} aria-label={`${t("skills.coverage.title")} ${cov.healthy}/${cov.desired}`}>
+    <button onClick={onOpen} style={{ ...ic, border: 0, background: "transparent", padding: "2px 4px", gap: 8 }} aria-label={`${t("skills.coverage.title")} ${cov.healthy}/${cov.total}`}>
       <span style={{ display: "inline-flex", gap: 3 }}>
         {cov.segments.map((s, i) => (
           <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: s === "healthy" ? "var(--green)" : "transparent", border: `1px solid ${dotColor(s)}` }} />
@@ -30,7 +30,7 @@ function CoverageCell({ cov, method, onOpen, t }: { cov: Coverage; method: strin
       </span>
       <span className="mono" style={{ fontSize: 13 }}>
         <span style={{ color: "var(--green)" }}>{cov.healthy}</span>
-        <span style={{ color: "var(--muted)" }}>/{cov.desired}</span>
+        <span style={{ color: "var(--muted)" }}>/{cov.total}</span>
       </span>
       <span style={{ color: "var(--muted)", fontSize: 12.5 }}>· {t(`skills.method.${method}`)}</span>
       {cov.state === "partial" && <span style={{ color: "#f0b352", fontSize: 12 }}>{cov.broken} {t("skills.coverage.broken")}</span>}
@@ -322,6 +322,7 @@ export function Skills() {
   }
 
   const { config, targets, skills } = view;
+  const targetIds = targets.map((tg) => tg.id);
   const newCands = (cands ?? []).filter((c) => !skills.some((s) => s.name === c.id));
 
   // Managed tab search filter
@@ -367,7 +368,7 @@ export function Skills() {
         ) : (
           <>
             {(() => {
-              const attention = skills.filter((s) => { const st = computeCoverage(s).state; return st === "partial" || st === "conflict"; }).length;
+              const attention = skills.filter((s) => { const st = computeCoverage(s, targetIds).state; return st === "partial" || st === "conflict"; }).length;
               return (
                 <div style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 8px" }}>
                   {skills.length} {t("skills.summary.managed")} ·{" "}
@@ -401,7 +402,7 @@ export function Skills() {
                         </span>
                       </td>
                       <td style={cellPad}>
-                        <CoverageCell cov={computeCoverage(row)} method={row.effective.method} onOpen={() => setPopover(row.name)} t={t} />
+                        <CoverageCell cov={computeCoverage(row, targetIds)} method={row.effective.method} onOpen={() => setPopover(row.name)} t={t} />
                       </td>
                       <td style={cellPad}>
                         <RowMenu row={row} busy={busy} t={t}

@@ -210,7 +210,7 @@ describe("Skills view", () => {
     vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
     vi.mocked(api.toggleSkill).mockResolvedValue({ ok: true, config: {} as never });
     render(<Skills />);
-    (await screen.findByRole("button", { name: /Coverage 1\/1/i })).click();
+    (await screen.findByRole("button", { name: /Coverage 1\/2/i })).click();
     const dialog = await screen.findByRole("dialog");
     // Codex is a catalog target but NOT in alpha's desired set → toggling it ON
     within(dialog).getByRole("switch", { name: /Codex/ }).click();
