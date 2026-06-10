@@ -491,6 +491,14 @@ export function saveSkillsConfig(config: SkillsConfig): Promise<{ ok: boolean }>
   });
 }
 
+export function saveSkillsTargets(targets: SkillTarget[]): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/api/skills/catalog", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targets }),
+  });
+}
+
 // ── Roost settings ───────────────────────────────────────────────────────────
 export function getSettings(): Promise<{ maxCaptureMB: number }> { return apiFetch("/api/settings"); }
 export function saveSettings(maxCaptureMB: number): Promise<{ ok: boolean; maxCaptureMB: number }> {
