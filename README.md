@@ -80,7 +80,7 @@ node packages/cli/dist/index.js doctor     # 之后:roost doctor
 
 ### 文档
 
-完整文档(中英双语)在 **https://chenkeliang.github.io/roost/**。 本地预览:
+完整文档(中英双语)在 ** https://chenkeliang.github.io/roost/ **。 本地预览:
 
 ```bash
 pnpm --dir website install
