@@ -388,3 +388,30 @@ describe("resolveSkillConflict (back up & take over)", () => {
     expect(fs.readFileSync(path.join(dest, "SKILL.md"), "utf8")).toBe("# roost-managed copy");
   });
 });
+
+describe("unadoptSkills (forget, keep local)", () => {
+  it("removes repo + config + link records but leaves source and links on disk", async () => {
+    // managed: repo content + a config entry + a recorded IDE link
+    mkSkill(path.join(repo, "skills"), "ua1", "# x");
+    mkSkill(path.join(home, ".agents", "skills"), "ua1", "# x");        // live source
+    const ideDir = path.join(home, ".claude", "skills");
+    fs.mkdirSync(ideDir, { recursive: true });
+    fs.symlinkSync(path.join(home, ".agents", "skills", "ua1"), path.join(ideDir, "ua1"));
+    saveSkillsConfig(repo, { sourceDir: "~/.agents/skills", method: "symlink", targets: ["claude"], skills: { ua1: { enabled: true } } });
+    saveSkillLinks(repo, [{ skill: "ua1", target: "claude", path: path.join(ideDir, "ua1"), kind: "symlink" }]);
+
+    const removed = unadoptSkills(ctx(), ["ua1"]);
+    expect(removed).toEqual(["ua1"]);
+    expect(fs.existsSync(path.join(repo, "skills", "ua1"))).toBe(false);          // forgotten in repo
+    expect(loadSkillsConfig(repo).skills.ua1).toBeUndefined();                    // config entry gone
+    expect(loadSkillLinks(repo).find((l) => l.skill === "ua1")).toBeUndefined();  // link record gone
+    expect(fs.existsSync(path.join(home, ".agents", "skills", "ua1", "SKILL.md"))).toBe(true); // source kept
+    expect(fs.existsSync(path.join(ideDir, "ua1"))).toBe(true);                   // on-disk link kept
+  });
+
+  it("dry-run makes no changes", async () => {
+    mkSkill(path.join(repo, "skills"), "ua2", "# x");
+    unadoptSkills({ ...ctx(), dryRun: true }, ["ua2"]);
+    expect(fs.existsSync(path.join(repo, "skills", "ua2"))).toBe(true);
+  });
+});

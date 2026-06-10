@@ -6,7 +6,7 @@ import type {
   DriftReport, DriftItem, ChangeSet, ApplyPlan, ApplyResult, Health, ModuleIndex, BlockedItem,
 } from "@roost/shared";
 import { loadSkillsTargets } from "../skills-catalog.js";
-import { loadSkillsConfig, loadSkillLinks, saveSkillLinks, effectiveSkill } from "../skills-config.js";
+import { loadSkillsConfig, saveSkillsConfig, loadSkillLinks, saveSkillLinks, effectiveSkill } from "../skills-config.js";
 import type { SkillLink } from "../skills-config.js";
 import { scanPathForSecrets } from "./dotfiles.js"; // reuse bounded content scanner
 
@@ -115,6 +115,27 @@ export function materializeSource(ctx: ModuleContext, names: string[]): string[]
     materializeOne(ctx, sourceRoot, repoDirSkills, name);
     done.push(name);
   }
+  return done;
+}
+
+// "Forget" skills: drop <repo>/skills/<name>, the skills.yaml entry, and the
+// per-machine link records — WITHOUT deleting the user's source dir or on-disk
+// links. Fully reversible (the skill becomes a Discover candidate again).
+export function unadoptSkills(ctx: ModuleContext, names: string[]): string[] {
+  const cfg = loadSkillsConfig(ctx.repoDir);
+  let links = loadSkillLinks(ctx.repoDir);
+  const set = new Set(names);
+  const done: string[] = [];
+  let changed = false;
+  for (const name of names) {
+    if (!ctx.dryRun) fs.rmSync(path.join(repoSkillsDir(ctx), name), { recursive: true, force: true });
+    if (cfg.skills[name]) { delete cfg.skills[name]; changed = true; }
+    done.push(name);
+  }
+  const before = links.length;
+  links = links.filter((l) => !set.has(l.skill));
+  if (links.length !== before) changed = true;
+  if (!ctx.dryRun && changed) { saveSkillsConfig(ctx.repoDir, cfg); saveSkillLinks(ctx.repoDir, links); }
   return done;
 }
 
