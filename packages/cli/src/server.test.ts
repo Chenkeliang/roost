@@ -15,7 +15,7 @@ import type {
   Candidate,
   ApplyPlan,
 } from "@roost/shared";
-import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule } from "@roost/core";
+import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule, loadSkillsTargets } from "@roost/core";
 import { buildServer, computeConflicts, classifyGitError } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
@@ -1849,5 +1849,23 @@ describe("POST /api/skills/capture (adopt + decouple)", () => {
       fs.rmSync(aHome, { recursive: true, force: true });
       fs.rmSync(aRepo, { recursive: true, force: true });
     }
+  });
+});
+
+describe("POST /api/skills/catalog", () => {
+  it("saves custom targets that loadSkillsTargets then returns", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(skillsModule);
+    const r = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cat-ep-"));
+    try {
+      const server = buildServer({ repoDir: r, registry: reg, makeCtx: (d) => makeCtx(r, d) });
+      const targets = [
+        { id: "claude", path: ".claude/skills", label: "Claude Code" },
+        { id: "myproj", path: "work/.skills", label: "My Proj" },
+      ];
+      const res = await server.inject({ method: "POST", url: "/api/skills/catalog", payload: { targets } });
+      expect(res.statusCode).toBe(200);
+      expect(loadSkillsTargets(r).find((t) => t.id === "myproj")?.path).toBe("work/.skills");
+    } finally { fs.rmSync(r, { recursive: true, force: true }); }
   });
 });

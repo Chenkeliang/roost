@@ -51,6 +51,7 @@ import {
   loadSkillsConfig,
   saveSkillsConfig,
   loadSkillsTargets,
+  saveSkillsTargets,
   effectiveSkill,
   loadSkillLinks,
   resolveSkillConflict,
@@ -1045,6 +1046,14 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.send({ ok: true });
     },
   );
+
+  // ── POST /api/skills/catalog (custom targets) ────────────────────────────────
+  server.post<{ Body: { targets?: SkillTarget[] } }>("/api/skills/catalog", async (req, reply) => {
+    const targets = req.body?.targets ?? [];
+    saveSkillsTargets(repoDir, targets);
+    cache.invalidateAll();
+    return reply.send({ ok: true });
+  });
 
   // ── /api/settings ─────────────────────────────────────────────────────────────
   server.get("/api/settings", async (_req, reply) => reply.send(loadRoostSettings(repoDir)));
