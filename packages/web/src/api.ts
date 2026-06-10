@@ -426,12 +426,33 @@ export function getSkills(): Promise<SkillsView> {
   return apiFetch<SkillsView>("/api/skills");
 }
 
-export function discoverSkills(): Promise<{ candidates: { id: string; note?: string }[] }> {
-  return apiFetch<{ candidates: { id: string; note?: string }[] }>("/api/skills/discover");
+export interface CandidateOrigin {
+  location: string;
+  linked: boolean;
+  needsRepair?: boolean;
+  conflictLocations?: string[];
 }
-
-export function captureSkills(names: string[]): Promise<{ written: string[]; blocked?: string[] }> {
-  return apiFetch<{ written: string[]; blocked?: string[] }>("/api/skills/capture", {
+export interface SkillCandidate {
+  id: string;
+  note?: string;
+  sizeBytes?: number;
+  origin?: CandidateOrigin;
+}
+export function discoverSkills(): Promise<{ candidates: SkillCandidate[] }> {
+  return apiFetch<{ candidates: SkillCandidate[] }>("/api/skills/discover");
+}
+export function adoptSkills(
+  names: string[],
+  opts?: { decouple?: boolean; from?: Record<string, string> },
+): Promise<{ written: string[]; blocked?: string[]; blockedDetail?: { id: string; reason: string; detail?: string }[]; materialized: string[] }> {
+  return apiFetch("/api/skills/capture", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ names, decouple: opts?.decouple ?? true, from: opts?.from }),
+  });
+}
+export function unadoptSkills(names: string[]): Promise<{ ok: boolean; removed: string[] }> {
+  return apiFetch("/api/skills/unadopt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ names }),
