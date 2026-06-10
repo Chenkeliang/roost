@@ -86,6 +86,8 @@ function RowMenu({ row, busy, t, onRemove, onMethod, onToggleEnabled }: {
   onRemove: () => void; onMethod: (m: SkillMethod) => void; onToggleEnabled: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  // solid, elevated menu item (no transparency — readable over the list)
+  const mi: React.CSSProperties = { background: "transparent", border: 0, width: "100%", textAlign: "left", justifyContent: "flex-start", display: "flex", alignItems: "center", color: "var(--text)", fontFamily: "var(--font)", fontSize: 13, padding: "7px 9px", borderRadius: 6, cursor: "pointer" };
   return (
     <span style={{ position: "relative", display: "inline-block" }}>
       <button aria-label={`actions ${row.name}`} aria-haspopup="menu" aria-expanded={open} disabled={busy} onClick={() => setOpen((o) => !o)} style={{ ...ic, border: 0, background: "transparent", padding: "4px 6px" }}>
@@ -94,14 +96,14 @@ function RowMenu({ row, busy, t, onRemove, onMethod, onToggleEnabled }: {
       {open && (
         <>
           <span aria-hidden="true" onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-          <div role="menu" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} style={{ position: "absolute", right: 0, top: "100%", zIndex: 91, ...card, minWidth: 160, padding: 4 }}>
-            <button role="menuitem" onClick={() => { setOpen(false); onToggleEnabled(); }} style={{ ...ic, border: 0, width: "100%", justifyContent: "flex-start" }}>
+          <div role="menu" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} style={{ position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 91, background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, minWidth: 168, padding: 4, boxShadow: "0 14px 30px -12px rgba(0,0,0,.6)" }}>
+            <button role="menuitem" onClick={() => { setOpen(false); onToggleEnabled(); }} style={mi}>
               {row.effective.enabled ? t("skills.menu.disable") : t("skills.menu.enable")}
             </button>
-            <button role="menuitem" onClick={() => { setOpen(false); onMethod(row.effective.method === "symlink" ? "copy" : "symlink"); }} style={{ ...ic, border: 0, width: "100%", justifyContent: "flex-start" }}>
+            <button role="menuitem" onClick={() => { setOpen(false); onMethod(row.effective.method === "symlink" ? "copy" : "symlink"); }} style={mi}>
               {row.effective.method === "symlink" ? t("skills.menu.method") : t("skills.menu.methodSymlink")}
             </button>
-            <button role="menuitem" onClick={() => { setOpen(false); onRemove(); }} style={{ ...ic, border: 0, width: "100%", justifyContent: "flex-start", color: "var(--accent)" }}>
+            <button role="menuitem" onClick={() => { setOpen(false); onRemove(); }} style={{ ...mi, color: "var(--accent)" }}>
               {t("skills.adopt.remove")}
             </button>
           </div>
@@ -342,9 +344,6 @@ export function Skills() {
           {t(`skills.method.${config.method}`)} · {config.targets.join(", ") || "—"}
         </span>
         <button onClick={() => setShowTargets(true)} style={{ ...ic, marginLeft: "auto" }}>{t("skills.targets.manage")}</button>
-        <button onClick={() => void onApplyLinks()} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
-          <LinkIcon size={14} />{t("skills.link")}
-        </button>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -359,6 +358,9 @@ export function Skills() {
         <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
           {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
           {scanning ? t("dotfiles.scanning") : t("common.discoveredTab")}
+        </button>
+        <button onClick={() => void onApplyLinks()} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
+          <LinkIcon size={14} />{t("skills.link")}
         </button>
       </div>
 
