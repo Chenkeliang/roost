@@ -88,7 +88,7 @@ function removeOwnedLink(ctx: ModuleContext, link: SkillLink): boolean {
 // by the generic capture/status path (so the orchestrator can pass names), but it
 // is intentionally not the truth here; do NOT wire skills into select/Manage —
 // that would create a competing truth source.
-export const skillsModule: SyncModule = {
+export const skillsModule = {
   name: "skills",
 
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
@@ -123,14 +123,18 @@ export const skillsModule: SyncModule = {
     return { available: true, managed };
   },
 
-  async capture(ctx: ModuleContext, sel: Selection): Promise<ChangeSet> {
+  async capture(ctx: ModuleContext, sel: Selection, opts?: { from?: Record<string, string> }): Promise<ChangeSet> {
     const names = sel.modules.skills ?? [];
     const written: string[] = [];
     const blocked: string[] = [];
     const blockedDetail: BlockedItem[] = [];
     for (const name of names) {
-      // find the first source root that has this skill
-      const root = scanRoots(ctx).map((r) => path.join(r.dir, name)).find((p) => fs.existsSync(p));
+      // prefer a user-chosen source dir (conflict picker), else first scan root that has it
+      const chosen = opts?.from?.[name];
+      const chosenPath = chosen ? path.join(expandHome(ctx.home, chosen), name) : undefined;
+      const root = chosenPath && fs.existsSync(chosenPath)
+        ? chosenPath
+        : scanRoots(ctx).map((r) => path.join(r.dir, name)).find((p) => fs.existsSync(p));
       if (!root) { blocked.push(name); blockedDetail.push({ id: name, reason: "error", detail: "not found" }); continue; }
       const scan = scanPathForSecrets(root);
       if (scan.tooLarge) {
@@ -140,17 +144,17 @@ export const skillsModule: SyncModule = {
         continue;
       }
       if (scan.secretFiles.length > 0) {
-        ctx.log.warn(
-          `skills capture: skill "${name}" contains potential secrets — skipped. Rotate any exposed credentials.`,
-        );
+        ctx.log.warn(`skills capture: skill "${name}" contains potential secrets — skipped. Rotate any exposed credentials.`);
         blocked.push(name);
         blockedDetail.push({ id: name, reason: "secret", detail: `${scan.secretFiles.length} file(s)` });
         continue; // I6 hard gate
       }
+      // dereference a top-level symlink so REAL content lands in the repo (inner symlinks preserved)
+      const realRoot = fs.lstatSync(root).isSymbolicLink() ? fs.realpathSync(root) : root;
       const dest = path.join(repoSkillsDir(ctx), name);
       if (!ctx.dryRun) {
         fs.rmSync(dest, { recursive: true, force: true });
-        fs.cpSync(root, dest, { recursive: true });
+        fs.cpSync(realRoot, dest, { recursive: true });
       }
       written.push(name);
     }
@@ -273,7 +277,7 @@ export const skillsModule: SyncModule = {
     }
     return out;
   },
-};
+} satisfies SyncModule;
 
 // Resolve a conflict by "back up & take over": MOVE the user's real dir at the
 // target to ~/.roost-backups, then link/copy the canonical source into place.

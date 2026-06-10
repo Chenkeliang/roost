@@ -220,6 +220,39 @@ describe("skills delete-safety", () => {
   });
 });
 
+describe("capture dereferences symlinked sources (adopt)", () => {
+  it("captures real content (not a symlink) when source is a symlink, preserving the target", () => {
+    // real content lives outside the source dir (mimics ~/.cc-switch/skills/X)
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext-"));
+    mkSkill(external, "tool-skill", "# real body");
+    const srcDir = path.join(home, ".agents", "skills");
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.symlinkSync(path.join(external, "tool-skill"), path.join(srcDir, "tool-skill"));
+
+    const cs = skillsModuleSync().capture(ctx(), sel(["tool-skill"]));
+    return Promise.resolve(cs).then((r) => {
+      expect(r.written).toContain("tool-skill");
+      const repoEntry = path.join(repo, "skills", "tool-skill");
+      expect(fs.lstatSync(repoEntry).isSymbolicLink()).toBe(false); // real dir, not a symlink
+      expect(fs.readFileSync(path.join(repoEntry, "SKILL.md"), "utf8")).toBe("# real body");
+      // the external target is untouched
+      expect(fs.existsSync(path.join(external, "tool-skill", "SKILL.md"))).toBe(true);
+      fs.rmSync(external, { recursive: true, force: true });
+    });
+  });
+
+  it("honors opts.from to pick a specific source directory", async () => {
+    mkSkill(path.join(home, ".agents", "skills"), "dup", "# from source");
+    mkSkill(path.join(home, ".claude", "skills"), "dup", "# from claude");
+    const cs = await skillsModule.capture(ctx(), sel(["dup"]), { from: { dup: "~/.claude/skills" } });
+    expect(cs.written).toContain("dup");
+    expect(fs.readFileSync(path.join(repo, "skills", "dup", "SKILL.md"), "utf8")).toBe("# from claude");
+  });
+});
+
+// helper used above (capture is the same object; this just documents intent)
+function skillsModuleSync() { return skillsModule; }
+
 describe("resolveSkillConflict (back up & take over)", () => {
   function setupConflict(method: "symlink" | "copy" = "symlink") {
     mkSkill(path.join(repo, "skills"), "foo", "# canonical foo");
