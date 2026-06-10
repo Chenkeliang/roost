@@ -23,7 +23,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function Setup({ onOpenSettings }: { onOpenSettings?: () => void } = {}) {
+export function Setup({ onOpenSettings, embedded, onReady }: { onOpenSettings?: () => void; embedded?: boolean; onReady?: (ready: boolean) => void } = {}) {
   const { t } = useT();
   const [checks, setChecks] = useState<EnvCheck[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,9 +35,10 @@ export function Setup({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       .then((d) => {
         setChecks(d.checks);
         setError(null);
+        onReady?.(d.checks.every((c) => !c.required || c.ok));
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, []);
+  }, [onReady]);
 
   useEffect(() => {
     refresh();
@@ -64,9 +65,11 @@ export function Setup({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-      <div style={{ fontSize: 12.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, marginBottom: 14 }}>
-        {t("setup.title")}
-      </div>
+      {!embedded && (
+        <div style={{ fontSize: 12.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, marginBottom: 14 }}>
+          {t("setup.title")}
+        </div>
+      )}
 
       {error ? (
         <div role="alert" style={{ padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", color: "#ff8c8c", fontSize: 14, marginBottom: 12 }}>
