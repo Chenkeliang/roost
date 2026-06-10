@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { ModuleContext, Selection } from "@roost/shared";
-import { skillsModule, hashSkillDir, resolveSkillConflict } from "./skills.js";
+import { skillsModule, hashSkillDir, resolveSkillConflict, materializeSource, unadoptSkills } from "./skills.js";
 import { loadSkillLinks } from "../skills-config.js";
 
 let home: string, repo: string;
@@ -113,7 +113,7 @@ describe("skills hardening", () => {
 });
 
 import { skillsModule as M } from "./skills.js";
-import { saveSkillsConfig, loadSkillLinks as loadLinks, DEFAULT_SKILLS_CONFIG, saveSkillLinks } from "../skills-config.js";
+import { saveSkillsConfig, loadSkillsConfig, loadSkillLinks as loadLinks, DEFAULT_SKILLS_CONFIG, saveSkillLinks } from "../skills-config.js";
 
 function plan() { return { module: "skills", actions: [] as never[] }; }
 
@@ -299,6 +299,32 @@ describe("discover classifies by real directory (origin)", () => {
     mkSkill(path.join(home, ".claude", "skills"), "dup2", "# B");
     const c = (await skillsModule.discover(ctx())).find((x) => x.id === "dup2")!;
     expect((c.origin?.conflictLocations ?? []).length).toBe(2);
+  });
+});
+
+describe("materializeSource (decouple)", () => {
+  it("replaces a symlinked source with the repo's real content", async () => {
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext3-"));
+    mkSkill(external, "dec1", "# real");
+    const srcDir = path.join(home, ".agents", "skills");
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.symlinkSync(path.join(external, "dec1"), path.join(srcDir, "dec1"));
+    // repo already has the real content (post-capture)
+    mkSkill(path.join(repo, "skills"), "dec1", "# real");
+
+    const done = materializeSource(ctx(), ["dec1"]);
+    expect(done).toEqual(["dec1"]);
+    const srcEntry = path.join(srcDir, "dec1");
+    expect(fs.lstatSync(srcEntry).isSymbolicLink()).toBe(false); // now a real dir
+    expect(fs.readFileSync(path.join(srcEntry, "SKILL.md"), "utf8")).toBe("# real");
+    fs.rmSync(external, { recursive: true, force: true });
+  });
+
+  it("dry-run makes no changes", async () => {
+    mkSkill(path.join(repo, "skills"), "dec2", "# x");
+    const dctx = { ...ctx(), dryRun: true };
+    materializeSource(dctx, ["dec2"]);
+    expect(fs.existsSync(path.join(home, ".agents", "skills", "dec2"))).toBe(false);
   });
 });
 

@@ -94,6 +94,30 @@ function removeOwnedLink(ctx: ModuleContext, link: SkillLink): boolean {
 // by the generic capture/status path (so the orchestrator can pass names), but it
 // is intentionally not the truth here; do NOT wire skills into select/Manage —
 // that would create a competing truth source.
+function materializeOne(ctx: ModuleContext, sourceRoot: string, repoDirSkills: string, name: string): void {
+  const src = path.join(sourceRoot, name);
+  if (ctx.dryRun) return;
+  fs.mkdirSync(sourceRoot, { recursive: true });
+  fs.rmSync(src, { recursive: true, force: true }); // removes only the symlink/dir here, never its target
+  fs.cpSync(path.join(repoDirSkills, name), src, { recursive: true });
+}
+
+// Materialize repo content into the canonical source dir, replacing any symlink
+// (decouples a skill from whatever tool the symlink pointed at). Skips names with
+// no repo content. Returns the names actually materialized.
+export function materializeSource(ctx: ModuleContext, names: string[]): string[] {
+  const cfg = loadSkillsConfig(ctx.repoDir);
+  const sourceRoot = expandHome(ctx.home, cfg.sourceDir);
+  const repoDirSkills = repoSkillsDir(ctx);
+  const done: string[] = [];
+  for (const name of names) {
+    if (!fs.existsSync(path.join(repoDirSkills, name))) continue;
+    materializeOne(ctx, sourceRoot, repoDirSkills, name);
+    done.push(name);
+  }
+  return done;
+}
+
 export const skillsModule = {
   name: "skills",
 
@@ -259,11 +283,7 @@ export const skillsModule = {
     for (const name of managed) {
       // 1) materialize repo -> sourceDir
       const src = path.join(sourceRoot, name);
-      if (!ctx.dryRun) {
-        fs.mkdirSync(sourceRoot, { recursive: true });
-        fs.rmSync(src, { recursive: true, force: true });
-        fs.cpSync(path.join(repoDirSkills, name), src, { recursive: true });
-      }
+      materializeOne(ctx, sourceRoot, repoDirSkills, name);
       const eff = effectiveSkill(cfg, name);
       if (!eff.enabled) continue;
       // 2) distribute to each enabled target
