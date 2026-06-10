@@ -408,6 +408,35 @@ export function gitPull(): Promise<GitOpResult> {
   return apiFetch<GitOpResult>("/api/git/pull", { method: "POST" });
 }
 
+// ── First-run onboarding (init / clone / set remote) ──────────────────────────
+export interface InitResult { created: string[]; isRepo: boolean; remote: string | null; }
+export interface CloneResult { ok: boolean; error?: string; }
+export interface RemoteResult { ok: boolean; remote: string; }
+
+export function postInit(remoteUrl?: string): Promise<InitResult> {
+  return apiFetch<InitResult>("/api/init", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(remoteUrl ? { remoteUrl } : {}),
+  });
+}
+
+export function postClone(url: string): Promise<CloneResult> {
+  return apiFetch<CloneResult>("/api/clone", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+}
+
+export function setGitRemote(url: string): Promise<RemoteResult> {
+  return apiFetch<RemoteResult>("/api/git/remote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+}
+
 // ── Skills ─────────────────────────────────────────────────────────────────────
 export type SkillMethod = "symlink" | "copy";
 export interface SkillTarget { id: string; path: string; label: string; }
