@@ -283,6 +283,103 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     zh: "无匹配项。换个搜索词或筛选标签试试。",
   },
 
+  // chip labels
+  "env.chip.all": { en: "All", zh: "全部" },
+  "env.chip.alias": { en: "Aliases", zh: "别名" },
+  "env.chip.env": { en: "Env", zh: "环境变量" },
+  "env.chip.path": { en: "PATH", zh: "PATH" },
+  "env.chip.function": { en: "Functions", zh: "函数" },
+
+  // search
+  "env.searchPlaceholder": { en: "Search aliases, env, PATH, functions…", zh: "搜索别名、环境变量、PATH、函数…" },
+  "env.searchAriaLabel": { en: "Search aliases, env, PATH, functions", zh: "搜索别名、环境变量、PATH、函数" },
+
+  // add button (per kind)
+  "env.add.alias": { en: "Add alias", zh: "添加别名" },
+  "env.add.env": { en: "Add env", zh: "添加环境变量" },
+  "env.add.path": { en: "Add PATH", zh: "添加 PATH" },
+  "env.add.function": { en: "Add function", zh: "添加函数" },
+
+  // unsaved badge
+  "env.unsaved": { en: "Unsaved", zh: "未保存" },
+
+  // result count pieces
+  "env.count.of": { en: "of", zh: "共" },
+  "env.count.items": { en: "items", zh: "项" },
+  "env.count.item": { en: "item", zh: "项" },
+  "env.count.matching": { en: "matching", zh: "匹配" },
+
+  // error / retry
+  "env.loadError": { en: "Could not load env data.", zh: "无法加载环境数据。" },
+  "env.retry": { en: "retry", zh: "重试" },
+
+  // apply button title
+  "env.applyTitle": { en: "Regenerate ~/.config/roost/env.sh so changes take effect", zh: "重新生成 ~/.config/roost/env.sh 以使改动生效" },
+
+  // HUD / toast messages
+  "env.hud.saved": { en: "Saved aliases & env", zh: "别名与环境变量已保存" },
+  "env.hud.saveFailed": { en: "Save failed", zh: "保存失败" },
+  "env.hud.applied": { en: "Applied to this machine", zh: "已应用到本机" },
+  "env.hud.applyFailed": { en: "Apply failed", zh: "应用失败" },
+  "env.hud.scanFailed": { en: "Could not scan shell", zh: "无法扫描 shell" },
+
+  // import picker
+  "env.import.title": { en: "Import from your shell", zh: "从你的 shell 导入" },
+  "env.import.description": {
+    en: "Best-effort scan of simple top-level alias / export lines in your rc files. Values aren't copied — fill them in after importing.",
+    zh: "尽力扫描 rc 文件中简单的顶层 alias / export 行。值不会复制 —— 导入后再填写。",
+  },
+  "env.import.empty": { en: "Nothing importable found in your shell rc files.", zh: "在你的 shell rc 文件中未找到可导入的内容。" },
+  "env.import.cancel": { en: "Cancel", zh: "取消" },
+  "env.import.button": { en: "Import", zh: "导入" },
+
+  // EnvEditor: secret source options
+  "env.source.age": { en: "Encrypted (age)", zh: "加密（age）" },
+  "env.source.op": { en: "1Password reference", zh: "1Password 引用" },
+  "env.source.rbw": { en: "rbw reference", zh: "rbw 引用" },
+
+  // EnvEditor: lock badge / password hint
+  "env.badge.encrypted": { en: "encrypted", zh: "已加密" },
+  "env.field.reencryptPlaceholder": { en: "enter new value to re-encrypt", zh: "输入新值以重新加密" },
+  "env.secret.hint.age": {
+    en: "Secret value is never stored in the repo or shown here — encrypted with your age key.",
+    zh: "密钥值从不存入仓库或在此显示 —— 已用你的 age 密钥加密。",
+  },
+  "env.secret.hint.ref": {
+    en: "Secret value is never stored in the repo or shown here — resolved from your password manager on apply.",
+    zh: "密钥值从不存入仓库或在此显示 —— 应用时从你的密码管理器解析。",
+  },
+
+  // PathEditor: position options + hint
+  "env.path.prepend": { en: "prepend", zh: "前置" },
+  "env.path.append": { en: "append", zh: "追加" },
+  "env.path.hint": {
+    en: "PATH order matters — earlier prepend entries win. Order is preserved across Macs.",
+    zh: "PATH 顺序很重要 —— 越靠前的 prepend 条目优先级越高。顺序在各 Mac 间保持一致。",
+  },
+
+  // FunctionEditor: hint
+  "env.function.hint": { en: "Function bodies are stored verbatim and run as-is.", zh: "函数体原样存储并直接执行。" },
+
+  // Field micro-labels
+  "env.field.name": { en: "name", zh: "名称" },
+  "env.field.value": { en: "value", zh: "值" },
+  "env.field.secret": { en: "secret", zh: "密钥" },
+  "env.field.source": { en: "source", zh: "来源" },
+  "env.field.reference": { en: "reference", zh: "引用" },
+  "env.field.path": { en: "path", zh: "路径" },
+  "env.field.position": { en: "position", zh: "位置" },
+  "env.field.order": { en: "order", zh: "顺序" },
+  "env.field.body": { en: "body", zh: "函数体" },
+
+  // ── Shared action / filter labels ────────────────────────────────────────────
+  "common.add": { en: "Add", zh: "添加" },
+  "common.save": { en: "Save", zh: "保存" },
+  "common.test": { en: "Test", zh: "测试" },
+  "common.noRemote": { en: "no remote", zh: "无远端" },
+  "common.filterDomains": { en: "Filter domains…", zh: "过滤域名…" },
+  "common.filterDotfiles": { en: "Filter dotfiles…", zh: "过滤 dotfiles…" },
+
   // ── Drift ─────────────────────────────────────────────────────────────────
   "drift.heading": { en: "Drift Overview", zh: "偏移总览" },
   "drift.noDriftTitle": { en: "No drift detected", zh: "未检测到偏移" },

@@ -33,12 +33,13 @@ interface AliasesEnvProps {
 type ItemKind = "alias" | "env" | "path" | "function";
 type ChipKind = "all" | ItemKind;
 
-const CHIPS: { id: ChipKind; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "alias", label: "Aliases" },
-  { id: "env", label: "Env" },
-  { id: "path", label: "PATH" },
-  { id: "function", label: "Functions" },
+// CHIPS carries i18n keys; labels are resolved at render time via t().
+const CHIPS: { id: ChipKind; labelKey: string }[] = [
+  { id: "all", labelKey: "env.chip.all" },
+  { id: "alias", labelKey: "env.chip.alias" },
+  { id: "env", labelKey: "env.chip.env" },
+  { id: "path", labelKey: "env.chip.path" },
+  { id: "function", labelKey: "env.chip.function" },
 ];
 
 // A flat reference into one of EnvData's four arrays. The unified list renders
@@ -208,13 +209,15 @@ function haystack(kind: ItemKind, item: AliasItem | EnvVarItem | PathEntry | Fun
 function AliasEditor({
   item,
   onChange,
+  t,
 }: {
   item: AliasItem;
   onChange: (next: Partial<AliasItem>) => void;
+  t: (key: string) => string;
 }) {
   return (
     <div style={editorGridStyle}>
-      <Field label="name" width={200}>
+      <Field label={t("env.field.name")} width={200}>
         <input
           aria-label={`alias name ${item.name}`}
           value={item.name}
@@ -222,7 +225,7 @@ function AliasEditor({
           style={inputStyle}
         />
       </Field>
-      <Field label="value" flex>
+      <Field label={t("env.field.value")} flex>
         <input
           aria-label={`alias value ${item.name}`}
           value={item.value}
@@ -237,9 +240,11 @@ function AliasEditor({
 function EnvEditor({
   item,
   onChange,
+  t,
 }: {
   item: EnvVarItem;
   onChange: (next: Partial<EnvVarItem>) => void;
+  t: (key: string) => string;
 }) {
   const sel = sourceSel(item);
   const isRef = item.secret && sel !== "age";
@@ -250,7 +255,7 @@ function EnvEditor({
   return (
     <div>
       <div style={editorGridStyle}>
-        <Field label="name" width={200}>
+        <Field label={t("env.field.name")} width={200}>
           <input
             aria-label={`env name ${item.name}`}
             value={item.name}
@@ -258,7 +263,7 @@ function EnvEditor({
             style={inputStyle}
           />
         </Field>
-        <Field label="secret">
+        <Field label={t("env.field.secret")}>
           <span style={{ display: "inline-flex", alignItems: "center", height: 24 }}>
             <Toggle
               on={item.secret}
@@ -269,7 +274,7 @@ function EnvEditor({
           </span>
         </Field>
         {item.secret && (
-          <Field label="source">
+          <Field label={t("env.field.source")}>
             <select
               aria-label={`env source ${item.name}`}
               value={sel}
@@ -278,14 +283,14 @@ function EnvEditor({
               }
               style={{ ...inputStyle, fontFamily: "var(--font)", cursor: "pointer" }}
             >
-              <option value="age">Encrypted (age)</option>
-              <option value="ref:op">1Password reference</option>
-              <option value="ref:rbw">rbw reference</option>
+              <option value="age">{t("env.source.age")}</option>
+              <option value="ref:op">{t("env.source.op")}</option>
+              <option value="ref:rbw">{t("env.source.rbw")}</option>
             </select>
           </Field>
         )}
         {isRef ? (
-          <Field label="reference" flex>
+          <Field label={t("env.field.reference")} flex>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span data-testid={`encrypted-${item.name}`} style={lockBadgeStyle}>
                 <LockKey size={11} weight="fill" />
@@ -309,16 +314,16 @@ function EnvEditor({
             </div>
           </Field>
         ) : isStoredSecret ? (
-          <Field label="value" flex>
+          <Field label={t("env.field.value")} flex>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span data-testid={`encrypted-${item.name}`} style={lockBadgeStyle}>
                 <LockKey size={11} weight="fill" />
-                encrypted
+                {t("env.badge.encrypted")}
               </span>
               <input
                 aria-label={`env value ${item.name}`}
                 type="password"
-                placeholder="enter new value to re-encrypt"
+                placeholder={t("env.field.reencryptPlaceholder")}
                 value={item.value}
                 onChange={(e) => onChange({ value: e.target.value })}
                 style={inputStyle}
@@ -326,7 +331,7 @@ function EnvEditor({
             </div>
           </Field>
         ) : (
-          <Field label="value" flex>
+          <Field label={t("env.field.value")} flex>
             <input
               aria-label={`env value ${item.name}`}
               type={item.secret ? "password" : "text"}
@@ -339,8 +344,7 @@ function EnvEditor({
       </div>
       {item.secret && (
         <p style={hintStyle}>
-          Secret value is never stored in the repo or shown here —{" "}
-          {isRef ? "resolved from your password manager on apply." : "encrypted with your age key."}
+          {isRef ? t("env.secret.hint.ref") : t("env.secret.hint.age")}
         </p>
       )}
     </div>
@@ -353,17 +357,19 @@ function PathEditor({
   onMove,
   canMoveUp,
   canMoveDown,
+  t,
 }: {
   item: PathEntry;
   onChange: (next: Partial<PathEntry>) => void;
   onMove: (dir: -1 | 1) => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  t: (key: string) => string;
 }) {
   return (
     <div>
       <div style={editorGridStyle}>
-        <Field label="path" flex>
+        <Field label={t("env.field.path")} flex>
           <input
             aria-label={`path value ${item.value}`}
             value={item.value}
@@ -371,18 +377,18 @@ function PathEditor({
             style={inputStyle}
           />
         </Field>
-        <Field label="position">
+        <Field label={t("env.field.position")}>
           <select
             aria-label={`path position ${item.value}`}
             value={item.position}
             onChange={(e) => onChange({ position: e.target.value as PathEntry["position"] })}
             style={{ ...inputStyle, fontFamily: "var(--font)", cursor: "pointer" }}
           >
-            <option value="prepend">prepend</option>
-            <option value="append">append</option>
+            <option value="prepend">{t("env.path.prepend")}</option>
+            <option value="append">{t("env.path.append")}</option>
           </select>
         </Field>
-        <Field label="order">
+        <Field label={t("env.field.order")}>
           <span style={{ display: "flex", gap: 5 }}>
             <button
               aria-label={`move up ${item.value}`}
@@ -404,8 +410,7 @@ function PathEditor({
         </Field>
       </div>
       <p style={hintStyle}>
-        PATH order matters — earlier <span className="mono">prepend</span> entries win. Order is
-        preserved across Macs.
+        {t("env.path.hint")}
       </p>
     </div>
   );
@@ -414,13 +419,15 @@ function PathEditor({
 function FunctionEditor({
   item,
   onChange,
+  t,
 }: {
   item: FunctionItem;
   onChange: (next: Partial<FunctionItem>) => void;
+  t: (key: string) => string;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <Field label="name" width={240}>
+      <Field label={t("env.field.name")} width={240}>
         <input
           aria-label={`function name ${item.name}`}
           value={item.name}
@@ -428,7 +435,7 @@ function FunctionEditor({
           style={inputStyle}
         />
       </Field>
-      <Field label="body">
+      <Field label={t("env.field.body")}>
         <textarea
           aria-label={`function body ${item.name}`}
           value={item.body}
@@ -443,7 +450,7 @@ function FunctionEditor({
           }}
         />
       </Field>
-      <p style={hintStyle}>Function bodies are stored verbatim and run as-is.</p>
+      <p style={hintStyle}>{t("env.function.hint")}</p>
     </div>
   );
 }
@@ -525,10 +532,12 @@ function ImportPicker({
   candidates,
   onMerge,
   onClose,
+  t,
 }: {
   candidates: Candidate[];
   onMerge: (chosen: Candidate[]) => void;
   onClose: () => void;
+  t: (key: string) => string;
 }) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
@@ -543,16 +552,14 @@ function ImportPicker({
   return (
     <div style={{ ...cardStyle, marginBottom: 16 }}>
       <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-soft)" }}>
-        <div style={{ fontWeight: 540, fontSize: 14 }}>Import from your shell</div>
+        <div style={{ fontWeight: 540, fontSize: 14 }}>{t("env.import.title")}</div>
         <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 3 }}>
-          Best-effort scan of simple top-level <span className="mono">alias</span> /{" "}
-          <span className="mono">export</span> lines in your rc files. Values aren&apos;t copied —
-          fill them in after importing.
+          {t("env.import.description")}
         </div>
       </div>
       {candidates.length === 0 ? (
         <div style={{ padding: "14px", color: "var(--muted)", fontSize: 13 }}>
-          Nothing importable found in your shell rc files.
+          {t("env.import.empty")}
         </div>
       ) : (
         candidates.map((c) => (
@@ -591,7 +598,7 @@ function ImportPicker({
         }}
       >
         <button onClick={onClose} style={iconButton("var(--muted)")}>
-          Cancel
+          {t("env.import.cancel")}
         </button>
         <button
           onClick={() => onMerge(candidates.filter((c) => picked.has(c.id)))}
@@ -599,7 +606,7 @@ function ImportPicker({
           style={{ ...iconButton("var(--accent)"), opacity: picked.size === 0 ? 0.5 : 1 }}
         >
           <DownloadSimple size={12} />
-          Import {picked.size > 0 ? picked.size : ""}
+          {t("env.import.button")}{picked.size > 0 ? ` ${picked.size}` : ""}
         </button>
       </div>
     </div>
@@ -653,13 +660,13 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
       const saved = await putEnv(data);
       setData(saved);
       setServerData(saved);
-      showHud?.({ text: "Saved aliases & env", type: "success" });
+      showHud?.({ text: t("env.hud.saved"), type: "success" });
     } catch (e) {
-      showHud?.({ text: e instanceof Error ? e.message : "Save failed", type: "error" });
+      showHud?.({ text: e instanceof Error ? e.message : t("env.hud.saveFailed"), type: "error" });
     } finally {
       setSaving(false);
     }
-  }, [data, showHud]);
+  }, [data, showHud, t]);
 
   // Regenerate the live env.sh so toggles/edits take effect on this machine.
   // Saves first if there are unsaved changes, then applies.
@@ -673,13 +680,13 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
       }
       const res = await applyEnv();
       setReloadCmd(res.reload);
-      showHud?.({ text: "Applied to this machine", type: "success" });
+      showHud?.({ text: t("env.hud.applied"), type: "success" });
     } catch (e) {
-      showHud?.({ text: e instanceof Error ? e.message : "Apply failed", type: "error" });
+      showHud?.({ text: e instanceof Error ? e.message : t("env.hud.applyFailed"), type: "error" });
     } finally {
       setApplying(false);
     }
-  }, [data, serverData, showHud]);
+  }, [data, serverData, showHud, t]);
 
   const openImport = useCallback(async () => {
     try {
@@ -687,9 +694,9 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
       const envCands = disc.candidates.env ?? [];
       setImportCandidates(envCands.filter((c) => c.id.startsWith("import:")));
     } catch (e) {
-      showHud?.({ text: e instanceof Error ? e.message : "Could not scan shell", type: "error" });
+      showHud?.({ text: e instanceof Error ? e.message : t("env.hud.scanFailed"), type: "error" });
     }
-  }, [showHud]);
+  }, [showHud, t]);
 
   const mergeImports = useCallback(
     (chosen: Candidate[]) => {
@@ -715,9 +722,9 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
         return next;
       });
       setImportCandidates(null);
-      showHud?.({ text: `Imported ${chosen.length} item(s) — review & save`, type: "success" });
+      showHud?.({ text: `${t("env.import.button")} ${chosen.length} item(s) — review & save`, type: "success" });
     },
-    [showHud],
+    [showHud, t],
   );
 
   // ── mutators keyed by (kind, idx) into the owning array ──────────────────────
@@ -834,7 +841,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             fontSize: 14,
           }}
         >
-          {error ?? "Could not load env data."} —{" "}
+          {error ?? t("env.loadError")} —{" "}
           <button
             onClick={() => void fetchData()}
             style={{
@@ -847,7 +854,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
               padding: 0,
             }}
           >
-            retry
+            {t("env.retry")}
           </button>
         </div>
       </div>
@@ -888,6 +895,19 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
 
   const sameRef = (a: Ref | null, b: Ref) => a !== null && a.kind === b.kind && a.idx === b.idx;
 
+  // Resolve the active chip label for use in the chip aria-label and result count.
+  const activeChip = CHIPS.find((c) => c.id === chip)!;
+  const activeChipLabel = t(activeChip.labelKey);
+
+  // Add button: per-kind i18n key.
+  const addKind: ItemKind = chip === "all" ? "alias" : chip;
+  const addKeyMap: Record<ItemKind, string> = {
+    alias: "env.add.alias",
+    env: "env.add.env",
+    path: "env.add.path",
+    function: "env.add.function",
+  };
+
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
       {/* explainer */}
@@ -922,8 +942,8 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             setQuery(e.target.value);
             setOpen(null);
           }}
-          placeholder="Search aliases, env, PATH, functions…"
-          aria-label="Search aliases, env, PATH, functions"
+          placeholder={t("env.searchPlaceholder")}
+          aria-label={t("env.searchAriaLabel")}
           autoComplete="off"
           style={{
             width: "100%",
@@ -939,25 +959,18 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
         />
       </div>
 
-      {/* toolbar: filter chips + actions */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 12,
-          flexWrap: "wrap",
-        }}
-      >
+      {/* Row A: filter chips — own full-width line */}
+      <div style={{ marginBottom: 8 }}>
         <div role="tablist" aria-label="Filter by kind" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {CHIPS.map((c) => {
             const active = chip === c.id;
+            const label = t(c.labelKey);
             return (
               <button
                 key={c.id}
                 role="tab"
                 aria-selected={active}
-                aria-label={`${c.label} ${counts[c.id]}`}
+                aria-label={`${label} ${counts[c.id]}`}
                 onClick={() => {
                   setChip(c.id);
                   setOpen(null);
@@ -978,33 +991,70 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                   transition: "all .12s",
                 }}
               >
-                {c.label}
+                {label}
                 <span style={{ fontSize: 12.5, opacity: 0.7 }}>{counts[c.id]}</span>
               </button>
             );
           })}
         </div>
+      </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+      {/* Row B: actions toolbar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        {/* LEFT group: Add + Import */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
-            onClick={() => addItem(chip === "all" ? "alias" : chip)}
-            style={{ ...iconButton("var(--text)"), padding: "6px 11px" }}
+            onClick={() => addItem(addKind)}
+            style={{
+              appearance: "none",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--text)",
+              fontFamily: "var(--font)",
+              fontSize: 13.5,
+              padding: "6px 11px",
+              borderRadius: 6,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+            }}
           >
             <Plus size={13} />
-            Add {chip === "all" ? "alias" : CHIPS.find((c) => c.id === chip)!.label.toLowerCase()}
+            {t(addKeyMap[addKind])}
           </button>
           <button
             onClick={() => void openImport()}
             style={{
-              ...iconButton("var(--text)"),
+              appearance: "none",
               border: "1px dashed var(--border)",
               background: "transparent",
+              color: "var(--text)",
+              fontFamily: "var(--font)",
+              fontSize: 13.5,
               padding: "6px 11px",
+              borderRadius: 6,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
             }}
           >
             <DownloadSimple size={13} />
             {t("env.importFromShell")}
           </button>
+        </div>
+
+        {/* RIGHT group: Unsaved badge + Save + Apply — pushed to the right */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           {dirty && (
             <span
               style={{
@@ -1019,7 +1069,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                 fontWeight: 540,
               }}
             >
-              Unsaved
+              {t("env.unsaved")}
             </span>
           )}
           <button
@@ -1027,14 +1077,14 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
             disabled={!dirty || saving}
             style={{
               appearance: "none",
-              border: 0,
-              background: dirty ? "var(--accent)" : "var(--raise)",
+              border: dirty ? "none" : "1px solid var(--border)",
+              background: dirty ? "var(--accent)" : "transparent",
               color: dirty ? "#0b0b0d" : "var(--muted)",
               fontFamily: "var(--font)",
-              fontSize: 14,
+              fontSize: 13.5,
               fontWeight: 560,
               padding: "6px 13px",
-              borderRadius: "var(--rr)",
+              borderRadius: 6,
               cursor: dirty && !saving ? "pointer" : "default",
               display: "inline-flex",
               alignItems: "center",
@@ -1048,12 +1098,20 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
           <button
             onClick={() => void applyToMachine()}
             disabled={applying}
-            title="Regenerate ~/.config/roost/env.sh so changes take effect"
+            title={t("env.applyTitle")}
             style={{
-              ...iconButton("var(--text)"),
+              appearance: "none",
               border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--text)",
+              fontFamily: "var(--font)",
+              fontSize: 13.5,
               padding: "6px 11px",
+              borderRadius: 6,
               cursor: applying ? "default" : "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
               opacity: applying ? 0.7 : 1,
             }}
           >
@@ -1111,14 +1169,15 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
           candidates={importCandidates}
           onMerge={mergeImports}
           onClose={() => setImportCandidates(null)}
+          t={t}
         />
       )}
 
       {/* result count */}
       <div style={{ color: "var(--faint)", fontSize: 12.5, margin: "0 2px 8px" }}>
-        {shown.length} of {counts.all} item{counts.all === 1 ? "" : "s"}
-        {query ? ` matching “${query}”` : ""}
-        {chip !== "all" ? ` · ${CHIPS.find((c) => c.id === chip)!.label}` : ""}
+        {shown.length} {t("env.count.of")} {counts.all} {counts.all === 1 ? t("env.count.item") : t("env.count.items")}
+        {query ? ` ${t("env.count.matching")} "${query}"` : ""}
+        {chip !== "all" ? ` · ${activeChipLabel}` : ""}
       </div>
 
       {/* unified list */}
@@ -1206,7 +1265,7 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                         ? ev.source.backend === "op"
                           ? "1Password"
                           : "rbw"
-                        : "encrypted"}
+                        : t("env.badge.encrypted")}
                     </span>
                   )}
                   <span style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0 }}>
@@ -1255,12 +1314,14 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                       <AliasEditor
                         item={item as AliasItem}
                         onChange={(next) => patchAlias(ref.idx, next)}
+                        t={t}
                       />
                     )}
                     {ref.kind === "env" && (
                       <EnvEditor
                         item={item as EnvVarItem}
                         onChange={(next) => patchEnv(ref.idx, next)}
+                        t={t}
                       />
                     )}
                     {ref.kind === "path" && (
@@ -1270,12 +1331,14 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                         onMove={(dir) => movePath(ref.idx, dir)}
                         canMoveUp={ref.idx > 0}
                         canMoveDown={ref.idx < data.path.length - 1}
+                        t={t}
                       />
                     )}
                     {ref.kind === "function" && (
                       <FunctionEditor
                         item={item as FunctionItem}
                         onChange={(next) => patchFn(ref.idx, next)}
+                        t={t}
                       />
                     )}
                   </div>
