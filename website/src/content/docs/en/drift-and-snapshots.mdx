@@ -46,10 +46,10 @@ and a relative time ("2h ago"). It reads your config repo's commit log; if you
 haven't captured yet, it shows a "No snapshots yet" empty state pointing you to
 `roost capture`.
 
-<Aside type="note" title="Read-only today">
-The Timeline currently *shows* snapshot history. Preview and rollback are part of
-the locked design for this view but may not be wired up in the current build —
-to roll back, check out an earlier commit in your config repo and `roost load`.
+<Aside type="note" title="Rollback">
+To roll back to an earlier snapshot, check out that commit in your config repo
+and run `roost load`. Preview and one-click rollback directly from the Timeline
+view are planned for a future release.
 </Aside>
 
 ### On the CLI

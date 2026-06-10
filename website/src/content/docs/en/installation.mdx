@@ -11,17 +11,18 @@ import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 Roost v1 targets **macOS only**. There are no cross-platform builds.
 </Aside>
 
-Roost is in early development. The **desktop app** ships as a macOS `.dmg` (see
-below); the **CLI / engine** is run from source today.
+Roost v0.1.0 is the first public release. The **desktop app** ships as a macOS
+`.dmg` for both Apple Silicon and Intel; the **CLI / engine** is still run from
+source (no CLI binary published yet).
 
 ## Desktop app
 
-Prebuilt **Apple Silicon** `.dmg` files are published to
-[Releases](https://github.com/Chenkeliang/roost/releases) — cut from version tags
-by CI. Open the `.dmg` and drag **Roost** into Applications.
+Prebuilt `.dmg` files for **Apple Silicon** and **Intel** are published to
+[Releases](https://github.com/Chenkeliang/roost/releases) — pick the one that
+matches your Mac. Open the `.dmg` and drag **Roost** into Applications.
 
-<Aside type="note" title="No release listed yet?">
-Build it yourself (needs the Rust toolchain):
+<Aside type="note" title="Build from source instead">
+If you prefer to build the desktop app yourself (needs the Rust toolchain):
 
 ```sh
 pnpm install

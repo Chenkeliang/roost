@@ -11,15 +11,15 @@ import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 Roost v1 **仅面向 macOS**,没有跨平台构建。
 </Aside>
 
-Roost 目前处于早期开发阶段。**桌面应用**以 macOS `.dmg` 形式发布(见下文);**CLI / 引擎**如今从源码运行。
+Roost v0.1.0 是首个公开版本。**桌面应用**以 macOS `.dmg` 形式提供,支持 Apple Silicon 和 Intel;**CLI / 引擎**目前仍从源码运行(尚无已发布的 CLI 二进制)。
 
 ## 桌面应用
 
-预构建的 **Apple Silicon** `.dmg` 会发布到
-[Releases](https://github.com/Chenkeliang/roost/releases)(由 CI 按版本 tag 打包)。打开 `.dmg` 后把 **Roost** 拖进「应用程序」。
+适用于 **Apple Silicon** 和 **Intel** 的预构建 `.dmg` 已发布到
+[Releases](https://github.com/Chenkeliang/roost/releases) —— 选择与你 Mac 匹配的版本。打开 `.dmg` 后把 **Roost** 拖进「应用程序」。
 
-<Aside type="note" title="暂时还没有 release?">
-自行构建(需 Rust 工具链):
+<Aside type="note" title="改为从源码构建">
+如果你偏好自行构建桌面应用(需 Rust 工具链):
 
 ```sh
 pnpm install

@@ -14,9 +14,11 @@ projects, aliases & env, and (optionally) secrets. Roost stores it in **your own
 private git repository**. On another Mac you **load** it back with one command,
 with a visual manager for everything you've backed up.
 
-<Aside type="note" title="Early development">
-Roost is in early development (P1 MVP). This documentation describes what exists
-in the codebase today, not future plans.
+<Aside type="note" title="v0.1.0">
+Roost v0.1.0 is the first public release. The desktop app ships as a downloadable
+.dmg for Apple Silicon and Intel — grab it from
+[GitHub Releases](https://github.com/Chenkeliang/roost/releases). The CLI/engine
+is run from source; no CLI binary is published yet.
 </Aside>
 
 ## Why it's safe
@@ -48,7 +50,7 @@ in the codebase today, not future plans.
 Roost is to your config repo what git is to your code repo. There are two
 separate things:
 
-- **Roost (this tool)** — the engine + CLI (and a desktop app later). It ships
+- **Roost (this tool)** — the engine + CLI, and a desktop app (.dmg). It ships
   with **zero personal data**.
 - **Your config repo** — your private git repo. It is the **single source of
   truth** (Roost's chezmoi source).

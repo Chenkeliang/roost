@@ -14,6 +14,23 @@ import { Aside } from '@astrojs/starlight/components';
 roost doctor
 ```
 
+## 首次启动时 Gatekeeper 拦截应用
+
+Roost 桌面应用(.dmg)**未经签名**,也未经 Apple 公证,因此 macOS Gatekeeper 会阻止默认双击打开。
+
+**解法——右键打开(推荐):**
+在 Finder 中,右键点击(或按住 Control 单击)Roost 应用并选择**打开**,在随后弹出的对话框中确认。
+每台机器只需操作一次。
+
+**解法——移除隔离属性:**
+若右键方式不奏效,打开终端并运行:
+
+```sh
+xattr -d com.apple.quarantine /Applications/Roost.app
+```
+
+CLI 与引擎从源码构建,不受 Gatekeeper 管制。
+
 ## 缺少 `chezmoi`、`age`、`brew` 或 `mise`
 
 Roost 是薄编排器——它驱动这些工具,而不是重新实现它们。若 `doctor` 报告某个工具缺失,

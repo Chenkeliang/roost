@@ -50,6 +50,18 @@ Only to append a single, idempotent source line for the managed `env.sh`,
 wrapped in markers. It never reorders or rewrites the rest of your file, and
 unmanaging removes the block again.
 
+### The app says it can't be opened because the developer can't be verified. What do I do?
+
+The Roost desktop app (.dmg) is **unsigned** — it is not notarized by Apple. macOS Gatekeeper blocks unsigned apps on first launch. Two ways to open it:
+
+- **Right-click Open:** in Finder, right-click (or Control-click) the Roost app and choose **Open**. Confirm in the dialog that appears. You only need to do this once.
+- **Remove the quarantine attribute:** if the right-click method doesn't work, run:
+  ```sh
+  xattr -d com.apple.quarantine /Applications/Roost.app
+  ```
+
+The CLI and engine are built from source and are not affected by Gatekeeper.
+
 ### Which platforms are supported?
 
 macOS only for v1.

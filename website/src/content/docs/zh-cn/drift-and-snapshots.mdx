@@ -41,9 +41,9 @@ roost list     # 被管条目及其漂移状态
 它读取你配置仓库的提交日志;若你还没采集过,它会显示 "No snapshots yet" 空态,引导你去跑
 `roost capture`。
 
-<Aside type="note" title="目前为只读">
-Timeline 目前*展示*快照历史。预览与回滚属于该视图已锁定的设计,但在当前构建里可能尚未接通
-——要回滚,请在你的配置仓库里检出更早的提交,再跑 `roost load`。
+<Aside type="note" title="回滚">
+要回滚到更早的快照,请在你的配置仓库里检出对应提交,再运行 `roost load`。直接在 Timeline
+视图内预览与一键回滚的功能计划在未来版本中推出。
 </Aside>
 
 ### 在 CLI 端

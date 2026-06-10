@@ -14,6 +14,24 @@ external dependency and per-module health check, so start there.
 roost doctor
 ```
 
+## Gatekeeper blocks the app on first launch
+
+The Roost desktop app (.dmg) is **unsigned** and not notarized by Apple, so macOS
+Gatekeeper prevents it from opening with the default double-click.
+
+**Fix — right-click Open (recommended):**
+In Finder, right-click (or Control-click) the Roost app and choose **Open**.
+Confirm in the dialog that follows. You only need to do this once per machine.
+
+**Fix — remove the quarantine attribute:**
+If the right-click method doesn't work, open Terminal and run:
+
+```sh
+xattr -d com.apple.quarantine /Applications/Roost.app
+```
+
+The CLI and engine are built from source and are not subject to Gatekeeper.
+
 ## Missing `chezmoi`, `age`, `brew`, or `mise`
 
 Roost is a thin orchestrator — it drives these tools rather than reimplementing
