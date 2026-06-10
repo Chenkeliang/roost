@@ -128,9 +128,11 @@ export function unadoptSkills(ctx: ModuleContext, names: string[]): string[] {
   const done: string[] = [];
   let changed = false;
   for (const name of names) {
-    if (!ctx.dryRun) fs.rmSync(path.join(repoSkillsDir(ctx), name), { recursive: true, force: true });
+    const repoPath = path.join(repoSkillsDir(ctx), name);
+    const existed = fs.existsSync(repoPath) || !!cfg.skills[name];
+    if (!ctx.dryRun) fs.rmSync(repoPath, { recursive: true, force: true });
     if (cfg.skills[name]) { delete cfg.skills[name]; changed = true; }
-    done.push(name);
+    if (existed) done.push(name); // only report names we actually had
   }
   const before = links.length;
   links = links.filter((l) => !set.has(l.skill));
@@ -150,7 +152,10 @@ export const skillsModule = {
       let st: fs.Stats;
       try { st = fs.lstatSync(p); } catch { return "none"; }
       if (st.isSymbolicLink()) return "broken";
-      return hashSkillDir(p) ? "real" : "broken";
+      // A real dir is "properly managed" only if it actually holds a skill; an
+      // empty/contentless dir is "broken" (hashSkillDir is non-empty even for an
+      // empty dir, so check SKILL.md presence instead).
+      return fs.existsSync(path.join(p, "SKILL.md")) ? "real" : "broken";
     };
     type Entry = { real: string; displayDir: string; hash: string; linked: boolean };
     const byName = new Map<string, Entry[]>();
@@ -211,7 +216,7 @@ export const skillsModule = {
         note: conflict
           ? `conflict: differing content across ${distinct.map((e) => loc(e.displayDir)).join(", ")}`
           : rs === "broken"
-            ? "needs repair (stored as symlink)"
+            ? `needs repair — real content at ${loc(rep.displayDir)}`
             : `found in ${loc(rep.displayDir)}`,
         origin: {
           location: loc(rep.displayDir),

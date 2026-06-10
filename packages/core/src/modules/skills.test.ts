@@ -300,6 +300,13 @@ describe("discover classifies by real directory (origin)", () => {
     const c = (await skillsModule.discover(ctx())).find((x) => x.id === "dup2")!;
     expect((c.origin?.conflictLocations ?? []).length).toBe(2);
   });
+
+  it("treats an empty repo dir (no SKILL.md) as needsRepair, not properly managed", async () => {
+    mkSkill(path.join(home, ".agents", "skills"), "empty1", "# real");
+    fs.mkdirSync(path.join(repo, "skills", "empty1"), { recursive: true }); // empty, no SKILL.md
+    const c = (await skillsModule.discover(ctx())).find((x) => x.id === "empty1");
+    expect(c?.origin?.needsRepair).toBe(true);
+  });
 });
 
 describe("materializeSource (decouple)", () => {
