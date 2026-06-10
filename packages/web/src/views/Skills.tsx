@@ -396,14 +396,16 @@ export function Skills() {
                 </thead>
                 <tbody>
                   {visibleSkills.map((row) => (
-                    <tr key={row.name} style={{ opacity: row.effective.enabled ? 1 : 0.6 }}>
-                      <td style={cellPad}>
+                    <tr key={row.name}>
+                      {/* dim only the content cells when disabled — NOT the actions cell,
+                          else CSS opacity inherits into the ⋯ menu and makes it translucent */}
+                      <td style={{ ...cellPad, opacity: row.effective.enabled ? 1 : 0.5 }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                           <Stack size={14} style={{ color: "var(--muted)" }} />
                           <span className="mono">{row.name}</span>
                         </span>
                       </td>
-                      <td style={cellPad}>
+                      <td style={{ ...cellPad, opacity: row.effective.enabled ? 1 : 0.5 }}>
                         <CoverageCell cov={computeCoverage(row, targetIds)} method={row.effective.method} onOpen={() => setPopover(row.name)} t={t} />
                       </td>
                       <td style={cellPad}>
