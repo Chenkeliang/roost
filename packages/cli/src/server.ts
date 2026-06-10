@@ -54,6 +54,9 @@ import {
   effectiveSkill,
   loadSkillLinks,
   resolveSkillConflict,
+  skillsModule,
+  materializeSource,
+  unadoptSkills,
   loadRoostSettings,
   saveRoostSettings,
 } from "@roost/core";
@@ -852,15 +855,19 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return reply.send({ candidates: await mod.discover(makeCtx(true)) });
   });
 
-  // ── POST /api/skills/capture ─────────────────────────────────────────────────
-  server.post<{ Body: { names?: string[] } }>("/api/skills/capture", async (req, reply) => {
-    const names = req.body?.names ?? [];
-    const mod = registry.get("skills");
-    if (!mod) return reply.status(404).send({ error: "skills module missing" });
-    const cs = await mod.capture(makeCtx(false), { modules: { skills: names } });
-    cache.invalidateAll();
-    return reply.send(cs);
-  });
+  // ── POST /api/skills/capture (adopt: capture + optional decouple) ─────────────
+  server.post<{ Body: { names?: string[]; decouple?: boolean; from?: Record<string, string> } }>(
+    "/api/skills/capture",
+    async (req, reply) => {
+      const names = req.body?.names ?? [];
+      const decouple = req.body?.decouple !== false; // default true
+      const from = req.body?.from;
+      const cs = await skillsModule.capture(makeCtx(false), { modules: { skills: names } }, { from });
+      const materialized = decouple ? materializeSource(makeCtx(false), cs.written) : [];
+      cache.invalidateAll();
+      return reply.send({ ...cs, materialized });
+    },
+  );
 
   // ── POST /api/skills/import-git ──────────────────────────────────────────────
   // Clone a remote repo (single skill or a skills/ pack) and ingest it — gated by

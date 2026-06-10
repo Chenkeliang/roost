@@ -15,7 +15,7 @@ import type {
   Candidate,
   ApplyPlan,
 } from "@roost/shared";
-import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData } from "@roost/core";
+import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule } from "@roost/core";
 import { buildServer, computeConflicts, classifyGitError } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
@@ -1779,5 +1779,46 @@ describe("classifyGitError", () => {
   it("returns undefined for non-auth output", () => {
     expect(classifyGitError("Everything up-to-date")).toBeUndefined();
     expect(classifyGitError("")).toBeUndefined();
+  });
+});
+
+describe("POST /api/skills/capture (adopt + decouple)", () => {
+  it("captures real content and materializes the source (decouple default on)", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(skillsModule);
+    const aHome = fs.mkdtempSync(path.join(os.tmpdir(), "roost-adopt-home-"));
+    const aRepo = fs.mkdtempSync(path.join(os.tmpdir(), "roost-adopt-repo-"));
+    try {
+      // external real content + a symlink in the source dir (mimics cc-switch)
+      const external = fs.mkdtempSync(path.join(os.tmpdir(), "roost-adopt-ext-"));
+      fs.mkdirSync(path.join(external, "x-skill"), { recursive: true });
+      fs.writeFileSync(path.join(external, "x-skill", "SKILL.md"), "# real");
+      const srcDir = path.join(aHome, ".agents", "skills");
+      fs.mkdirSync(srcDir, { recursive: true });
+      fs.symlinkSync(path.join(external, "x-skill"), path.join(srcDir, "x-skill"));
+
+      const ctxFn = (dryRun: boolean): ModuleContext => ({
+        repoDir: aRepo, home: aHome, profile: "base", dryRun,
+        exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} }, t: (k) => k,
+      });
+      const server = buildServer({ repoDir: aRepo, registry: reg, makeCtx: ctxFn });
+      const res = await server.inject({
+        method: "POST", url: "/api/skills/capture",
+        payload: { names: ["x-skill"] }, // decouple defaults to true
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.written).toContain("x-skill");
+      expect(body.materialized).toContain("x-skill");
+      // repo has REAL content (not a symlink)
+      expect(fs.lstatSync(path.join(aRepo, "skills", "x-skill")).isSymbolicLink()).toBe(false);
+      // source is now a real dir (decoupled)
+      expect(fs.lstatSync(path.join(srcDir, "x-skill")).isSymbolicLink()).toBe(false);
+      fs.rmSync(external, { recursive: true, force: true });
+    } finally {
+      fs.rmSync(aHome, { recursive: true, force: true });
+      fs.rmSync(aRepo, { recursive: true, force: true });
+    }
   });
 });
