@@ -614,9 +614,20 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   server.post("/api/git/push", async (_req, reply) => {
     cache.invalidateAll();
     const exec = makeCtx(false).exec;
+    // A freshly-initialized repo's branch has no upstream yet (the onboarding
+    // "create new" → push path). Detect that by exit code — git's "no upstream
+    // branch" message is localized, so never match on the text — and set the
+    // upstream on the first push.
+    const hasUpstream =
+      (await exec.run("git", ["-C", repoDir, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])).code === 0;
+    const branch =
+      (await exec.run("git", ["-C", repoDir, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim() || "main";
+    const args = hasUpstream
+      ? ["-C", repoDir, "push"]
+      : ["-C", repoDir, "push", "-u", "origin", branch];
     // Fail fast instead of hanging on an interactive credential prompt the web
     // UI can't answer; a missing credential surfaces as a classifiable error.
-    const result = await exec.run("git", ["-C", repoDir, "push"], {
+    const result = await exec.run("git", args, {
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     });
     const ok = result.code === 0;

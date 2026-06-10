@@ -1365,6 +1365,46 @@ describe("buildServer", () => {
     await server.close();
   });
 
+  it("POST /api/git/push → sets upstream on the first push when the branch has no upstream", async () => {
+    const calls: string[][] = [];
+    function makeNoUpstreamExec(): Exec {
+      return {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          calls.push([cmd, ...args]);
+          const a = args.join(" ");
+          // No upstream yet → @{u} resolution fails. This is the locale-independent
+          // signal (git's "no upstream branch" message is translated).
+          if (a.includes("symbolic-full-name @{u}")) return { code: 1, stdout: "", stderr: "no upstream" };
+          if (a.includes("rev-parse --abbrev-ref HEAD")) return { code: 0, stdout: "main", stderr: "" };
+          if (cmd === "git" && args.includes("push")) return { code: 0, stdout: "branch 'main' set up to track 'origin/main'.", stderr: "" };
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+    }
+    function makeNoUpstreamCtx(repoDir: string, dryRun = false): ModuleContext {
+      return {
+        repoDir,
+        home: os.homedir(),
+        profile: "base",
+        dryRun,
+        exec: makeNoUpstreamExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      };
+    }
+
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeNoUpstreamCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/git/push" });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { ok: boolean }).ok).toBe(true);
+    // The first push must set the upstream: `git push -u origin main`.
+    expect(
+      calls.some((c) => c[0] === "git" && c.includes("push") && c.includes("-u") && c.includes("origin") && c.includes("main")),
+    ).toBe(true);
+    await server.close();
+  });
+
   it("POST /api/git/pull → ok:true on exit 0", async () => {
     function makePullExec(): Exec {
       return {
