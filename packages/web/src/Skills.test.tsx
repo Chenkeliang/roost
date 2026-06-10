@@ -195,8 +195,9 @@ describe("Skills view", () => {
     ]));
     vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
     render(<Skills />);
-    expect(await screen.findByText("2/2")).toBeInTheDocument(); // alpha covered
-    expect(await screen.findByText("1/2")).toBeInTheDocument(); // beta partial
+    // n/m is split into colored spans (enabled count green / total muted), so match via the cell aria-label
+    expect(await screen.findByLabelText(/Coverage 2\/2/)).toBeInTheDocument(); // alpha covered
+    expect(await screen.findByLabelText(/Coverage 1\/2/)).toBeInTheDocument(); // beta partial
     // the old per-tool column headers are gone
     expect(screen.queryByRole("columnheader", { name: "Gemini CLI" })).not.toBeInTheDocument();
   });

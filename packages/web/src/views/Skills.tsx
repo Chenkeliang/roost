@@ -16,19 +16,22 @@ const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--b
 const cellPad: React.CSSProperties = { padding: "9px 12px", borderBottom: "1px solid var(--border-soft)", fontSize: 14, verticalAlign: "middle" };
 
 function CoverageCell({ cov, method, onOpen, t }: { cov: Coverage; method: string; onOpen: () => void; t: (k: string) => string }) {
-  const color = cov.state === "conflict" ? "var(--accent)" : cov.state === "partial" ? "#f0b352" : "var(--muted)";
   if (cov.state === "disabled") {
-    return <span aria-label={t("skills.coverage.disabled")} style={{ color: "var(--muted)", opacity: 0.6, fontSize: 13 }}>—</span>;
+    return <span aria-label={t("skills.coverage.disabled")} style={{ color: "var(--muted)", fontSize: 13 }}>—</span>;
   }
-  const dotColor = (s: string) => (s === "conflict" ? "var(--accent)" : s === "broken" ? "#f0b352" : "var(--muted)");
+  // healthy = green (the on-ratio shows as the green portion), broken = amber, conflict = coral
+  const dotColor = (s: string) => (s === "conflict" ? "var(--accent)" : s === "broken" ? "#f0b352" : "var(--green)");
   return (
     <button onClick={onOpen} style={{ ...ic, border: 0, background: "transparent", padding: "2px 4px", gap: 8 }} aria-label={`${t("skills.coverage.title")} ${cov.healthy}/${cov.desired}`}>
       <span style={{ display: "inline-flex", gap: 3 }}>
         {cov.segments.map((s, i) => (
-          <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: s === "healthy" ? "var(--muted)" : "transparent", border: `1px solid ${dotColor(s)}` }} />
+          <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: s === "healthy" ? "var(--green)" : "transparent", border: `1px solid ${dotColor(s)}` }} />
         ))}
       </span>
-      <span className="mono" style={{ color, fontSize: 13 }}>{cov.healthy}/{cov.desired}</span>
+      <span className="mono" style={{ fontSize: 13 }}>
+        <span style={{ color: "var(--green)" }}>{cov.healthy}</span>
+        <span style={{ color: "var(--muted)" }}>/{cov.desired}</span>
+      </span>
       <span style={{ color: "var(--muted)", fontSize: 12.5 }}>· {t(`skills.method.${method}`)}</span>
       {cov.state === "partial" && <span style={{ color: "#f0b352", fontSize: 12 }}>{cov.broken} {t("skills.coverage.broken")}</span>}
       {cov.state === "conflict" && <span style={{ color: "var(--accent)", fontSize: 12 }}>{t("skills.coverage.conflict")}</span>}
@@ -54,7 +57,7 @@ function SkillTargetsPopover({ row, targets, busy, t, onToggle, onResolve, onClo
                 <button role="switch" aria-checked={on} aria-label={tg.label} disabled={busy || !row.effective.enabled}
                   onClick={() => onToggle(tg.id, !on)}
                   style={{ ...ic, border: 0, background: "transparent", padding: 0 }}>
-                  {on ? <CheckCircle size={18} weight="fill" style={{ color: "var(--green)" }} /> : <Circle size={18} style={{ color: "var(--border)" }} />}
+                  {on ? <CheckCircle size={18} weight="fill" style={{ color: "var(--green)" }} /> : <Circle size={18} style={{ color: "var(--muted)" }} />}
                 </button>
                 <span style={{ flex: 1 }}>{tg.label}</span>
                 {st === "conflict" ? (
@@ -390,7 +393,7 @@ export function Skills() {
                 </thead>
                 <tbody>
                   {visibleSkills.map((row) => (
-                    <tr key={row.name} style={{ opacity: row.effective.enabled ? 1 : 0.45 }}>
+                    <tr key={row.name} style={{ opacity: row.effective.enabled ? 1 : 0.6 }}>
                       <td style={cellPad}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                           <Stack size={14} style={{ color: "var(--muted)" }} />
