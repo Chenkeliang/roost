@@ -9,6 +9,7 @@ vi.mock("./api", () => ({
   getHealth: vi.fn().mockResolvedValue({ ok: true, name: "roost" }),
   getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
   getMachines: vi.fn().mockResolvedValue({ hosts: ["macbook.local"], states: {} }),
+  getGitStatus: vi.fn().mockResolvedValue({ isRepo: true, remote: "git@x:y.git", branch: "main", ahead: 0, behind: 0, clean: true }),
   getStatus: vi.fn().mockResolvedValue({
     reports: [
       {
