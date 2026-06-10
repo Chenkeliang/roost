@@ -14,7 +14,6 @@ export function TargetManager({ initial, t, onClose, onSaved }: {
   const [targets, setTargets] = useState<SkillTarget[]>(initial);
   const targetsRef = useRef<SkillTarget[]>(initial);
   const [name, setName] = useState(""); const [dir, setDir] = useState("");
-  const [method, setMethod] = useState<"symlink" | "copy">("symlink");
   const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null);
 
   const add = () => {
@@ -52,10 +51,6 @@ export function TargetManager({ initial, t, onClose, onSaved }: {
         <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("skills.targets.name")} style={{ ...ic, width: 120 }} />
           <input value={dir} onChange={(e) => setDir(e.target.value)} placeholder={t("skills.targets.dir")} style={{ ...ic, flex: 1 }} />
-          <select value={method} onChange={(e) => setMethod(e.target.value as "symlink" | "copy")} style={{ ...ic }}>
-            <option value="symlink">{t("skills.method.symlink")}</option>
-            <option value="copy">{t("skills.method.copy")}</option>
-          </select>
           <button onClick={add} style={{ ...ic }}>{t("skills.targets.add")}</button>
         </div>
         <p style={{ fontSize: 11.5, color: "var(--muted)", margin: "0 0 12px" }}>{t("skills.targets.removeNote")}</p>
