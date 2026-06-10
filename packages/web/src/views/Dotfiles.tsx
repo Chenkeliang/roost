@@ -180,7 +180,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter dotfiles…"
+            placeholder={t("common.filterDotfiles")}
             style={{ width: "100%", appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--font)", fontSize: 14, padding: "6px 10px 6px 28px", borderRadius: 6, boxSizing: "border-box" }}
           />
         </div>
@@ -268,7 +268,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
                         <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
                       </>
                     ) : (
-                      <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />Add</button>
+                      <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />{t("common.add")}</button>
                     )}
                   </div>
                 );

@@ -150,7 +150,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter domains…"
+            placeholder={t("common.filterDomains")}
             style={{ width: "100%", appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--font)", fontSize: 14, padding: "6px 10px 6px 28px", borderRadius: 6, boxSizing: "border-box" }}
           />
         </div>
@@ -228,7 +228,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
                       <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${domain}`}><X size={11} />{t("common.remove")}</button>
                     </>
                   ) : (
-                    <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${domain}`}><FloppyDisk size={11} />Add</button>
+                    <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${domain}`}><FloppyDisk size={11} />{t("common.add")}</button>
                   )}
                 </div>
               );

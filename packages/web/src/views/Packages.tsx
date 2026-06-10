@@ -257,7 +257,7 @@ export function Packages({ showHud }: PackagesProps) {
                   <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
                   <KindIcon kind={kindOf(c.id)} />
                   <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.note?.startsWith("mas") ? c.note : valOf(c.id)}</span>
-                  <button onClick={() => void add(c.id)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.id}`}><FloppyDisk size={11} />Add</button>
+                  <button onClick={() => void add(c.id)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.id}`}><FloppyDisk size={11} />{t("common.add")}</button>
                 </div>
               ))}
             </div>
