@@ -1,11 +1,13 @@
+import type { ReactNode } from "react";
 import { Kbd } from "./Kbd";
 
 interface ActionBarProps {
   onApply?: () => void;
   onOpenPalette?: () => void;
+  left?: ReactNode;
 }
 
-export function ActionBar({ onApply, onOpenPalette }: ActionBarProps) {
+export function ActionBar({ onApply, onOpenPalette, left }: ActionBarProps) {
   return (
     <div
       style={{
@@ -26,7 +28,8 @@ export function ActionBar({ onApply, onOpenPalette }: ActionBarProps) {
         zIndex: 30,
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {left}
+      <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
         <Kbd>↵</Kbd>
         <button
           onClick={onApply}
