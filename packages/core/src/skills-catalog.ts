@@ -38,6 +38,11 @@ function parseTargets(raw: unknown): SkillTarget[] {
   return out;
 }
 
+export function saveSkillsTargets(repoDir: string, targets: SkillTarget[]): void {
+  fs.mkdirSync(path.join(repoDir, "roost"), { recursive: true });
+  fs.writeFileSync(overridePath(repoDir), yaml.dump({ targets }), "utf8");
+}
+
 // Defaults merged with user override, keyed by id (override path/label wins;
 // new ids appended; default ids not mentioned remain).
 export function loadSkillsTargets(repoDir: string): SkillTarget[] {

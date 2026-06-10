@@ -152,7 +152,7 @@ export type {
   LoadResult,
   LoadPluginOpts,
 } from "./plugins/loader.js";
-export { DEFAULT_SKILLS_TARGETS, loadSkillsTargets } from "./skills-catalog.js";
+export { DEFAULT_SKILLS_TARGETS, loadSkillsTargets, saveSkillsTargets } from "./skills-catalog.js";
 export type { SkillTarget } from "./skills-catalog.js";
 export {
   DEFAULT_SKILLS_CONFIG,
