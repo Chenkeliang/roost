@@ -205,7 +205,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   const trackedCount = statusData?.reports.reduce((n, r) => n + (r.items?.length ?? 0), 0);
 
   if (gitStatus && !gitStatus.isRepo) {
-    return <Onboarding t={t} showHud={showHud} onComplete={() => void fetchData()} />;
+    return <Onboarding t={t} showHud={showHud} onComplete={() => void fetchData()} onOpenSync={onOpenSync} />;
   }
 
   const noRemote = !!gitStatus?.isRepo && gitStatus.remote === null;
