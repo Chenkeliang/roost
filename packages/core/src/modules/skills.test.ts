@@ -307,6 +307,21 @@ describe("discover classifies by real directory (origin)", () => {
     const c = (await skillsModule.discover(ctx())).find((x) => x.id === "empty1");
     expect(c?.origin?.needsRepair).toBe(true);
   });
+
+  it("a real source dir that is also symlinked into an IDE dir is reported by its source copy (linked:false)", async () => {
+    // real content in the canonical source
+    mkSkill(path.join(home, ".agents", "skills"), "dual", "# real");
+    // an IDE dir symlinks the same name to a DIFFERENT external copy (same content)
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), "roost-dual-"));
+    mkSkill(external, "dual", "# real");
+    const ide = path.join(home, ".claude", "skills");
+    fs.mkdirSync(ide, { recursive: true });
+    fs.symlinkSync(path.join(external, "dual"), path.join(ide, "dual"));
+    const c = (await skillsModule.discover(ctx())).find((x) => x.id === "dual")!;
+    expect(c.origin?.location).toBe("~/.agents/skills"); // representative = the real source copy
+    expect(c.origin?.linked).toBe(false); // shown copy is a real dir, not a symlink
+    fs.rmSync(external, { recursive: true, force: true });
+  });
 });
 
 describe("materializeSource (decouple)", () => {

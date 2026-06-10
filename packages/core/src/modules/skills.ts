@@ -220,7 +220,11 @@ export const skillsModule = {
             : `found in ${loc(rep.displayDir)}`,
         origin: {
           location: loc(rep.displayDir),
-          linked: distinct.some((e) => e.linked),
+          // reflect the REPRESENTATIVE (displayed) copy: if a skill is a real dir
+          // in source but also symlinked elsewhere, the shown location is the real
+          // source dir, so it is not "linked". cc-switch skills, whose source entry
+          // IS the symlink, stay linked:true.
+          linked: rep.linked,
           ...(rs === "broken" ? { needsRepair: true } : {}),
           ...(conflict ? { conflictLocations: distinct.map((e) => loc(e.displayDir)) } : {}),
         },
