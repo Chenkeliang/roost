@@ -230,4 +230,21 @@ describe("Skills view", () => {
     expect(screen.queryByText("alpha")).not.toBeInTheDocument();
     expect(screen.getByText("zeta")).toBeInTheDocument();
   });
+
+  it("target manager: adding a custom target calls saveSkillsTargets", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(BASE_VIEW);
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
+    vi.mocked(api.saveSkillsTargets).mockResolvedValue({ ok: true });
+    render(<Skills />);
+    (await screen.findByRole("button", { name: /Manage targets|管理目标/ })).click();
+    const dialog = await screen.findByRole("dialog");
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.change(within(dialog).getByPlaceholderText(/name|名称/i), { target: { value: "myproj" } });
+    fireEvent.change(within(dialog).getByPlaceholderText(/directory|目录/i), { target: { value: "~/work/.skills" } });
+    within(dialog).getByRole("button", { name: /Add|添加/ }).click();
+    within(dialog).getByRole("button", { name: /Save|保存/ }).click();
+    await waitFor(() => expect(api.saveSkillsTargets).toHaveBeenCalled());
+    const saved = vi.mocked(api.saveSkillsTargets).mock.calls[0]![0]!
+    expect(saved.some((t) => t.id === "myproj" && t.path === "~/work/.skills")).toBe(true);
+  });
 });

@@ -5,6 +5,7 @@ import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
 import { getSkills, discoverSkills, toggleSkill, linkSkills, saveSkillsConfig, resolveSkillConflict, postSkillsImportScan, postSkillsImportApply, adoptSkills, unadoptSkills } from "../api";
+import { TargetManager } from "./TargetManager";
 import type { SkillImportResponse, SkillScanResponse, SkillCandidate } from "../api";
 import type { SkillsView, SkillRow, SkillMethod } from "../api";
 import { computeCoverage, targetStatus } from "./skillsCoverage";
@@ -125,6 +126,7 @@ export function Skills() {
   const [removing, setRemoving] = useState<string | null>(null); // skill pending un-adopt
   const [popover, setPopover] = useState<string | null>(null);
   const [managedFilter, setManagedFilter] = useState("");
+  const [showTargets, setShowTargets] = useState(false);
 
   const load = useCallback(async () => {
     const v = await getSkills();
@@ -335,7 +337,8 @@ export function Skills() {
         <span style={{ color: "var(--muted)", fontSize: 13.5 }}>
           {t(`skills.method.${config.method}`)} · {config.targets.join(", ") || "—"}
         </span>
-        <button onClick={() => void onApplyLinks()} disabled={busy} style={{ ...ic, marginLeft: "auto", color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
+        <button onClick={() => setShowTargets(true)} style={{ ...ic, marginLeft: "auto" }}>{t("skills.targets.manage")}</button>
+        <button onClick={() => void onApplyLinks()} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
           <LinkIcon size={14} />{t("skills.link")}
         </button>
       </div>
@@ -626,6 +629,8 @@ export function Skills() {
           </div>
         </div>
       )}
+
+      {showTargets && <TargetManager initial={targets} t={t} onClose={() => setShowTargets(false)} onSaved={() => void refetch()} />}
 
       {removing && (
         <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }}>
