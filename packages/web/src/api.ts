@@ -48,9 +48,12 @@ export interface CaptureResponse {
   changes: ChangeSet[];
 }
 
-// Server POST /api/load returns { results: ApplyResult[] }
+// Server POST /api/load returns { results: ApplyResult[] }, plus { blocked, blockers }
+// when a real apply is refused by the preflight hard-gate (ADR-0016 §5).
 export interface LoadResponse {
   results: ApplyResult[];
+  blocked?: boolean;
+  blockers?: { name: string; detail?: string }[];
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
