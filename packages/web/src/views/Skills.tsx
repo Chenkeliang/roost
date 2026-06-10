@@ -96,7 +96,7 @@ function RowMenu({ row, busy, t, onRemove, onMethod, onToggleEnabled }: {
       {open && (
         <>
           <span aria-hidden="true" onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-          <div role="menu" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} style={{ position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 91, background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, minWidth: 168, padding: 4, boxShadow: "0 14px 30px -12px rgba(0,0,0,.6)" }}>
+          <div role="menu" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} style={{ position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 91, background: "#2c2c33", border: "1px solid #3a3a42", borderRadius: 10, minWidth: 168, padding: 4, boxShadow: "0 18px 44px -14px rgba(0,0,0,.78), inset 0 1px 0 rgba(255,255,255,.05)" }}>
             <button role="menuitem" onClick={() => { setOpen(false); onToggleEnabled(); }} style={mi}>
               {row.effective.enabled ? t("skills.menu.disable") : t("skills.menu.enable")}
             </button>
