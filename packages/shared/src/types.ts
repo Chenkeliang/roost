@@ -16,10 +16,22 @@ export interface ModuleContext {
 }
 export interface Selection { modules: Record<string, string[]>; }
 
+export interface CandidateOrigin {
+  /** Directory where the real content lives, home-collapsed for display (e.g. "~/.cc-switch/skills"). */
+  location: string;
+  /** True if the candidate is reached via a symlink (UI shows the "another tool manages this" hint). */
+  linked: boolean;
+  /** Already in <repo>/skills but stored as a symlink / no real content — re-capture repairs it. */
+  needsRepair?: boolean;
+  /** Same name found in >1 directory with differing content; UI lets the user pick which to adopt. */
+  conflictLocations?: string[];
+}
+
 export interface Candidate {
   id: string; path: string; category: string; sizeBytes?: number;
   recommendation: Recommendation; note?: string;
   remote?: string; host?: string; protocol?: "ssh" | "https" | "other";
+  origin?: CandidateOrigin;
 }
 
 export interface ModuleIndex {
