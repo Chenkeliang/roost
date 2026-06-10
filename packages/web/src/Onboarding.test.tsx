@@ -44,8 +44,10 @@ describe("Onboarding flow", () => {
     (await screen.findByRole("button", { name: "onboard.select.confirm" })).click();
     await waitFor(() => expect(api.addSelection).toHaveBeenCalledWith("dotfiles", "a"));
 
-    // Step 4 capture
-    (await screen.findByRole("button", { name: "onboard.capture.btn" })).click();
+    // Step 4 capture — wait until the selection summary loads (button enabled)
+    const captureBtn = await screen.findByRole("button", { name: "onboard.capture.btn" });
+    await waitFor(() => expect(captureBtn).not.toBeDisabled());
+    captureBtn.click();
     await waitFor(() => expect(api.postCapture).toHaveBeenCalled());
 
     // Step 5 push
