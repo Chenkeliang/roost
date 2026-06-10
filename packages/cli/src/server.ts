@@ -5,7 +5,7 @@ import * as crypto from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import type { FastifyInstance } from "fastify";
-import type { ModuleContext, EnvData } from "@roost/shared";
+import type { ModuleContext, EnvData, Exec } from "@roost/shared";
 import type { ModuleRegistry } from "@roost/core";
 import {
   loadSelection,
@@ -64,6 +64,8 @@ import {
 import type { SkillTarget, SkillsConfig, SkillLink } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 import { finalizeCapture } from "./captureFlow.js";
+import { runInit } from "./init.js";
+import { ensureGitRepo } from "./gitRepo.js";
 
 // Target ids where a skill is enabled but the on-disk dest is a REAL (non-Roost)
 // directory — a genuine conflict the user must resolve before linking.
@@ -115,6 +117,13 @@ export function classifyGitError(output: string): "auth" | "pull-first" | undefi
     return "pull-first";
   }
   return undefined;
+}
+
+// Add or update the `origin` remote idempotently.
+async function setOrigin(exec: Exec, repoDir: string, url: string): Promise<void> {
+  const existing = await exec.run("git", ["-C", repoDir, "remote", "get-url", "origin"]);
+  const sub = existing.code === 0 ? "set-url" : "add";
+  await exec.run("git", ["-C", repoDir, "remote", sub, "origin", url]);
 }
 
 export interface ServerDeps {
@@ -623,6 +632,35 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const ok = result.code === 0;
     const output = `${result.stdout}\n${result.stderr}`.trim();
     return reply.send({ ok, output });
+  });
+
+  // ── POST /api/init ────────────────────────────────────────────────────────────
+  // Scaffold a fresh config repo (idempotent) + git init + first commit; optionally
+  // wire an origin remote. Delegates to existing helpers; no shell-out from the UI.
+  server.post<{ Body: { remoteUrl?: string } }>("/api/init", async (req, reply) => {
+    try {
+      cache.invalidateAll();
+      const exec = makeCtx(false).exec;
+      const { created } = await runInit({ repoDir });
+      await ensureGitRepo(exec, repoDir);
+      const remoteUrl = req.body?.remoteUrl?.trim();
+      if (remoteUrl) await setOrigin(exec, repoDir, remoteUrl);
+      const r = await exec.run("git", ["-C", repoDir, "remote", "get-url", "origin"]);
+      const remote = r.code === 0 ? r.stdout.trim() || null : null;
+      return reply.send({ created, isRepo: true, remote });
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // ── POST /api/git/remote ──────────────────────────────────────────────────────
+  server.post<{ Body: { url?: string } }>("/api/git/remote", async (req, reply) => {
+    cache.invalidateAll();
+    const url = req.body?.url?.trim();
+    if (!url) return reply.status(400).send({ error: "url is required" });
+    const exec = makeCtx(false).exec;
+    await setOrigin(exec, repoDir, url);
+    return reply.send({ ok: true, remote: url });
   });
 
   // ── GET /api/timeline ────────────────────────────────────────────────────────
