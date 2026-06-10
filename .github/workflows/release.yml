@@ -1,10 +1,10 @@
 name: release
 
-# Builds the macOS desktop app and attaches the .dmg to a GitHub Release.
-# Triggers ONLY on a version tag (e.g. `v0.1.0`) — pushing code to main does not
-# release. `workflow_dispatch` lets you build a .dmg on demand (uploaded as a CI
-# artifact, no release). The release is created as a DRAFT, so it is never public
-# until you review and publish it. The app is currently unsigned/un-notarized.
+# Builds the macOS desktop app for BOTH architectures (Apple Silicon + Intel)
+# and attaches both .dmg files to a GitHub Release. Triggers ONLY on a version
+# tag (e.g. `v0.1.0`); pushing code to main does not release. `workflow_dispatch`
+# builds the .dmgs on demand (uploaded as a CI artifact, no release). The app is
+# currently unsigned/un-notarized.
 on:
   push:
     tags: ["v*"]
@@ -15,28 +15,36 @@ permissions:
 
 jobs:
   desktop:
-    runs-on: macos-latest # Apple Silicon → aarch64 .dmg
+    runs-on: macos-latest # Apple Silicon host; cross-compiles the x86_64 build too
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with: { node-version: 24, cache: "pnpm" }
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build:desktop
-      - name: Upload .dmg as a build artifact
+      # Builds packages + both-arch Node SEA sidecars (build-sidecar downloads the
+      # x86_64 Node for the cross sidecar; default ROOST_ARCHES=arm64,x64).
+      - run: pnpm build:sidecar
+      - name: Build Apple Silicon .dmg
+        run: pnpm --filter @roost/web exec tauri build --target aarch64-apple-darwin
+      - name: Build Intel .dmg
+        run: pnpm --filter @roost/web exec tauri build --target x86_64-apple-darwin
+      - name: Upload both .dmgs as a build artifact
         uses: actions/upload-artifact@v4
         with:
           name: roost-dmg
-          path: packages/web/src-tauri/target/release/bundle/dmg/*.dmg
+          path: packages/web/src-tauri/target/*/release/bundle/dmg/*.dmg
           if-no-files-found: error
-      - name: Draft a GitHub Release with the .dmg (tags only)
+      - name: Attach both .dmgs to the release (tags only)
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            packages/web/src-tauri/target/release/bundle/dmg/*.dmg \
-            --title "Roost $GITHUB_REF_NAME" \
-            --generate-notes \
-            --draft
+          dmgs=(packages/web/src-tauri/target/*/release/bundle/dmg/*.dmg)
+          # Add to an existing release (e.g. re-run), else create a fresh DRAFT.
+          gh release upload "$GITHUB_REF_NAME" "${dmgs[@]}" --clobber \
+            || gh release create "$GITHUB_REF_NAME" "${dmgs[@]}" \
+                 --title "Roost $GITHUB_REF_NAME" --generate-notes --draft
