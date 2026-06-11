@@ -2045,6 +2045,22 @@ describe("repo hygiene endpoints (ADR-0021)", () => {
     await server.close();
   });
 
+  it("backup/status omits large files the user approved via dotfiles-large-ok", async () => {
+    const reg = new ModuleRegistry();
+    const dir = path.join(tmpDir, "dot_config", "bigapp");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "encrypted_huge.bin.age"), Buffer.alloc(11 * 1024 * 1024));
+    // approve the file (target path) → the advisory must not list it again
+    const target = path.join(os.homedir(), ".config", "bigapp", "huge.bin");
+    let sel = emptySelection();
+    sel = addItem(sel, "dotfiles-large-ok", target);
+    saveSelection(tmpDir, sel);
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/backup/status" });
+    expect((res.json() as { largeItems: unknown[] }).largeItems).toEqual([]);
+    await server.close();
+  });
+
   it("POST /api/dotfiles/exclude forgets the path and records it in dotfiles-exclude", async () => {
     const reg = new ModuleRegistry();
     const calls: string[][] = [];

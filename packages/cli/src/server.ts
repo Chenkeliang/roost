@@ -548,6 +548,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const state = readState(repoDir, os.hostname());
     const home = os.homedir();
     const largeItems: { path: string; mb: number }[] = [];
+    // User-approved large files (仍要备份/保留) are not re-advised.
+    const largeOk = new Set(loadSelection(repoDir).modules["dotfiles-large-ok"] ?? []);
     const SKIP = new Set([".git", "roost", "state"]);
     const walk = (dir: string, rel: string): void => {
       let entries: fs.Dirent[] = [];
@@ -561,7 +563,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
           let size = 0;
           try { size = fs.statSync(abs).size; } catch { continue; }
           if (size > LARGE_FILE_MB * 1024 * 1024) {
-            largeItems.push({ path: sourceToTarget(r, home), mb: Math.round(size / 1048576) });
+            const target = sourceToTarget(r, home);
+            if (!largeOk.has(target)) largeItems.push({ path: target, mb: Math.round(size / 1048576) });
           }
         }
       }

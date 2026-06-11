@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Files } from "@phosphor-icons/react";
-import { excludeDotfile } from "../api";
+import { excludeDotfile, addSelection } from "../api";
 
 const banner: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: "var(--surface)", border: "1px solid #4a3a1e", borderRadius: "var(--rc)", marginBottom: 14, fontSize: 13.5 };
 const ghost: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12, padding: "3px 10px", borderRadius: 7, cursor: "pointer", whiteSpace: "nowrap" };
@@ -21,6 +21,12 @@ export function LargeFilesAdvisory({ t, items, onChanged }: {
     finally { setBusyPath(null); }
   };
 
+  const keep = async (p: string) => {
+    setBusyPath(p);
+    try { await addSelection("dotfiles-large-ok", p); onChanged(); } catch { /* stays listed */ }
+    finally { setBusyPath(null); }
+  };
+
   return (
     <div style={banner} role="status">
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -33,6 +39,9 @@ export function LargeFilesAdvisory({ t, items, onChanged }: {
         <div key={i.path} style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 6, borderTop: "1px solid var(--border-soft)" }}>
           <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)", fontSize: 12.5 }}>{i.path}</span>
           <span style={{ color: "var(--muted)", fontSize: 12.5, flexShrink: 0 }}>{i.mb} MB</span>
+          <button onClick={() => void keep(i.path)} disabled={busyPath !== null} style={ghost}>
+            {t("large.keep")}
+          </button>
           <button onClick={() => void exclude(i.path)} disabled={busyPath !== null} style={{ ...ghost, color: "var(--accent)" }}>
             {busyPath === i.path ? "…" : t("large.remove")}
           </button>
