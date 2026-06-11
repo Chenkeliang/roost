@@ -10,7 +10,8 @@ import {
 import { Skeleton } from "../components/Skeleton";
 import { KeyBackupConfirm } from "../components/KeyBackupConfirm";
 import { useT } from "../i18n";
-import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, getSettings, saveSettings, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
+import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, getSettings, saveSettings, type ModulesResponse, type GitStatus,
+  type GitOpResult, type KeyStatus } from "../api";
 import { openExternal } from "../openExternal";
 import { checkForUpdate } from "../updateCheck";
 
@@ -22,7 +23,7 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitBusy, setGitBusy] = useState<"push" | "pull" | null>(null);
-  const [gitResult, setGitResult] = useState<{ kind: "push" | "pull"; ok: boolean; output: string; hint?: "auth" } | null>(null);
+  const [gitResult, setGitResult] = useState<{ kind: "push" | "pull"; ok: boolean; output: string; hint?: GitOpResult["hint"] } | null>(null);
   const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null);
   const [keyBusy, setKeyBusy] = useState<"generate" | "rotate" | null>(null);
   const [keyResult, setKeyResult] = useState<{ ok: boolean; text: string } | null>(null);
