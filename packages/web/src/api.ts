@@ -396,7 +396,7 @@ export interface GitStatus {
 export interface GitOpResult {
   ok: boolean;
   output: string;
-  hint?: "auth" | "pull-first";
+  hint?: "auth" | "pull-first" | "busy";
 }
 
 export function getGitStatus(): Promise<GitStatus> {
@@ -542,7 +542,15 @@ export function saveSettings(s: Partial<SettingsResponse>): Promise<{ ok: boolea
 
 // ── Backup freshness (ADR-0020) ───────────────────────────────────────────────
 export interface BackupLastRun { at: string; captured: number; blocked: number; blockedDetail: BlockedItem[]; pushed?: boolean; pushHint?: "auth" | "pull-first"; error?: string }
-export interface BackupStatus { autoBackup: "off" | "daily" | "weekly"; autoPush: boolean; lastRun: BackupLastRun | null; lastCaptureAt: string | null }
+export interface BackupStatus { autoBackup: "off" | "daily" | "weekly"; autoPush: boolean; lastRun: BackupLastRun | null; lastCaptureAt: string | null; largeItems: { path: string; mb: number }[] }
 export function getBackupStatus(): Promise<BackupStatus> {
   return apiFetch<BackupStatus>("/api/backup/status");
+}
+
+export function excludeDotfile(path: string): Promise<{ ok: boolean }> {
+  return apiFetch("/api/dotfiles/exclude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
 }
