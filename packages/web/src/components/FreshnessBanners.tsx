@@ -46,7 +46,7 @@ export function FreshnessBanners({ t, locale, gitStatus, lastCaptureAt, update, 
       if (r.ok) { showHud?.({ text: t("fresh.ahead.pushed"), type: "success" }); onRefresh(); }
       else {
         const hint = r.hint;
-        setPushErrKey(hint === "auth" ? "fresh.ahead.authHint" : hint === "pull-first" ? "fresh.ahead.pullFirstHint" : "fresh.ahead.pushFailed");
+        setPushErrKey(hint === "auth" ? "fresh.ahead.authHint" : hint === "pull-first" ? "fresh.ahead.pullFirstHint" : hint === "busy" ? "fresh.ahead.busy" : "fresh.ahead.pushFailed");
       }
     } catch { setPushErrKey("fresh.ahead.pushFailed"); }
     finally { setBusy(null); }
