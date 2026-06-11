@@ -1,5 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as os from "node:os";
+import { createHash } from "node:crypto";
 import type {
   SyncModule,
   ModuleContext,
@@ -19,6 +21,29 @@ import { scanForSecrets } from "../secrets/scanner.js";
 import { loadAppConfigCatalog, expandCatalogPath } from "../app-config-catalog.js";
 import { ensureChezmoiAgeConfig } from "../chezmoi-config.js";
 import { loadRoostSettings } from "../settings.js";
+import { loadModuleEncHashes, recordModuleEncHashes } from "../sync-baseline.js";
+
+// Per-file size gate (ADR-0021): new files above this are blocked pending user
+// confirmation. Repo-side only — local files are never touched.
+export const LARGE_FILE_MB = 10;
+
+// Regular files under a path (the path itself if it is a file). Symlinks skipped.
+function walkRegularFiles(p: string): string[] {
+  let st: fs.Stats;
+  try { st = fs.lstatSync(p); } catch { return []; }
+  if (st.isSymbolicLink()) return [];
+  if (st.isFile()) return [p];
+  if (!st.isDirectory()) return [];
+  let out: string[] = [];
+  let entries: fs.Dirent[] = [];
+  try { entries = fs.readdirSync(p, { withFileTypes: true }); } catch { return []; }
+  for (const e of entries) out = out.concat(walkRegularFiles(path.join(p, e.name)));
+  return out;
+}
+
+function sha256File(p: string): string | null {
+  try { return createHash("sha256").update(fs.readFileSync(p)).digest("hex"); } catch { return null; }
+}
 
 export interface CaptureScanResult {
   secretFiles: string[];
@@ -266,6 +291,20 @@ export const dotfilesModule: SyncModule = {
     // Capture size guard cap (configurable via roost/settings.yaml). (Task 5)
     const maxBytes = loadRoostSettings(ctx.repoDir).maxCaptureMB * 1024 * 1024;
 
+    const excludeList = sel.modules["dotfiles-exclude"] ?? [];
+    const largeOk = new Set(sel.modules["dotfiles-large-ok"] ?? []);
+    const prevEncHashes = loadModuleEncHashes(ctx.repoDir, "dotfiles");
+    const newEncHashes: Record<string, string> = {};
+    // Target paths chezmoi already manages (relative to home) → absolute set.
+    let managedAbs: Set<string>;
+    try {
+      managedAbs = new Set((await chezmoi.managed()).map((rel) => path.join(ctx.home, rel)));
+    } catch {
+      managedAbs = new Set();
+    }
+    const isExcluded = (f: string): boolean =>
+      excludeList.some((e) => f === e || f.startsWith(e.endsWith("/") ? e : e + "/"));
+
     for (const id of ids) {
       // Never try to manage tool-internal config (roost's / chezmoi's own).
       if (isRoostManaged(id)) {
@@ -291,6 +330,30 @@ export const dotfilesModule: SyncModule = {
         continue;
       }
 
+      const files = walkRegularFiles(id);
+      const largeNew = files.filter(
+        (f) =>
+          !isExcluded(f) &&
+          !largeOk.has(f) &&
+          !managedAbs.has(f) &&
+          (fs.statSync(f).size > LARGE_FILE_MB * 1024 * 1024),
+      );
+      const toForget = [...new Set([...files.filter(isExcluded), ...largeNew])];
+
+      const forgetOffenders = async (): Promise<void> => {
+        for (const f of toForget) {
+          try { await chezmoi.forget(f); } catch { /* not managed → nothing to remove */ }
+        }
+        for (const f of largeNew) {
+          blocked.push(f);
+          blockedDetail.push({
+            id: f,
+            reason: "large",
+            detail: `${Math.round(fs.statSync(f).size / 1048576)}MB`,
+          });
+        }
+      };
+
       if (wantsEncrypt) {
         // Configure chezmoi's age recipient from the existing key (once).
         if (ageReady === null) {
@@ -305,7 +368,27 @@ export const dotfilesModule: SyncModule = {
           blockedDetail.push({ id, reason: "error", detail: "no age key" });
           continue;
         }
+        // Churn control (ADR-0021): age output is non-deterministic, so skip the
+        // re-encrypt entirely when every plaintext hash is unchanged and the
+        // source already holds the ciphertext.
+        const hashable = files.filter((f) => !isExcluded(f));
+        const hashes: Record<string, string> = {};
+        let allKnown = hashable.length > 0;
+        for (const f of hashable) {
+          const h = sha256File(f);
+          if (h === null) { allKnown = false; break; }
+          hashes[f] = h;
+        }
+        const unchanged =
+          allKnown &&
+          hashable.every((f) => prevEncHashes[f] === hashes[f] && managedAbs.has(f));
+        if (unchanged) {
+          encrypted.push(id); // state is current; no new ciphertext produced
+          continue;
+        }
         await chezmoi.add(id, { encrypt: true });
+        await forgetOffenders();
+        Object.assign(newEncHashes, hashes);
         encrypted.push(id);
         continue;
       }
@@ -323,7 +406,12 @@ export const dotfilesModule: SyncModule = {
       }
 
       await chezmoi.add(id, { encrypt: false });
+      await forgetOffenders();
       written.push(id);
+    }
+
+    if (Object.keys(newEncHashes).length > 0) {
+      recordModuleEncHashes(ctx.repoDir, os.hostname(), "dotfiles", newEncHashes);
     }
 
     return { module: "dotfiles", written, encrypted, blocked, blockedDetail };

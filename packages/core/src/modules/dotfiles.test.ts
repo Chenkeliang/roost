@@ -264,6 +264,7 @@ describe("dotfilesModule.capture", () => {
     fs.mkdirSync(path.join(home, ".config", "sops", "age"), { recursive: true });
     fs.writeFileSync(path.join(home, ".config", "sops", "age", "keys.txt"), "AGE-SECRET-KEY-X");
     const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" },                 // chezmoi managed
       { code: 0, stdout: "age1recipientkey", stderr: "" }, // age-keygen -y (recipientFromKey)
       { code: 0, stdout: "", stderr: "" }, // chezmoi add --encrypt
     ]);
@@ -287,6 +288,7 @@ describe("dotfilesModule.capture", () => {
     const file = path.join(dir, "clash.yaml");
     fs.writeFileSync(file, "password: longsecretvalue12345"); // would normally be blocked
     const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" },                 // chezmoi managed
       { code: 0, stdout: "age1recipientkey", stderr: "" }, // age-keygen -y
       { code: 0, stdout: "", stderr: "" }, // chezmoi add --encrypt
     ]);
@@ -597,5 +599,120 @@ describe("dotfilesModule.apply scope", () => {
     const applyCall = calls.find((c) => c.cmd === "chezmoi" && c.args.includes("apply"));
     expect(applyCall?.args).toContain(target);
     expect(result.applied).toContain(target);
+  });
+});
+
+// ── ADR-0021: churn control + large-file gate ─────────────────────────────────
+
+describe("capture churn control + large-file gate (ADR-0021)", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-adr0021-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("skips chezmoi add --encrypt when plaintext hashes are unchanged and source has the file", async () => {
+    const home = tmpDir;
+    const repoDir = path.join(tmpDir, "repo");
+    fs.mkdirSync(repoDir, { recursive: true });
+    // age key required so ensureChezmoiAgeConfig returns ready:true
+    fs.mkdirSync(path.join(home, ".config", "sops", "age"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".config", "sops", "age", "keys.txt"), "AGE-SECRET-KEY-X");
+    const f = path.join(home, ".secret-conf");
+    fs.writeFileSync(f, "value=1\n", "utf8");
+
+    // mark for encryption via the marked-encrypt convention
+    const sel: Selection = { modules: { dotfiles: [f], "dotfiles-encrypt": [f] } };
+
+    // Call order: managed (empty), age-keygen -y, chezmoi add
+    const { exec, calls } = makeFakeExec([
+      { code: 0, stdout: "", stderr: "" },                 // chezmoi managed → empty
+      { code: 0, stdout: "age1recipientkey", stderr: "" }, // age-keygen -y
+    ]);
+    const ctx = makeCtx({ exec, home, repoDir });
+
+    // 1st capture: must add (no recorded hash yet)
+    await dotfilesModule.capture(ctx, sel);
+    const adds1 = calls.filter((c) => c.cmd === "chezmoi" && c.args.includes("add")).length;
+    expect(adds1).toBe(1);
+
+    // pretend the source now holds the ciphertext: chezmoi managed lists the file
+    const rel = path.relative(home, f);
+    const calls2: { cmd: string; args: string[] }[] = [];
+    const exec2: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls2.push({ cmd, args });
+        if (cmd === "chezmoi" && args.includes("managed")) return { code: 0, stdout: rel + "\n", stderr: "" };
+        if (cmd === "age-keygen") return { code: 0, stdout: "age1recipientkey", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const ctx2 = makeCtx({ exec: exec2, home, repoDir });
+
+    // 2nd capture, unchanged plaintext: must SKIP the add
+    await dotfilesModule.capture(ctx2, sel);
+    expect(calls2.filter((c) => c.cmd === "chezmoi" && c.args.includes("add")).length).toBe(0);
+
+    // change the plaintext → must add again
+    fs.writeFileSync(f, "value=2\n", "utf8");
+    await dotfilesModule.capture(ctx2, sel);
+    expect(calls2.filter((c) => c.cmd === "chezmoi" && c.args.includes("add")).length).toBe(1);
+  });
+
+  it("blocks a NEW >10MB file with reason 'large' and forgets it from the source — local file untouched", async () => {
+    const home = tmpDir;
+    const repoDir = path.join(tmpDir, "repo");
+    fs.mkdirSync(repoDir, { recursive: true });
+    const dir = path.join(home, ".bigapp");
+    fs.mkdirSync(dir);
+    const big = path.join(dir, "huge.bin");
+    fs.writeFileSync(big, Buffer.alloc(11 * 1024 * 1024)); // 11MB
+    fs.writeFileSync(path.join(dir, "small.conf"), "ok\n", "utf8");
+
+    const sel: Selection = { modules: { dotfiles: [dir] } };
+
+    const { exec, calls } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home, repoDir });
+    const cs = await dotfilesModule.capture(ctx, sel);
+
+    expect(cs.blockedDetail?.some((b) => b.id === big && b.reason === "large")).toBe(true);
+    // forgotten from the source after the dir add
+    expect(calls.some((c) => c.cmd === "chezmoi" && c.args.includes("forget") && c.args.includes(big))).toBe(true);
+    // the local file is untouched
+    expect(fs.existsSync(big)).toBe(true);
+  });
+
+  it("respects dotfiles-large-ok (no block) and dotfiles-exclude (silent forget)", async () => {
+    const home = tmpDir;
+    const repoDir = path.join(tmpDir, "repo");
+    fs.mkdirSync(repoDir, { recursive: true });
+    const dir = path.join(home, ".bigapp2");
+    fs.mkdirSync(dir);
+    const big = path.join(dir, "huge.bin");
+    const noisy = path.join(dir, "cache.db");
+    fs.writeFileSync(big, Buffer.alloc(11 * 1024 * 1024));
+    fs.writeFileSync(noisy, "x", "utf8");
+
+    const sel: Selection = {
+      modules: {
+        dotfiles: [dir],
+        "dotfiles-large-ok": [big],
+        "dotfiles-exclude": [noisy],
+      },
+    };
+
+    const { exec, calls } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home, repoDir });
+    const cs = await dotfilesModule.capture(ctx, sel);
+
+    expect(cs.blockedDetail?.some((b) => b.reason === "large")).toBe(false);
+    // approved big file NOT forgotten; excluded path IS forgotten (silently)
+    expect(calls.some((c) => c.cmd === "chezmoi" && c.args.includes("forget") && c.args.includes(big))).toBe(false);
+    expect(calls.some((c) => c.cmd === "chezmoi" && c.args.includes("forget") && c.args.includes(noisy))).toBe(true);
+    expect(fs.existsSync(noisy)).toBe(true); // local file untouched
   });
 });
