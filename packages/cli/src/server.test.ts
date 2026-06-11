@@ -2008,3 +2008,44 @@ describe("onboarding endpoints", () => {
     await server.close();
   });
 });
+
+describe("backup status + settings passthrough", () => {
+  it("GET /api/backup/status returns scheduler state and lastCaptureAt", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/backup/status" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { autoBackup: string; autoPush: boolean; lastRun: unknown; lastCaptureAt: string | null };
+    expect(body.autoBackup).toBe("daily");
+    expect(body.autoPush).toBe(false);
+    expect(body.lastRun).toBeNull();
+    expect(body.lastCaptureAt).toBeNull();
+    await server.close();
+  });
+
+  it("POST /api/settings accepts and persists the freshness fields", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({
+      method: "POST", url: "/api/settings",
+      payload: { maxCaptureMB: 42, autoBackup: "weekly", autoPush: true, checkUpdates: false },
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).toBe(200);
+    const get = await server.inject({ method: "GET", url: "/api/settings" });
+    expect(get.json()).toMatchObject({ maxCaptureMB: 42, autoBackup: "weekly", autoPush: true, checkUpdates: false });
+    await server.close();
+  });
+
+  it("POST /api/settings rejects bad autoBackup values back to default", async () => {
+    const reg = new ModuleRegistry();
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    await server.inject({
+      method: "POST", url: "/api/settings",
+      payload: { autoBackup: "hourly" }, headers: { "content-type": "application/json" },
+    });
+    const get = await server.inject({ method: "GET", url: "/api/settings" });
+    expect((get.json() as { autoBackup: string }).autoBackup).toBe("daily");
+    await server.close();
+  });
+});
