@@ -4,7 +4,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import type { Exec, ExecResult, ModuleContext, Selection } from "@roost/shared";
 import { classifyDotfile, isSensitivePath, dotfilesModule, scanPathForSecrets } from "./dotfiles.js";
-import { saveRoostSettings } from "../settings.js";
+import { saveRoostSettings, DEFAULT_ROOST_SETTINGS } from "../settings.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -366,7 +366,7 @@ describe("dotfilesModule.capture", () => {
     const repo = fs.mkdtempSync(path.join(os.tmpdir(), "roost-cap-repo-"));
     const f = path.join(home, ".biggish");
     fs.writeFileSync(f, "x".repeat(5000)); // 5KB
-    saveRoostSettings(repo, { maxCaptureMB: 0 }); // 0MB cap → any non-empty content is "too large"
+    saveRoostSettings(repo, { ...DEFAULT_ROOST_SETTINGS, maxCaptureMB: 0 }); // 0MB cap → any non-empty content is "too large"
     const { exec } = makeFakeExec([{ code: 0, stdout: "", stderr: "" }]);
     const ctx = makeCtx({ exec, home, repoDir: repo });
     const cs = await dotfilesModule.capture(ctx, { modules: { dotfiles: [f] } });
