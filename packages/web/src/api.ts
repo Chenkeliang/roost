@@ -396,7 +396,7 @@ export interface GitStatus {
 export interface GitOpResult {
   ok: boolean;
   output: string;
-  hint?: "auth";
+  hint?: "auth" | "pull-first";
 }
 
 export function getGitStatus(): Promise<GitStatus> {

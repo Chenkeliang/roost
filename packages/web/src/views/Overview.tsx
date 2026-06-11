@@ -95,6 +95,17 @@ function ModuleHealthChip({ report }: ModuleHealthProps) {
   );
 }
 
+// "3 days ago / 2 小时前" — pick the largest sensible unit so an old backup never
+// renders as "192 hours ago".
+function formatAgo(iso: string, locale: string): string {
+  const rtf = new Intl.RelativeTimeFormat(locale === "zh" ? "zh" : "en", { numeric: "auto" });
+  const mins = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
+  if (Math.abs(mins) < 60) return rtf.format(mins, "minute");
+  const hours = Math.round(mins / 60);
+  if (Math.abs(hours) < 48) return rtf.format(hours, "hour");
+  return rtf.format(Math.round(hours / 24), "day");
+}
+
 export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   const { t, locale } = useT();
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -417,7 +428,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
         <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 13 }}>
           {backupStatus?.lastCaptureAt && (
             <>
-              {t("fresh.lastBackup")} {new Intl.RelativeTimeFormat(locale === "zh" ? "zh" : "en", { numeric: "auto" }).format(Math.round((new Date(backupStatus.lastCaptureAt).getTime() - Date.now()) / 3600000), "hour")}
+              {t("fresh.lastBackup")} {formatAgo(backupStatus.lastCaptureAt, locale)}
               {backupStatus.lastRun && backupStatus.lastRun.captured > 0 && new Date(backupStatus.lastRun.at) >= new Date(backupStatus.lastCaptureAt) ? ` ${t("fresh.lastBackup.auto")}` : ""}
               {" · "}
             </>
