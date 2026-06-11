@@ -199,6 +199,43 @@ describe("statusAll", () => {
     expect(reports.some((r) => r.module === "dotfiles")).toBe(true);
     expect(reports.some((r) => r.module === "packages")).toBe(true);
   });
+
+  it("runs module status concurrently (cost = slowest module, not the sum) and keeps registry order", async () => {
+    const started: string[] = [];
+    let releaseA: () => void = () => {};
+    const gateA = new Promise<void>((res) => { releaseA = res; });
+
+    const mkMod = (name: string, wait?: Promise<void>): SyncModule => ({
+      name,
+      async discover() { return []; },
+      async status(): Promise<DriftReport> {
+        started.push(name);
+        if (wait) await wait;
+        return { module: name, items: [] };
+      },
+      async capture() { return { module: name, written: [], encrypted: [] }; },
+      async apply() { return { module: name, applied: [], backedUp: [], skipped: [] }; },
+      async diff() { return ""; },
+      async unmanage() { return { module: name, applied: [], backedUp: [], skipped: [] }; },
+      async doctor() { return []; },
+    });
+
+    const reg = new ModuleRegistry();
+    reg.register(mkMod("a", gateA)); // first module blocks until released
+    reg.register(mkMod("b"));
+
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpDir, repoDir: tmpDir });
+    const pending = statusAll(reg, ctx, { modules: {} });
+
+    // With sequential execution "b" could never start while "a" is blocked.
+    await new Promise((r) => setTimeout(r, 10));
+    expect(started).toEqual(["a", "b"]);
+
+    releaseA();
+    const reports = await pending;
+    expect(reports.map((r) => r.module)).toEqual(["a", "b"]); // registry order preserved
+  });
 });
 
 // ── loadAll ───────────────────────────────────────────────────────────────────
