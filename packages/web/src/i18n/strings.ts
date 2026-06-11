@@ -626,6 +626,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "large.title": { en: "large file(s) in your backup, total", zh: "个大文件在备份中,共" },
   "large.expand": { en: "Show", zh: "展开" },
   "large.collapse": { en: "Hide", zh: "收起" },
+  "large.keep": { en: "Keep backing up (don't remind again)", zh: "保留备份(不再提醒)" },
   "large.remove": { en: "Stop backing up (keeps local file)", zh: "移出备份(不影响本地文件)" },
   "large.removed": { en: "Removed from backups — local file untouched.", zh: "已移出备份 —— 本地文件未受影响。" },
 };
