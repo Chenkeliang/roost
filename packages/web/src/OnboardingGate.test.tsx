@@ -24,6 +24,8 @@ vi.mock("./api", () => ({
   getEnvironment: vi.fn(), getDiscover: vi.fn(), addSelection: vi.fn(), getSelection: vi.fn(),
   getKey: vi.fn(), generateKey: vi.fn(), postCapture: vi.fn(), gitPush: vi.fn(), postInit: vi.fn(),
   postClone: vi.fn(), postBrewInstall: vi.fn(), setGitRemote: vi.fn(),
+  getBackupStatus: vi.fn().mockResolvedValue({ autoBackup: "daily", autoPush: false, lastRun: null, lastCaptureAt: new Date().toISOString() }),
+  gitPull: vi.fn().mockResolvedValue({ ok: true, output: "" }),
 }));
 
 describe("Overview onboarding gate", () => {

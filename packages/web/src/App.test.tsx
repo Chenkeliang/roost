@@ -30,6 +30,7 @@ vi.mock("./api", () => ({
   rotateKey: vi.fn().mockResolvedValue({ recipient: "age1x", rotated: [], failed: [], swapped: true }),
   getSettings: vi.fn().mockResolvedValue({ maxCaptureMB: 100 }),
   saveSettings: vi.fn().mockResolvedValue({ ok: true, maxCaptureMB: 100 }),
+  getBackupStatus: vi.fn().mockResolvedValue({ autoBackup: "daily", autoPush: false, lastRun: null, lastCaptureAt: new Date().toISOString() }),
 }));
 
 describe("App", () => {

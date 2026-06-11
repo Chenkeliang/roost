@@ -14,6 +14,7 @@ import {
   postCapture,
   getEnvironment,
   getGitStatus,
+  getBackupStatus,
   addSelection,
   removeSelection,
   type HealthResponse,
@@ -21,7 +22,11 @@ import {
   type StatusResponse,
   type BlockedItem,
   type GitStatus,
+  type BackupStatus,
 } from "../api";
+import { FreshnessBanners } from "../components/FreshnessBanners";
+import { checkForUpdate } from "../updateCheck";
+import type { UpdateInfo } from "../updateCheck";
 import { Onboarding } from "./onboarding/Onboarding";
 import { RemoteWarningBanner } from "../components/RemoteWarningBanner";
 
@@ -90,7 +95,7 @@ function ModuleHealthChip({ report }: ModuleHealthProps) {
 }
 
 export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [machines, setMachines] = useState<MachinesResponse | null>(null);
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
@@ -103,6 +108,8 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   const [blockedDetail, setBlockedDetail] = useState<BlockedItem[]>([]);
   const [retrying, setRetrying] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoadingData(true);
@@ -118,16 +125,31 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
     void getEnvironment()
       .then((env) => setMissingDeps(env.checks.filter((c) => c.required && !c.ok).map((c) => c.id)))
       .catch(() => {});
-    const [h, m, git] = await Promise.allSettled([getHealth(), getMachines(), getGitStatus()]);
+    const [h, m, git, backup] = await Promise.allSettled([getHealth(), getMachines(), getGitStatus(), getBackupStatus()]);
     if (h.status === "fulfilled") setHealth(h.value);
     if (m.status === "fulfilled") setMachines(m.value);
     if (git.status === "fulfilled") setGitStatus(git.value);
+    if (backup.status === "fulfilled") setBackupStatus(backup.value);
     setLoadingData(false);
   }, []);
 
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    // Once per app session; browser/dev mode has no Tauri version — skip silently.
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { getVersion } = await import("@tauri-apps/api/app");
+        const current = await getVersion();
+        const info = await checkForUpdate(current);
+        if (!cancelled && info && localStorage.getItem("roost.dismissedUpdate") !== info.version) setUpdate(info);
+      } catch { /* not running under Tauri */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleCapture = async () => {
     setCapturing(true);
@@ -233,6 +255,21 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           >
             {t("overview.depsFix")}
           </button>
+        </div>
+      )}
+      <FreshnessBanners
+        t={t}
+        locale={locale}
+        gitStatus={gitStatus}
+        lastCaptureAt={backupStatus?.lastCaptureAt ?? null}
+        update={update}
+        onDismissUpdate={() => { if (update) localStorage.setItem("roost.dismissedUpdate", update.version); setUpdate(null); }}
+        onRefresh={() => void fetchData()}
+        showHud={showHud}
+      />
+      {backupStatus?.lastRun?.error && (
+        <div style={{ marginBottom: 14, padding: "8px 14px", background: "rgba(242,85,90,.08)", border: "1px solid var(--red)", borderRadius: "var(--rr)", color: "var(--red)", fontSize: 13 }}>
+          {t("fresh.autoError")} {backupStatus.lastRun.error}
         </div>
       )}
       {error && (
@@ -375,6 +412,13 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
         </button>
 
         <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 13 }}>
+          {backupStatus?.lastCaptureAt && (
+            <>
+              {t("fresh.lastBackup")} {new Intl.RelativeTimeFormat(locale === "zh" ? "zh" : "en", { numeric: "auto" }).format(Math.round((new Date(backupStatus.lastCaptureAt).getTime() - Date.now()) / 3600000), "hour")}
+              {backupStatus.lastRun && backupStatus.lastRun.captured > 0 && new Date(backupStatus.lastRun.at) >= new Date(backupStatus.lastCaptureAt) ? ` ${t("fresh.lastBackup.auto")}` : ""}
+              {" · "}
+            </>
+          )}
           ↵ to capture · <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>⌘K actions</span>
         </span>
       </div>

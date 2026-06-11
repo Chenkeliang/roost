@@ -35,6 +35,9 @@ vi.mock("./api", () => ({
   }),
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
   removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
+  getBackupStatus: vi.fn().mockResolvedValue({ autoBackup: "daily", autoPush: false, lastRun: null, lastCaptureAt: new Date().toISOString() }),
+  gitPull: vi.fn().mockResolvedValue({ ok: true, output: "" }),
+  gitPush: vi.fn().mockResolvedValue({ ok: true, output: "" }),
 }));
 
 describe("Overview", () => {
@@ -133,5 +136,17 @@ describe("Overview", () => {
     await waitFor(() => {
       expect(onOpenSync).toHaveBeenCalled();
     });
+  });
+
+  it("shows the unpushed banner when git status reports ahead > 0", async () => {
+    vi.mocked(api.getGitStatus).mockResolvedValue({ isRepo: true, remote: "git@x:y.git", branch: "main", ahead: 2, behind: 0, clean: true });
+    await act(async () => { render(<Overview showHud={noop} />); });
+    expect(await screen.findByRole("button", { name: /Push|推送/ })).toBeInTheDocument();
+  });
+
+  it("shows the stale banner when the last capture is older than 7 days", async () => {
+    vi.mocked(api.getBackupStatus).mockResolvedValue({ autoBackup: "daily", autoPush: false, lastRun: null, lastCaptureAt: new Date(Date.now() - 9 * 86400000).toISOString() });
+    await act(async () => { render(<Overview showHud={noop} />); });
+    expect(await screen.findByText(/Last backup was|上次备份已是/)).toBeInTheDocument();
   });
 });
