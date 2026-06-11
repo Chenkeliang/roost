@@ -10,7 +10,7 @@ export function loadRoostSettings(repoDir: string): RoostSettings {
     const raw = yaml.load(fs.readFileSync(settingsPath(repoDir), "utf8"));
     if (raw && typeof raw === "object") {
       const r = raw as Record<string, unknown>;
-      if (typeof r["maxCaptureMB"] === "number" && r["maxCaptureMB"] > 0) s.maxCaptureMB = r["maxCaptureMB"];
+      if (typeof r["maxCaptureMB"] === "number" && r["maxCaptureMB"] >= 0) s.maxCaptureMB = r["maxCaptureMB"];
       if (FREQS.includes(r["autoBackup"] as AutoBackupFreq)) s.autoBackup = r["autoBackup"] as AutoBackupFreq;
       if (typeof r["autoPush"] === "boolean") s.autoPush = r["autoPush"];
       if (typeof r["checkUpdates"] === "boolean") s.checkUpdates = r["checkUpdates"];

@@ -26,6 +26,15 @@ describe("RoostSettings freshness fields", () => {
     saveRoostSettings(tmpDir, { maxCaptureMB: 50, autoBackup: "weekly", autoPush: true, checkUpdates: false });
     expect(loadRoostSettings(tmpDir)).toEqual({ maxCaptureMB: 50, autoBackup: "weekly", autoPush: true, checkUpdates: false });
   });
+  it("maxCaptureMB of 0 is accepted (means block everything)", () => {
+    saveRoostSettings(tmpDir, { ...DEFAULT_ROOST_SETTINGS, maxCaptureMB: 0 });
+    expect(loadRoostSettings(tmpDir).maxCaptureMB).toBe(0);
+  });
+  it("negative maxCaptureMB falls back to default", () => {
+    fs.mkdirSync(path.join(tmpDir, "roost"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, "roost", "settings.yaml"), "maxCaptureMB: -1\n", "utf8");
+    expect(loadRoostSettings(tmpDir).maxCaptureMB).toBe(DEFAULT_ROOST_SETTINGS.maxCaptureMB);
+  });
   it("invalid values fall back per-field (forward compatible)", () => {
     fs.mkdirSync(path.join(tmpDir, "roost"), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, "roost", "settings.yaml"), "maxCaptureMB: 25\nautoBackup: hourly\nautoPush: maybe\n", "utf8");
