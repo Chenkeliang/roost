@@ -95,6 +95,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   const [machines, setMachines] = useState<MachinesResponse | null>(null);
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
   const [loadingData, setLoadingData] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [missingDeps, setMissingDeps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -105,27 +106,23 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
 
   const fetchData = useCallback(async () => {
     setLoadingData(true);
+    setStatusLoading(true);
     setError(null);
-    try {
-      const [h, m, s, env, git] = await Promise.allSettled([
-        getHealth(),
-        getMachines(),
-        getStatus(),
-        getEnvironment(),
-        getGitStatus(),
-      ]);
-      if (h.status === "fulfilled") setHealth(h.value);
-      if (m.status === "fulfilled") setMachines(m.value);
-      if (s.status === "fulfilled") setStatusData(s.value);
-      if (env.status === "fulfilled") {
-        setMissingDeps(env.value.checks.filter((c) => c.required && !c.ok).map((c) => c.id));
-      }
-      if (git.status === "fulfilled") setGitStatus(git.value);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoadingData(false);
-    }
+    // /api/status is the slow call (statusAll shells out per module) — let it
+    // land independently so it never holds the machine cards hostage. The
+    // module-health section keeps its own skeleton via statusLoading.
+    void getStatus()
+      .then(setStatusData)
+      .catch(() => {})
+      .finally(() => setStatusLoading(false));
+    void getEnvironment()
+      .then((env) => setMissingDeps(env.checks.filter((c) => c.required && !c.ok).map((c) => c.id)))
+      .catch(() => {});
+    const [h, m, git] = await Promise.allSettled([getHealth(), getMachines(), getGitStatus()]);
+    if (h.status === "fulfilled") setHealth(h.value);
+    if (m.status === "fulfilled") setMachines(m.value);
+    if (git.status === "fulfilled") setGitStatus(git.value);
+    setLoadingData(false);
   }, []);
 
   useEffect(() => {
@@ -492,7 +489,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
         >
           {t("overview.moduleHealth")}
         </div>
-        {loadingData ? (
+        {statusLoading ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} width={100} height={28} />

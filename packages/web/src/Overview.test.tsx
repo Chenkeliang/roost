@@ -77,6 +77,15 @@ describe("Overview", () => {
     });
   });
 
+  it("renders the machine card as soon as fast data lands, without waiting for the slow status call", async () => {
+    // /api/status is the slow call (statusAll shells out per module). It must
+    // not hold the whole first paint hostage: with status pending forever, the
+    // machine card (fed by health/machines) must still render its hostname.
+    vi.mocked(api.getStatus).mockReturnValue(new Promise(() => {}));
+    await act(async () => { render(<Overview showHud={noop} />); });
+    expect(await screen.findByText("macbook.local")).toBeTruthy();
+  });
+
   it("shows one real machine card and an honest empty state when there is no second machine", async () => {
     await act(async () => {
       render(<Overview showHud={noop} />);
