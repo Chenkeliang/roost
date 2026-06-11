@@ -62,11 +62,12 @@ import {
   saveRoostSettings,
   cloneRepo,
 } from "@roost/core";
-import type { SkillTarget, SkillsConfig, SkillLink } from "@roost/core";
+import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 import { finalizeCapture } from "./captureFlow.js";
 import { runInit } from "./init.js";
 import { ensureGitRepo } from "./gitRepo.js";
+import { createAutoBackup } from "./autoBackup.js";
 
 // Target ids where a skill is enabled but the on-disk dest is a REAL (non-Roost)
 // directory — a genuine conflict the user must resolve before linking.
@@ -120,6 +121,25 @@ export function classifyGitError(output: string): "auth" | "pull-first" | undefi
   return undefined;
 }
 
+// Shared by POST /api/git/push and the auto-backup scheduler (ADR-0020).
+export async function runGitPush(
+  exec: Exec,
+  repoDir: string,
+): Promise<{ ok: boolean; output: string; hint?: "auth" | "pull-first" }> {
+  // A freshly-initialized repo's branch has no upstream yet. Detect by exit
+  // code (git's message is localized) and set the upstream on the first push.
+  const hasUpstream =
+    (await exec.run("git", ["-C", repoDir, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])).code === 0;
+  const branch =
+    (await exec.run("git", ["-C", repoDir, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim() || "main";
+  const args = hasUpstream ? ["-C", repoDir, "push"] : ["-C", repoDir, "push", "-u", "origin", branch];
+  // Fail fast instead of hanging on an interactive credential prompt.
+  const result = await exec.run("git", args, { env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+  const ok = result.code === 0;
+  const output = `${result.stdout}\n${result.stderr}`.trim();
+  return { ok, output, hint: ok ? undefined : classifyGitError(output) };
+}
+
 // Add or update the `origin` remote idempotently.
 async function setOrigin(exec: Exec, repoDir: string, url: string): Promise<void> {
   const existing = await exec.run("git", ["-C", repoDir, "remote", "get-url", "origin"]);
@@ -160,6 +180,32 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // Short-TTL response cache for the expensive read fan-outs (status/discover).
   // Slow once, then instant for ~25s; wiped on any state-changing mutation below.
   const cache = createTtlCache(25_000);
+
+  // ── auto-backup scheduler (ADR-0020) ─────────────────────────────────────────
+  const autoBackup = createAutoBackup({
+    loadSettings: () => loadRoostSettings(repoDir),
+    isRepo: async () =>
+      (await makeCtx(true).exec.run("git", ["-C", repoDir, "rev-parse", "--is-inside-work-tree"])).code === 0,
+    runCapture: async () => {
+      const sel = loadSelection(repoDir);
+      const ctx = makeCtx(false);
+      const changes = await captureAll(registry, ctx, sel);
+      await finalizeCapture(ctx.exec, repoDir, ctx.home);
+      cache.invalidateAll();
+      return {
+        captured: changes.reduce((n, c) => n + c.written.length + c.encrypted.length, 0),
+        blocked: changes.reduce((n, c) => n + (c.blocked?.length ?? 0), 0),
+        blockedDetail: changes.flatMap((c) => c.blockedDetail ?? []),
+      };
+    },
+    runPush: async () => {
+      const r = await runGitPush(makeCtx(false).exec, repoDir);
+      return { ok: r.ok, hint: r.hint };
+    },
+  });
+  autoBackup.reconfigure();
+  server.addHook("onClose", async () => autoBackup.stop());
+
   // Staged skill-import sources awaiting a select-then-apply (token → temp dir).
   const importStaging = new Map<string, { dir: string; at: number }>();
   const pruneStaging = () => {
@@ -459,6 +505,18 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  // ── GET /api/backup/status ────────────────────────────────────────────────────
+  server.get("/api/backup/status", async (_req, reply) => {
+    const s = loadRoostSettings(repoDir);
+    const state = readState(repoDir, os.hostname());
+    return reply.send({
+      autoBackup: s.autoBackup,
+      autoPush: s.autoPush,
+      lastRun: autoBackup.lastRun(),
+      lastCaptureAt: state?.capturedAt ?? null,
+    });
+  });
+
   // ── /api/machines ────────────────────────────────────────────────────────────
   server.get("/api/machines", async (_req, reply) => {
     try {
@@ -613,27 +671,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ── POST /api/git/push ────────────────────────────────────────────────────────
   server.post("/api/git/push", async (_req, reply) => {
     cache.invalidateAll();
-    const exec = makeCtx(false).exec;
-    // A freshly-initialized repo's branch has no upstream yet (the onboarding
-    // "create new" → push path). Detect that by exit code — git's "no upstream
-    // branch" message is localized, so never match on the text — and set the
-    // upstream on the first push.
-    const hasUpstream =
-      (await exec.run("git", ["-C", repoDir, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])).code === 0;
-    const branch =
-      (await exec.run("git", ["-C", repoDir, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim() || "main";
-    const args = hasUpstream
-      ? ["-C", repoDir, "push"]
-      : ["-C", repoDir, "push", "-u", "origin", branch];
-    // Fail fast instead of hanging on an interactive credential prompt the web
-    // UI can't answer; a missing credential surfaces as a classifiable error.
-    const result = await exec.run("git", args, {
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-    });
-    const ok = result.code === 0;
-    const output = `${result.stdout}\n${result.stderr}`.trim();
-    const hint = ok ? undefined : classifyGitError(output);
-    return reply.send({ ok, output, hint });
+    return reply.send(await runGitPush(makeCtx(false).exec, repoDir));
   });
 
   // ── POST /api/git/pull ────────────────────────────────────────────────────────
@@ -1119,11 +1157,19 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ── /api/settings ─────────────────────────────────────────────────────────────
   server.get("/api/settings", async (_req, reply) => reply.send(loadRoostSettings(repoDir)));
   server.post("/api/settings", async (req, reply) => {
-    const b = (req.body ?? {}) as { maxCaptureMB?: unknown };
-    const n = typeof b.maxCaptureMB === "number" && b.maxCaptureMB > 0 ? b.maxCaptureMB : 100;
-    saveRoostSettings(repoDir, { maxCaptureMB: n });
+    const b = (req.body ?? {}) as Partial<Record<keyof RoostSettings, unknown>>;
+    const prev = loadRoostSettings(repoDir);
+    const freqs: AutoBackupFreq[] = ["off", "daily", "weekly"];
+    const next: RoostSettings = {
+      maxCaptureMB: typeof b.maxCaptureMB === "number" && b.maxCaptureMB > 0 ? b.maxCaptureMB : prev.maxCaptureMB,
+      autoBackup: freqs.includes(b.autoBackup as AutoBackupFreq) ? (b.autoBackup as AutoBackupFreq) : prev.autoBackup,
+      autoPush: typeof b.autoPush === "boolean" ? b.autoPush : prev.autoPush,
+      checkUpdates: typeof b.checkUpdates === "boolean" ? b.checkUpdates : prev.checkUpdates,
+    };
+    saveRoostSettings(repoDir, next);
+    autoBackup.reconfigure(); // apply frequency changes immediately
     cache.invalidateAll();
-    return reply.send({ ok: true, maxCaptureMB: n });
+    return reply.send({ ok: true, ...next });
   });
 
   // ── static / SPA ─────────────────────────────────────────────────────────────

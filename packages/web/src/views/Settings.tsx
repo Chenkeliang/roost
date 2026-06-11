@@ -12,6 +12,7 @@ import { KeyBackupConfirm } from "../components/KeyBackupConfirm";
 import { useT } from "../i18n";
 import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, getSettings, saveSettings, type ModulesResponse, type GitStatus, type KeyStatus } from "../api";
 import { openExternal } from "../openExternal";
+import { checkForUpdate } from "../updateCheck";
 
 export function Settings() {
   const { t } = useT();
@@ -27,6 +28,8 @@ export function Settings() {
   const [keyResult, setKeyResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [keyBackup, setKeyBackup] = useState<{ recipient: string | null; keyPath: string } | null>(null);
   const [maxCaptureMB, setMaxCaptureMB] = useState(100);
+  const [appSettings, setAppSettings] = useState<{ autoBackup: "off" | "daily" | "weekly"; autoPush: boolean; checkUpdates: boolean }>({ autoBackup: "daily", autoPush: false, checkUpdates: true });
+  const [updateResult, setUpdateResult] = useState<"checking" | "latest" | "failed" | { version: string; url: string } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -39,15 +42,34 @@ export function Settings() {
         if (mods.status === "fulfilled") setModules(mods.value);
         if (git.status === "fulfilled") setGitStatus(git.value);
         if (key.status === "fulfilled") setKeyStatus(key.value);
-        if (settings.status === "fulfilled") setMaxCaptureMB(settings.value.maxCaptureMB);
+        if (settings.status === "fulfilled") {
+          setMaxCaptureMB(settings.value.maxCaptureMB);
+          setAppSettings({ autoBackup: settings.value.autoBackup, autoPush: settings.value.autoPush, checkUpdates: settings.value.checkUpdates });
+        }
       })
       .finally(() => setLoading(false));
   }, []);
 
+  async function saveApp(next: Partial<{ autoBackup: "off" | "daily" | "weekly"; autoPush: boolean; checkUpdates: boolean }>) {
+    const merged = { ...appSettings, ...next };
+    setAppSettings(merged);
+    try { await saveSettings(merged); } catch { /* keep optimistic state; next load re-syncs */ }
+  }
+
+  async function handleCheckUpdates() {
+    setUpdateResult("checking");
+    let current = "0.0.0";
+    try { current = await (await import("@tauri-apps/api/app")).getVersion(); } catch { /* browser/dev */ }
+    try {
+      const info = await checkForUpdate(current);
+      setUpdateResult(info ?? "latest");
+    } catch { setUpdateResult("failed"); }
+  }
+
   function commitMaxCapture(value: number) {
     if (!Number.isFinite(value) || value <= 0) return;
     setMaxCaptureMB(value);
-    void saveSettings(value);
+    void saveSettings({ maxCaptureMB: value });
   }
 
   async function handleGenerateKey() {
@@ -434,6 +456,59 @@ export function Settings() {
         <div style={{ fontSize: 13, color: "var(--muted)", padding: "2px 2px", lineHeight: 1.5 }}>
           {t("settings.maxCapture.note")}
         </div>
+      </div>
+
+      {/* ── Auto backup (ADR-0020) ── */}
+      <div style={sectionLabel}>{t("settings.autoBackup.heading")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={row}>
+          <label htmlFor="auto-backup-freq" style={{ color: "var(--muted)", minWidth: 80 }}>{t("settings.autoBackup.label")}</label>
+          <select
+            id="auto-backup-freq"
+            value={appSettings.autoBackup}
+            onChange={(e) => void saveApp({ autoBackup: e.target.value as "off" | "daily" | "weekly" })}
+            style={{ background: "var(--raise)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 7, padding: "5px 9px", fontFamily: "var(--font)", fontSize: 13 }}
+          >
+            <option value="off">{t("settings.autoBackup.off")}</option>
+            <option value="daily">{t("settings.autoBackup.daily")}</option>
+            <option value="weekly">{t("settings.autoBackup.weekly")}</option>
+          </select>
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>{t("settings.autoBackup.note")}</div>
+        <div style={row}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14 }}>
+            <input type="checkbox" checked={appSettings.autoPush} onChange={(e) => void saveApp({ autoPush: e.target.checked })} />
+            {t("settings.autoPush.label")}
+          </label>
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>{t("settings.autoPush.note")}</div>
+      </div>
+
+      {/* ── Updates ── */}
+      <div style={sectionLabel}>{t("settings.updates.heading")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={row}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14 }}>
+            <input type="checkbox" checked={appSettings.checkUpdates} onChange={(e) => void saveApp({ checkUpdates: e.target.checked })} />
+            {t("settings.updates.toggle")}
+          </label>
+          <span style={{ flex: 1 }} />
+          <button onClick={() => void handleCheckUpdates()} disabled={updateResult === "checking"}
+            style={{ padding: "6px 13px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rr)", fontSize: 13, cursor: "pointer", color: "var(--text)" }}>
+            {updateResult === "checking" ? t("settings.updates.checking") : t("settings.updates.check")}
+          </button>
+        </div>
+        {updateResult === "latest" && <div style={{ fontSize: 13, color: "var(--green)" }}>{t("settings.updates.latest")}</div>}
+        {updateResult === "failed" && <div style={{ fontSize: 13, color: "var(--red)" }}>{t("settings.updates.failed")}</div>}
+        {updateResult !== null && typeof updateResult === "object" && (
+          <div style={{ fontSize: 13 }}>
+            {t("settings.updates.available")} <span className="mono">{updateResult.version}</span>{" "}
+            <button onClick={() => void openExternal(updateResult.url)} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontFamily: "var(--font)", fontSize: 13, padding: 0 }}>
+              {t("fresh.update.download")}
+            </button>
+          </div>
+        )}
+        <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>{t("settings.updates.note")}</div>
       </div>
 
       {/* ── Privacy ── */}

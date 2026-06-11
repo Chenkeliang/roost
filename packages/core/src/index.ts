@@ -171,4 +171,4 @@ export type {
 } from "./skills-config.js";
 export { skillsModule, resolveSkillConflict, materializeSource, unadoptSkills } from "./modules/skills.js";
 export { DEFAULT_ROOST_SETTINGS, loadRoostSettings, saveRoostSettings } from "./settings.js";
-export type { RoostSettings } from "./settings.js";
+export type { RoostSettings, AutoBackupFreq } from "./settings.js";
