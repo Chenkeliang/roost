@@ -60,7 +60,7 @@ export interface DriftItem {
   blocked?: boolean; // a prerequisite is missing (age key / tool / decrypt)
 }
 export interface DriftReport { module: string; items: DriftItem[]; }
-export type BlockReason = "secret" | "too-large" | "managed" | "error";
+export type BlockReason = "secret" | "too-large" | "managed" | "error" | "large";
 export interface BlockedItem { id: string; reason: BlockReason; detail?: string }
 export interface ChangeSet { module: string; written: string[]; encrypted: string[]; blocked?: string[]; blockedDetail?: BlockedItem[]; }
 export type ApplyKind = "create" | "update" | "delete" | "skip";

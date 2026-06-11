@@ -108,7 +108,7 @@ export type {
   SyncStateReport,
   PushSafety,
 } from "./sync-state.js";
-export { hashContent, loadModuleBaseline, recordModuleBaseline } from "./sync-baseline.js";
+export { hashContent, loadModuleBaseline, recordModuleBaseline, loadModuleEncHashes, recordModuleEncHashes } from "./sync-baseline.js";
 export { cloneRepo, remoteHead, checkPushSafety } from "./onboarding.js";
 export { preflight } from "./preflight.js";
 export type { PreflightResult } from "./preflight.js";
@@ -129,7 +129,7 @@ export {
   skillName,
 } from "./skills-import.js";
 export type { SkillImportResult, ScannedSkill } from "./skills-import.js";
-export { readBaseline, writeBaseline } from "./state.js";
+export { readBaseline, writeBaseline, readEncHashes, writeEncHashes } from "./state.js";
 export type { ModuleBaseline } from "./state.js";
 export {
   createDotfilesRepoImporter,

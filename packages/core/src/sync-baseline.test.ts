@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { hashContent, loadModuleBaseline, recordModuleBaseline } from "./sync-baseline.js";
-import { writeState, stateDir, readState } from "./state.js";
+import { hashContent, loadModuleBaseline, recordModuleBaseline, loadModuleEncHashes, recordModuleEncHashes } from "./sync-baseline.js";
+import { writeState, stateDir, readState, readBaseline } from "./state.js";
 
 describe("hashContent", () => {
   it("null in → null out", () => {
@@ -81,5 +81,33 @@ describe("recordModuleBaseline", () => {
     expect(() => recordModuleBaseline(tmp, "h3", "env", { "env.sh": "z" })).not.toThrow();
     const st = readState(tmp, "h3")!;
     expect((st.modules["env"] as { baseline: unknown }).baseline).toEqual({ "env.sh": "z" });
+  });
+});
+
+let tmpDir: string;
+beforeEach(() => { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ench-")); });
+afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true }); });
+
+describe("encHashes (ADR-0021)", () => {
+  it("round-trips and MERGES per-module plaintext hashes", () => {
+    const host = "test-host";
+    recordModuleEncHashes(tmpDir, host, "dotfiles", { "/a": "h1", "/b": "h2" });
+    recordModuleEncHashes(tmpDir, host, "dotfiles", { "/b": "h2x", "/c": "h3" });
+    // loadModuleEncHashes reads THIS machine's host; emulate by reading state directly
+    const st = readState(tmpDir, host);
+    expect(st).not.toBeNull();
+    const entry = st!.modules["dotfiles"] as { encHashes?: Record<string, string> };
+    expect(entry.encHashes).toEqual({ "/a": "h1", "/b": "h2x", "/c": "h3" });
+  });
+
+  it("does not disturb the ADR-0018 baseline bag", () => {
+    const host = "test-host";
+    recordModuleEncHashes(tmpDir, host, "dotfiles", { "/a": "h1" });
+    const st = readState(tmpDir, host)!;
+    expect(readBaseline(st, "dotfiles")).toEqual({});
+  });
+
+  it("loadModuleEncHashes returns {} when no state exists", () => {
+    expect(loadModuleEncHashes(tmpDir, "dotfiles")).toEqual({});
   });
 });

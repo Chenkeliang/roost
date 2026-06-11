@@ -111,3 +111,28 @@ export function writeBaseline(
     modules: { ...state.modules, [moduleName]: { ...prevObj, baseline } },
   };
 }
+
+// Read a module's plaintext-hash bag (ADR-0021), tolerating missing/legacy shapes.
+export function readEncHashes(state: MachineState, moduleName: string): Record<string, string> {
+  const entry = state.modules[moduleName];
+  if (entry && typeof entry === "object" && "encHashes" in entry) {
+    const b = (entry as { encHashes?: unknown }).encHashes;
+    if (b && typeof b === "object") return { ...(b as Record<string, string>) };
+  }
+  return {};
+}
+
+// Return a NEW MachineState with the given module's encHashes replaced (immutable).
+export function writeEncHashes(
+  state: MachineState,
+  moduleName: string,
+  hashes: Record<string, string>,
+): MachineState {
+  const prevEntry = state.modules[moduleName];
+  const prevObj =
+    prevEntry && typeof prevEntry === "object" ? (prevEntry as Record<string, unknown>) : {};
+  return {
+    ...state,
+    modules: { ...state.modules, [moduleName]: { ...prevObj, encHashes: hashes } },
+  };
+}
