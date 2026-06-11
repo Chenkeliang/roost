@@ -118,3 +118,19 @@ describe("runCapture with directory selections", () => {
     await expect(runCapture({ repoDir: tmpDir, ctx })).resolves.toBeDefined();
   });
 });
+
+describe("runCapture pre-gate vs marked-encrypt", () => {
+  it("does not block files explicitly marked for encryption (they ship as .age, not plaintext)", async () => {
+    const f = path.join(tmpDir, "sub.yaml");
+    fs.writeFileSync(f, "password: super-secret-credential-value\n", "utf8");
+
+    let sel = emptySelection();
+    sel = addItem(sel, "dotfiles", f);
+    sel = addItem(sel, "dotfiles-encrypt", f); // user marked it: encrypt on capture
+    saveSelection(tmpDir, sel);
+
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpDir, repoDir: tmpDir });
+    await expect(runCapture({ repoDir: tmpDir, ctx })).resolves.toBeDefined();
+  });
+});
