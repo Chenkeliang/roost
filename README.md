@@ -53,7 +53,7 @@
 
 从 [Releases](https://github.com/Chenkeliang/roost/releases/latest) 下载对应架构的 `.dmg`(**Apple Silicon**:`aarch64`;**Intel**:`x64`),打开后把 **Roost** 拖进「应用程序」。
 
-> **首次启动**(尚未 Apple 签名):右键 `Roost.app` →「打开」→「打开」,或运行 `xattr -dr com.apple.quarantine /Applications/Roost.app`。
+> **首次启动**(已 ad-hoc 签名,但未经 Apple 公证):右键 `Roost.app` →「打开」→「打开」。若提示「已损坏,无法打开」:先把 Roost 拖进「应用程序」,再在终端运行 `xattr -cr /Applications/Roost.app`,然后打开。
 
 **或自行构建**(需 Rust 工具链):
 
@@ -127,7 +127,7 @@ pnpm --dir website dev
 
 Download the `.dmg` for your Mac from [Releases](https://github.com/Chenkeliang/roost/releases/latest) (**Apple Silicon**: `aarch64`; **Intel**: `x64`), open it, and drag **Roost** into Applications.
 
-> **First launch** (not yet Apple-signed): right-click `Roost.app` → **Open** → **Open**, or run `xattr -dr com.apple.quarantine /Applications/Roost.app`.
+> **First launch** (ad-hoc signed, not Apple-notarized): right-click `Roost.app` → **Open** → **Open**. If it says it's "damaged and can't be opened": drag Roost into Applications, then run `xattr -cr /Applications/Roost.app` in Terminal and open it.
 
 **Or build it yourself** (requires the Rust toolchain):
 
