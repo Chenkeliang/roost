@@ -47,7 +47,7 @@ export function Settings() {
   function commitMaxCapture(value: number) {
     if (!Number.isFinite(value) || value <= 0) return;
     setMaxCaptureMB(value);
-    void saveSettings(value);
+    void saveSettings({ maxCaptureMB: value });
   }
 
   async function handleGenerateKey() {
