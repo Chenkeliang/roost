@@ -152,14 +152,15 @@ describe("listStateHosts", () => {
 // ── commitRepo ────────────────────────────────────────────────────────────────
 
 describe("commitRepo", () => {
-  it("calls git add -A then git commit -m <message>", async () => {
-    const { exec, calls } = makeFakeExec([{ code: 0 }, { code: 0 }]);
+  it("calls git add -A, checks porcelain, then git commit -m <message>", async () => {
+    const { exec, calls } = makeFakeExec([{ code: 0 }, { code: 0, stdout: " M roost/selection.yaml" }, { code: 0 }]);
     await commitRepo(exec, "/my/repo", "test: save state");
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
     expect(calls[0]!.cmd).toBe("git");
     expect(calls[0]!.args).toEqual(["-C", "/my/repo", "add", "-A"]);
-    expect(calls[1]!.cmd).toBe("git");
-    expect(calls[1]!.args).toEqual([
+    expect(calls[1]!.args).toEqual(["-C", "/my/repo", "status", "--porcelain"]);
+    expect(calls[2]!.cmd).toBe("git");
+    expect(calls[2]!.args).toEqual([
       "-C", "/my/repo",
       "-c", "user.name=Roost",
       "-c", "user.email=roost@localhost",
@@ -170,6 +171,7 @@ describe("commitRepo", () => {
   it("does not throw when commit exits non-zero with 'nothing to commit' stdout", async () => {
     const { exec } = makeFakeExec([
       { code: 0 },
+      { code: 0, stdout: " M f" }, // porcelain reports a change → proceed to commit
       { code: 1, stdout: "nothing to commit, working tree clean", stderr: "" },
     ]);
     await expect(commitRepo(exec, "/my/repo", "chore: noop")).resolves.toBeUndefined();
@@ -178,6 +180,7 @@ describe("commitRepo", () => {
   it("does not throw when commit exits non-zero with 'nothing to commit' in stderr", async () => {
     const { exec } = makeFakeExec([
       { code: 0 },
+      { code: 0, stdout: " M f" },
       { code: 1, stdout: "", stderr: "nothing to commit" },
     ]);
     await expect(commitRepo(exec, "/my/repo", "chore: noop")).resolves.toBeUndefined();
@@ -186,6 +189,7 @@ describe("commitRepo", () => {
   it("throws on real commit failure (non-zero, no 'nothing to commit')", async () => {
     const { exec } = makeFakeExec([
       { code: 0 },
+      { code: 0, stdout: " M f" },
       { code: 1, stdout: "", stderr: "error: pathspec does not match" },
     ]);
     await expect(commitRepo(exec, "/my/repo", "fail")).rejects.toThrow();
@@ -229,5 +233,23 @@ describe("MachineState v2 baseline", () => {
     const next = writeBaseline(s, "env", { EDITOR: "hash1", PAGER: "hash2" });
     expect(readBaseline(next, "env")).toEqual({ EDITOR: "hash1", PAGER: "hash2" });
     expect(readBaseline(next, "dotfiles")).toEqual({}); // untouched module
+  });
+});
+
+describe("commitRepo no-op (localized git)", () => {
+  it("returns silently when nothing is staged, even with a localized git message", async () => {
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        const a = args.join(" ");
+        if (a.includes("status --porcelain")) return { code: 0, stdout: "", stderr: "" };
+        if (a.includes("commit")) return { code: 1, stdout: "", stderr: "没有什么可以提交,干净的工作区" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    await expect(commitRepo(exec, "/repo", "roost: capture")).resolves.toBeUndefined();
+    // the commit itself must not even run when the tree is clean
+    expect(calls.some((c) => c.includes("commit"))).toBe(false);
   });
 });

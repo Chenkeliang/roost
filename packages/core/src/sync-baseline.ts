@@ -2,7 +2,7 @@
 // baseline loading reads this machine's persisted state.
 import { createHash } from "node:crypto";
 import * as os from "node:os";
-import { readState, writeState, readBaseline, writeBaseline, STATE_SCHEMA_VERSION } from "./state.js";
+import { readState, writeState, readBaseline, writeBaseline, readEncHashes, writeEncHashes, STATE_SCHEMA_VERSION } from "./state.js";
 import type { MachineState, ModuleBaseline } from "./state.js";
 
 export function hashContent(content: string | null): string | null {
@@ -47,5 +47,41 @@ export function recordModuleBaseline(
   next.schemaVersion = STATE_SCHEMA_VERSION;
   if (meta?.lastSyncedCommit !== undefined) next.lastSyncedCommit = meta.lastSyncedCommit;
   if (meta?.lastSeen !== undefined) next.lastSeen = meta.lastSeen;
+  writeState(repoDir, next);
+}
+
+// This machine's plaintext-hash bag for a module's encrypted files (ADR-0021).
+export function loadModuleEncHashes(repoDir: string, moduleName: string): Record<string, string> {
+  try {
+    const st = readState(repoDir, os.hostname());
+    return st ? readEncHashes(st, moduleName) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Merge newly captured plaintext hashes into this machine's record, so the next
+// capture can skip re-encrypting unchanged files. Never throws.
+export function recordModuleEncHashes(
+  repoDir: string,
+  host: string,
+  moduleName: string,
+  hashes: Record<string, string>,
+): void {
+  let st: MachineState | null = null;
+  try {
+    st = readState(repoDir, host);
+  } catch {
+    st = null;
+  }
+  let next: MachineState = st ?? {
+    host,
+    schemaVersion: STATE_SCHEMA_VERSION,
+    capturedAt: null,
+    modules: {},
+  };
+  const merged = { ...readEncHashes(next, moduleName), ...hashes };
+  next = writeEncHashes(next, moduleName, merged);
+  next.schemaVersion = STATE_SCHEMA_VERSION;
   writeState(repoDir, next);
 }

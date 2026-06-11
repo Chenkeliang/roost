@@ -57,10 +57,18 @@ describe("runCapture", () => {
     sel = addItem(sel, "dotfiles", dotfileId);
     saveSelection(repoDir, sel);
 
-    // responses: chezmoi add, git add -A, git commit
-    const { exec, calls } = makeFakeExec(
-      Array.from({ length: 20 }, () => ({ code: 0, stdout: "", stderr: "" })),
-    );
+    // Behavior-aware fake: `git status --porcelain` must report a change, or
+    // commitRepo's locale-independent no-op check (rightly) skips the commit.
+    const calls: Call[] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push({ cmd, args });
+        if (cmd === "git" && args.join(" ").includes("status --porcelain")) {
+          return { code: 0, stdout: " M dot_zshrc", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
     const ctx = makeCtx({ exec, home, repoDir });
 
     const changeSets = await runCapture({ repoDir, ctx });

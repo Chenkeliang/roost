@@ -88,4 +88,13 @@ describe("FreshnessBanners", () => {
     );
     expect(container.textContent).toBe("");
   });
+
+  it("busy push shows the busy hint", async () => {
+    vi.mocked(api.gitPush).mockResolvedValueOnce({ ok: false, output: "push already in progress", hint: "busy" });
+    render(
+      <FreshnessBanners t={t} locale="en" gitStatus={GS({ ahead: 1 })} lastCaptureAt={daysAgo(1)} update={null} onDismissUpdate={() => {}} onRefresh={() => {}} />,
+    );
+    screen.getByRole("button", { name: "fresh.ahead.push" }).click();
+    expect(await screen.findByText("fresh.ahead.busy")).toBeInTheDocument();
+  });
 });

@@ -35,7 +35,8 @@ vi.mock("./api", () => ({
   }),
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
   removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
-  getBackupStatus: vi.fn().mockResolvedValue({ autoBackup: "daily", autoPush: false, lastRun: null, lastCaptureAt: new Date().toISOString() }),
+  getBackupStatus: vi.fn().mockResolvedValue({ autoBackup: "daily", autoPush: false, lastRun: null, lastCaptureAt: new Date().toISOString(), largeItems: [] }),
+  excludeDotfile: vi.fn().mockResolvedValue({ ok: true }),
   gitPull: vi.fn().mockResolvedValue({ ok: true, output: "" }),
   gitPush: vi.fn().mockResolvedValue({ ok: true, output: "" }),
 }));
@@ -145,8 +146,21 @@ describe("Overview", () => {
   });
 
   it("shows the stale banner when the last capture is older than 7 days", async () => {
-    vi.mocked(api.getBackupStatus).mockResolvedValue({ autoBackup: "daily", autoPush: false, lastRun: null, lastCaptureAt: new Date(Date.now() - 9 * 86400000).toISOString() });
+    vi.mocked(api.getBackupStatus).mockResolvedValue({ autoBackup: "daily", autoPush: false, lastRun: null, lastCaptureAt: new Date(Date.now() - 9 * 86400000).toISOString(), largeItems: [] });
     await act(async () => { render(<Overview showHud={noop} />); });
     expect(await screen.findByText(/Last backup was|上次备份已是/)).toBeInTheDocument();
+  });
+
+  it("blocked 'large' item offers keep + exclude actions", async () => {
+    vi.mocked(api.postCapture).mockResolvedValueOnce({
+      changes: [{ module: "dotfiles", written: [], encrypted: [], blocked: ["/u/.x/huge.bin"], blockedDetail: [{ id: "/u/.x/huge.bin", reason: "large", detail: "11MB" }] }],
+    });
+    await act(async () => { render(<Overview showHud={noop} />); });
+    const captureBtn = await screen.findByRole("button", { name: /Capture/i });
+    await act(async () => { fireEvent.click(captureBtn); });
+    expect(await screen.findByRole("button", { name: /Back up anyway|仍要备份/ })).toBeInTheDocument();
+    const exclude = screen.getByRole("button", { name: /Stop backing up|移出管理/ });
+    await act(async () => { fireEvent.click(exclude); });
+    await waitFor(() => expect(api.excludeDotfile).toHaveBeenCalledWith("/u/.x/huge.bin"));
   });
 });

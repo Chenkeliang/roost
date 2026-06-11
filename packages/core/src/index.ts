@@ -25,7 +25,7 @@ export { scanForSecrets, hasSecret, assertNoPlaintextSecrets } from "./secrets/s
 export type { SecretFinding } from "./secrets/scanner.js";
 export { scanDir, isNoise } from "./discovery/scan.js";
 export type { ScanCandidate } from "./discovery/scan.js";
-export { dotfilesModule, classifyDotfile, isSensitivePath, isRoostManaged } from "./modules/dotfiles.js";
+export { dotfilesModule, classifyDotfile, isSensitivePath, isRoostManaged, LARGE_FILE_MB } from "./modules/dotfiles.js";
 export { packagesModule, parseBrewfile, brewfileText, packageStates } from "./modules/packages.js";
 export type { BrewfileEntries, PackageState } from "./modules/packages.js";
 export { appconfigModule, classifyDomain, SENSITIVE_DOMAIN_HINTS } from "./modules/appconfig.js";
@@ -108,7 +108,7 @@ export type {
   SyncStateReport,
   PushSafety,
 } from "./sync-state.js";
-export { hashContent, loadModuleBaseline, recordModuleBaseline } from "./sync-baseline.js";
+export { hashContent, loadModuleBaseline, recordModuleBaseline, loadModuleEncHashes, recordModuleEncHashes } from "./sync-baseline.js";
 export { cloneRepo, remoteHead, checkPushSafety } from "./onboarding.js";
 export { preflight } from "./preflight.js";
 export type { PreflightResult } from "./preflight.js";
@@ -129,7 +129,7 @@ export {
   skillName,
 } from "./skills-import.js";
 export type { SkillImportResult, ScannedSkill } from "./skills-import.js";
-export { readBaseline, writeBaseline } from "./state.js";
+export { readBaseline, writeBaseline, readEncHashes, writeEncHashes } from "./state.js";
 export type { ModuleBaseline } from "./state.js";
 export {
   createDotfilesRepoImporter,

@@ -18,6 +18,7 @@ import {
   getSettings,
   addSelection,
   removeSelection,
+  excludeDotfile,
   type HealthResponse,
   type MachinesResponse,
   type StatusResponse,
@@ -26,6 +27,7 @@ import {
   type BackupStatus,
 } from "../api";
 import { FreshnessBanners } from "../components/FreshnessBanners";
+import { LargeFilesAdvisory } from "../components/LargeFilesAdvisory";
 import { checkForUpdate } from "../updateCheck";
 import type { UpdateInfo } from "../updateCheck";
 import { Onboarding } from "./onboarding/Onboarding";
@@ -281,6 +283,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
         onRefresh={() => void fetchData()}
         showHud={showHud}
       />
+      <LargeFilesAdvisory t={t} items={backupStatus?.largeItems ?? []} onChanged={() => void fetchData()} />
       {backupStatus?.lastRun?.error && (
         <div style={{ marginBottom: 14, padding: "8px 14px", background: "rgba(242,85,90,.08)", border: "1px solid var(--red)", borderRadius: "var(--rr)", color: "var(--red)", fontSize: 13 }}>
           {t("fresh.autoError")} {backupStatus.lastRun.error}
@@ -462,6 +465,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
               item.reason === "secret" ? t("overview.blocked.secret")
               : item.reason === "too-large" ? t("overview.blocked.tooLarge")
               : item.reason === "managed" ? t("overview.blocked.managed")
+              : item.reason === "large" ? t("overview.blocked.large")
               : t("overview.blocked.error");
             return (
               <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border-soft)", fontSize: 13.5 }}>
@@ -488,6 +492,32 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
                   >
                     {t("overview.blocked.remove")}
                   </button>
+                )}
+                {item.reason === "large" && (
+                  <span style={{ display: "inline-flex", gap: 6 }}>
+                    <button
+                      onClick={() => {
+                        void addSelection("dotfiles-large-ok", item.id).then(() => {
+                          setBlockedDetail((d) => d.filter((b) => b.id !== item.id));
+                          showHud?.({ text: t("overview.blocked.largeKept"), type: "success" });
+                        });
+                      }}
+                      style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 9px", borderRadius: 6, cursor: "pointer", whiteSpace: "nowrap" }}
+                    >
+                      {t("overview.blocked.keepLarge")}
+                    </button>
+                    <button
+                      onClick={() => {
+                        void excludeDotfile(item.id).then(() => {
+                          setBlockedDetail((d) => d.filter((b) => b.id !== item.id));
+                          showHud?.({ text: t("overview.blocked.largeExcluded"), type: "success" });
+                        });
+                      }}
+                      style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 9px", borderRadius: 6, cursor: "pointer", whiteSpace: "nowrap" }}
+                    >
+                      {t("overview.blocked.excludeLarge")}
+                    </button>
+                  </span>
                 )}
               </div>
             );
