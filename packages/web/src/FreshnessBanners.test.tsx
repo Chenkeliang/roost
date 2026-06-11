@@ -54,6 +54,15 @@ describe("FreshnessBanners", () => {
     expect(await screen.findByText("fresh.ahead.authHint")).toBeInTheDocument();
   });
 
+  it("push shows a busy label while in flight (not a bare ellipsis)", async () => {
+    vi.mocked(api.gitPush).mockReturnValue(new Promise(() => {})); // never resolves
+    render(
+      <FreshnessBanners t={t} locale="en" gitStatus={GS({ ahead: 11 })} lastCaptureAt={daysAgo(1)} update={null} onDismissUpdate={() => {}} onRefresh={() => {}} />,
+    );
+    screen.getByRole("button", { name: "fresh.ahead.push" }).click();
+    expect(await screen.findByRole("button", { name: "fresh.ahead.pushing" })).toBeDisabled();
+  });
+
   it("ahead banner hidden when there is no remote", () => {
     render(
       <FreshnessBanners t={t} locale="en" gitStatus={GS({ ahead: 2, remote: null })} lastCaptureAt={daysAgo(1)} update={null} onDismissUpdate={() => {}} onRefresh={() => {}} />,

@@ -9,7 +9,7 @@ import type { UpdateInfo } from "../updateCheck";
 export const STALE_DAYS = 7;
 
 const banner: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "var(--surface)", border: "1px solid #4a3a1e", borderRadius: "var(--rc)", marginBottom: 14, fontSize: 13.5, flexWrap: "wrap" };
-const cta: React.CSSProperties = { fontSize: 12.5, fontWeight: 600, padding: "5px 12px", borderRadius: 8, cursor: "pointer", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e" };
+const cta: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", flexShrink: 0, fontSize: 12.5, fontWeight: 600, padding: "5px 12px", borderRadius: 8, cursor: "pointer", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e" };
 const dot = (color: string): React.CSSProperties => ({ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 });
 
 export function FreshnessBanners({ t, locale, gitStatus, lastCaptureAt, update, onDismissUpdate, onRefresh, showHud }: {
@@ -76,7 +76,7 @@ export function FreshnessBanners({ t, locale, gitStatus, lastCaptureAt, update, 
           <span style={dot("var(--amber)")} />
           <span>{t("fresh.behind.title")} {gitStatus.behind} {t("fresh.behind.commits")}</span>
           <span style={{ flex: 1 }} />
-          <button onClick={() => void pull()} disabled={busy !== null} style={cta}><DownloadSimple size={13} style={{ marginRight: 4, verticalAlign: -2 }} />{busy === "pull" ? "…" : t("fresh.behind.pull")}</button>
+          <button onClick={() => void pull()} disabled={busy !== null} style={{ ...cta, opacity: busy ? 0.7 : 1, cursor: busy ? "default" : "pointer" }}><DownloadSimple size={13} />{busy === "pull" ? t("fresh.behind.pulling") : t("fresh.behind.pull")}</button>
           {pullFailed && <span style={{ color: "var(--red)", fontSize: 12.5, width: "100%" }}>{t("fresh.behind.pullFailed")}</span>}
         </div>
       )}
@@ -86,7 +86,7 @@ export function FreshnessBanners({ t, locale, gitStatus, lastCaptureAt, update, 
           <span style={dot("var(--amber)")} />
           <span>{t("fresh.ahead.title")} {gitStatus.ahead} {t("fresh.ahead.commits")}</span>
           <span style={{ flex: 1 }} />
-          <button onClick={() => void push()} disabled={busy !== null} style={cta}><UploadSimple size={13} style={{ marginRight: 4, verticalAlign: -2 }} />{busy === "push" ? "…" : t("fresh.ahead.push")}</button>
+          <button onClick={() => void push()} disabled={busy !== null} style={{ ...cta, opacity: busy ? 0.7 : 1, cursor: busy ? "default" : "pointer" }}><UploadSimple size={13} />{busy === "push" ? t("fresh.ahead.pushing") : t("fresh.ahead.push")}</button>
           {pushErrKey && <span style={{ color: "var(--red)", fontSize: 12.5, width: "100%" }}>{t(pushErrKey)}</span>}
         </div>
       )}
