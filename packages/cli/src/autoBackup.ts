@@ -69,7 +69,7 @@ export function createAutoBackup(deps: AutoBackupDeps): AutoBackup {
     const freq = deps.loadSettings().autoBackup;
     if (freq === "off") return;
     handle = timers.set((): Promise<void> => {
-      return runNow().finally(() => schedule(intervalMsFor(freq === "off" ? "daily" : freq)));
+      return runNow().finally(() => schedule(intervalMsFor(freq)));
     }, delayMs);
     // Never keep the process alive just for the backup timer.
     (handle as { unref?: () => void }).unref?.();
