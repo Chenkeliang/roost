@@ -15,7 +15,7 @@ import type {
   Candidate,
   ApplyPlan,
 } from "@roost/shared";
-import { ModuleRegistry, saveSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule, loadSkillsTargets } from "@roost/core";
+import { ModuleRegistry, saveSelection, loadSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule, loadSkillsTargets } from "@roost/core";
 import { buildServer, computeConflicts, classifyGitError } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
@@ -2005,6 +2005,64 @@ describe("onboarding endpoints", () => {
     const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
     const res = await server.inject({ method: "POST", url: "/api/clone", payload: {}, headers: { "content-type": "application/json" } });
     expect(res.statusCode).toBe(400);
+    await server.close();
+  });
+});
+
+describe("repo hygiene endpoints (ADR-0021)", () => {
+  it("second concurrent push returns hint busy", async () => {
+    const reg = new ModuleRegistry();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        if (cmd === "git" && args.includes("push")) { await gate; return { code: 0, stdout: "", stderr: "" }; }
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const first = server.inject({ method: "POST", url: "/api/git/push" });
+    await new Promise((r) => setTimeout(r, 30)); // let the first reach the gate
+    const second = await server.inject({ method: "POST", url: "/api/git/push" });
+    expect((second.json() as { hint?: string }).hint).toBe("busy");
+    release();
+    expect(((await first).json() as { ok: boolean }).ok).toBe(true);
+    await server.close();
+  });
+
+  it("backup/status lists stock large files with target paths", async () => {
+    const reg = new ModuleRegistry();
+    // a >10MB file inside the repo source, chezmoi-named
+    const dir = path.join(tmpDir, "dot_config", "bigapp");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "encrypted_huge.bin.age"), Buffer.alloc(11 * 1024 * 1024));
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: "/api/backup/status" });
+    const body = res.json() as { largeItems: { path: string; mb: number }[] };
+    expect(body.largeItems.length).toBe(1);
+    expect(body.largeItems[0]!.path.endsWith(".config/bigapp/huge.bin")).toBe(true);
+    expect(body.largeItems[0]!.mb).toBe(11);
+    await server.close();
+  });
+
+  it("POST /api/dotfiles/exclude forgets the path and records it in dotfiles-exclude", async () => {
+    const reg = new ModuleRegistry();
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({
+      method: "POST", url: "/api/dotfiles/exclude",
+      payload: { path: "/Users/x/.config/bigapp/huge.bin" }, headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(calls.some((c) => c[0] === "chezmoi" && c.includes("forget"))).toBe(true);
+    const sel = loadSelection(tmpDir);
+    expect(sel.modules["dotfiles-exclude"]).toContain("/Users/x/.config/bigapp/huge.bin");
     await server.close();
   });
 });

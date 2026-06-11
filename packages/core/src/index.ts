@@ -25,7 +25,7 @@ export { scanForSecrets, hasSecret, assertNoPlaintextSecrets } from "./secrets/s
 export type { SecretFinding } from "./secrets/scanner.js";
 export { scanDir, isNoise } from "./discovery/scan.js";
 export type { ScanCandidate } from "./discovery/scan.js";
-export { dotfilesModule, classifyDotfile, isSensitivePath, isRoostManaged } from "./modules/dotfiles.js";
+export { dotfilesModule, classifyDotfile, isSensitivePath, isRoostManaged, LARGE_FILE_MB } from "./modules/dotfiles.js";
 export { packagesModule, parseBrewfile, brewfileText, packageStates } from "./modules/packages.js";
 export type { BrewfileEntries, PackageState } from "./modules/packages.js";
 export { appconfigModule, classifyDomain, SENSITIVE_DOMAIN_HINTS } from "./modules/appconfig.js";

@@ -61,6 +61,7 @@ import {
   loadRoostSettings,
   saveRoostSettings,
   cloneRepo,
+  LARGE_FILE_MB,
 } from "@roost/core";
 import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -147,6 +148,29 @@ async function setOrigin(exec: Exec, repoDir: string, url: string): Promise<void
   await exec.run("git", ["-C", repoDir, "remote", sub, "origin", url]);
 }
 
+// Map a repo-source-relative path to its absolute target path (subset of
+// chezmoi's source-state naming — enough for display + forget).
+export function sourceToTarget(rel: string, home: string): string {
+  const ATTRS = ["encrypted_", "private_", "literal_", "executable_", "readonly_", "exact_", "empty_", "symlink_"];
+  const segs = rel.split("/").map((seg) => {
+    let s = seg;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const a of ATTRS) {
+        if (s.startsWith(a)) { s = s.slice(a.length); changed = true; }
+      }
+      if (s.startsWith("dot_")) { s = "." + s.slice(4); changed = true; }
+    }
+    return s;
+  });
+  let file = segs[segs.length - 1] ?? "";
+  if (file.endsWith(".age")) file = file.slice(0, -4);
+  if (file.endsWith(".tmpl")) file = file.slice(0, -5);
+  segs[segs.length - 1] = file;
+  return path.join(home, ...segs);
+}
+
 export interface ServerDeps {
   repoDir: string;
   registry: ModuleRegistry;
@@ -181,6 +205,19 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // Slow once, then instant for ~25s; wiped on any state-changing mutation below.
   const cache = createTtlCache(25_000);
 
+  // Single-flight pushes (ADR-0021): the API route and the auto-backup scheduler
+  // share this lock so two pushes never race for bandwidth.
+  let pushInFlight = false;
+  const guardedPush = async (): Promise<{ ok: boolean; output: string; hint?: "auth" | "pull-first" | "busy" }> => {
+    if (pushInFlight) return { ok: false, output: "push already in progress", hint: "busy" };
+    pushInFlight = true;
+    try {
+      return await runGitPush(makeCtx(false).exec, repoDir);
+    } finally {
+      pushInFlight = false;
+    }
+  };
+
   // ── auto-backup scheduler (ADR-0020) ─────────────────────────────────────────
   const autoBackup = createAutoBackup({
     loadSettings: () => loadRoostSettings(repoDir),
@@ -199,8 +236,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       };
     },
     runPush: async () => {
-      const r = await runGitPush(makeCtx(false).exec, repoDir);
-      return { ok: r.ok, hint: r.hint };
+      const r = await guardedPush();
+      return { ok: r.ok, hint: r.hint === "busy" ? undefined : r.hint };
     },
   });
   autoBackup.reconfigure();
@@ -509,11 +546,33 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   server.get("/api/backup/status", async (_req, reply) => {
     const s = loadRoostSettings(repoDir);
     const state = readState(repoDir, os.hostname());
+    const home = os.homedir();
+    const largeItems: { path: string; mb: number }[] = [];
+    const SKIP = new Set([".git", "roost", "state"]);
+    const walk = (dir: string, rel: string): void => {
+      let entries: fs.Dirent[] = [];
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (rel === "" && SKIP.has(e.name)) continue;
+        const abs = path.join(dir, e.name);
+        const r = rel === "" ? e.name : `${rel}/${e.name}`;
+        if (e.isDirectory()) walk(abs, r);
+        else if (e.isFile()) {
+          let size = 0;
+          try { size = fs.statSync(abs).size; } catch { continue; }
+          if (size > LARGE_FILE_MB * 1024 * 1024) {
+            largeItems.push({ path: sourceToTarget(r, home), mb: Math.round(size / 1048576) });
+          }
+        }
+      }
+    };
+    walk(repoDir, "");
     return reply.send({
       autoBackup: s.autoBackup,
       autoPush: s.autoPush,
       lastRun: autoBackup.lastRun(),
       lastCaptureAt: state?.capturedAt ?? null,
+      largeItems,
     });
   });
 
@@ -615,6 +674,27 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  // ── POST /api/dotfiles/exclude ───────────────────────────────────────────────
+  // Stop backing up a path: forget it from the source repo and record it in the
+  // sticky exclude list. NEVER touches the user's local file (ADR-0021).
+  server.post<{ Body: { path?: string } }>("/api/dotfiles/exclude", async (req, reply) => {
+    const p = req.body?.path?.trim();
+    if (!p) return reply.status(400).send({ error: "path is required" });
+    try {
+      cache.invalidateAll();
+      const ctx = makeCtx(false);
+      const chezmoi = createChezmoi(ctx.exec, { sourceDir: repoDir });
+      try { await chezmoi.forget(p); } catch { /* not managed → nothing to remove */ }
+      let doc = loadSelection(repoDir);
+      doc = addItem(doc, "dotfiles-exclude", p);
+      saveSelection(repoDir, doc);
+      await finalizeCapture(ctx.exec, repoDir, ctx.home);
+      return reply.send({ ok: true });
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
   // ── GET /api/discover ────────────────────────────────────────────────────────
   server.get("/api/discover", async (req, reply) => {
     try {
@@ -671,7 +751,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ── POST /api/git/push ────────────────────────────────────────────────────────
   server.post("/api/git/push", async (_req, reply) => {
     cache.invalidateAll();
-    return reply.send(await runGitPush(makeCtx(false).exec, repoDir));
+    return reply.send(await guardedPush());
   });
 
   // ── POST /api/git/pull ────────────────────────────────────────────────────────
