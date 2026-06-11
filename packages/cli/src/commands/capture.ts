@@ -25,7 +25,12 @@ export async function runCapture(deps: CaptureDeps): Promise<ChangeSet[]> {
   const toCheck: { path: string; content: string }[] = [];
   for (const id of dotfileIds) {
     if (isSensitivePath(id)) continue;
-    if (!fs.existsSync(id)) continue;
+    // Only regular files can be read here; directory selections (and broken
+    // symlinks) crash readFileSync with EISDIR/ENOENT — their contents are
+    // scanned per-file by the dotfiles module's own gate instead.
+    let isFile = false;
+    try { isFile = fs.statSync(id).isFile(); } catch { continue; }
+    if (!isFile) continue;
     const content = fs.readFileSync(id, "utf8");
     toCheck.push({ path: id, content });
   }

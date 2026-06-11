@@ -102,3 +102,19 @@ describe("runCapture", () => {
     expect(chezmoiAdd).toBeUndefined();
   });
 });
+
+describe("runCapture with directory selections", () => {
+  it("does not crash when a selected dotfiles id is a directory (EISDIR regression)", async () => {
+    const dir = path.join(tmpDir, "some-config-dir");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "a.conf"), "plain = 1\n", "utf8");
+
+    let sel = emptySelection();
+    sel = addItem(sel, "dotfiles", dir);
+    saveSelection(tmpDir, sel);
+
+    const { exec } = makeFakeExec([]);
+    const ctx = makeCtx({ exec, home: tmpDir, repoDir: tmpDir });
+    await expect(runCapture({ repoDir: tmpDir, ctx })).resolves.toBeDefined();
+  });
+});
