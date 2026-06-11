@@ -71,6 +71,11 @@ export async function commitRepo(
   message: string,
 ): Promise<void> {
   await exec.run("git", ["-C", repoDir, "add", "-A"]);
+  // Nothing staged → nothing to commit. Check via --porcelain (locale-independent):
+  // matching git's "nothing to commit" message breaks on localized systems
+  // (e.g. 「没有什么可以提交」 on a Chinese macOS), turning a no-op into a crash.
+  const status = await exec.run("git", ["-C", repoDir, "status", "--porcelain"]);
+  if (status.code === 0 && status.stdout.trim() === "") return;
   // Pass an explicit identity for Roost's automated commit so capture works on a
   // machine (or CI runner) with no global git user.name/email configured. `-c`
   // applies only to this command — it does NOT touch the user's git config.
