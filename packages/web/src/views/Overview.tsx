@@ -15,6 +15,7 @@ import {
   getEnvironment,
   getGitStatus,
   getBackupStatus,
+  getSettings,
   addSelection,
   removeSelection,
   type HealthResponse,
@@ -142,6 +143,8 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
     let cancelled = false;
     void (async () => {
       try {
+        const s = await getSettings().catch(() => null);
+        if (s && !s.checkUpdates) return;
         const { getVersion } = await import("@tauri-apps/api/app");
         const current = await getVersion();
         const info = await checkForUpdate(current);
