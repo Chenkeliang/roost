@@ -532,7 +532,17 @@ export function saveSkillsTargets(targets: SkillTarget[]): Promise<{ ok: boolean
 }
 
 // ── Roost settings ───────────────────────────────────────────────────────────
-export function getSettings(): Promise<{ maxCaptureMB: number }> { return apiFetch("/api/settings"); }
-export function saveSettings(maxCaptureMB: number): Promise<{ ok: boolean; maxCaptureMB: number }> {
-  return apiFetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ maxCaptureMB }) });
+export interface SettingsResponse { maxCaptureMB: number; autoBackup: "off" | "daily" | "weekly"; autoPush: boolean; checkUpdates: boolean }
+export function getSettings(): Promise<SettingsResponse> {
+  return apiFetch<SettingsResponse>("/api/settings");
+}
+export function saveSettings(s: Partial<SettingsResponse>): Promise<{ ok: boolean } & SettingsResponse> {
+  return apiFetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(s) });
+}
+
+// ── Backup freshness (ADR-0020) ───────────────────────────────────────────────
+export interface BackupLastRun { at: string; captured: number; blocked: number; blockedDetail: BlockedItem[]; pushed?: boolean; pushHint?: "auth" | "pull-first"; error?: string }
+export interface BackupStatus { autoBackup: "off" | "daily" | "weekly"; autoPush: boolean; lastRun: BackupLastRun | null; lastCaptureAt: string | null }
+export function getBackupStatus(): Promise<BackupStatus> {
+  return apiFetch<BackupStatus>("/api/backup/status");
 }
