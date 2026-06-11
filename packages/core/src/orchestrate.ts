@@ -73,12 +73,10 @@ export async function statusAll(
   ctx: ModuleContext,
   sel: Selection,
 ): Promise<DriftReport[]> {
-  const reports: DriftReport[] = [];
-  for (const mod of reg.list()) {
-    const report = await mod.status(ctx, sel);
-    reports.push(report);
-  }
-  return reports;
+  // Module status shells out to slow externals (brew, chezmoi, defaults…).
+  // Run modules concurrently so the total cost is the slowest module, not the
+  // sum of all of them. Promise.all preserves registry order in the result.
+  return Promise.all(reg.list().map((mod) => mod.status(ctx, sel)));
 }
 
 // Aggregate every module's status into the sync-state review model (ADR-0016).
