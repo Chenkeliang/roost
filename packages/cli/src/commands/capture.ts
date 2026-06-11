@@ -22,9 +22,12 @@ export async function runCapture(deps: CaptureDeps): Promise<ChangeSet[]> {
 
   // Gate secrets BEFORE capture: read each non-sensitive selected dotfile and check
   const dotfileIds = sel.modules["dotfiles"] ?? [];
+  // Files the user explicitly marked for encryption ship as .age ciphertext —
+  // plaintext-secret gating doesn't apply to them (ADR-0010).
+  const markedEncrypt = new Set(sel.modules["dotfiles-encrypt"] ?? []);
   const toCheck: { path: string; content: string }[] = [];
   for (const id of dotfileIds) {
-    if (isSensitivePath(id)) continue;
+    if (isSensitivePath(id) || markedEncrypt.has(id)) continue;
     // Only regular files can be read here; directory selections (and broken
     // symlinks) crash readFileSync with EISDIR/ENOENT — their contents are
     // scanned per-file by the dotfiles module's own gate instead.
