@@ -110,6 +110,7 @@ pnpm --dir website dev
 
 | Module | What it backs up |
 |---|---|
+| **AI tools** | AI tool configs — Claude Code / Claude Desktop / Codex / Gemini CLI memory files, settings, MCP config (sensitive entries age-encrypted; OAuth/session tokens are **never** backed up) |
 | **dotfiles** | tracked config files (via chezmoi; secrets encrypted) |
 | **packages** | your Homebrew Brewfile |
 | **appconfig** | selected macOS app preferences (`defaults`) |
@@ -122,6 +123,8 @@ pnpm --dir website dev
 - **Sync Review** — a git-like view of how this machine differs from your repo (*in sync / repo-newer / local-newer / conflict*). Safe changes auto-resolve; only real conflicts ask you. Per-item two-column diff, batch apply, every overwrite backed up.
 - **Second-machine onboarding** — `roost clone`, a doctor pre-flight gate, and an **Environment check** page that one-click-installs missing tools via Homebrew.
 - **Skills management** — coverage per tool at a glance; adopt existing skills from a **local folder / .zip / git URL** (secret/size gated); add custom distribution-target directories.
+- **History & rollback** — every capture is a readable changelog commit (`capture: dotfiles(2) packages(1)` with a per-file body). Browse any file's history in the Timeline (or `roost history <path>`) and restore a past version with one click (`roost restore <path> <sha>`) — the restore rewrites only the **repo** copy; your machine file is untouched until you apply it through Sync Review.
+- **Plays nice with runtime managers** — tools like [cc-switch](https://github.com/farion1231/cc-switch) manage *which provider you're using right now*; Roost is the encrypted, versioned layer underneath: it backs up their data stores (cc-switch's database ships age-encrypted), labels their skill mounts as externally managed instead of fighting for them, and never touches another manager's files.
 
 ### Install the desktop app
 
