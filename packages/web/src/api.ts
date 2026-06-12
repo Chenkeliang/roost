@@ -162,7 +162,7 @@ export interface AiCatalogPath {
   path: string;
   kind: "memory" | "settings" | "mcp" | "data";
   encrypt: boolean;
-  state: "selected" | "available" | "dotfiles" | "never" | "missing";
+  state: "selected" | "pending" | "available" | "dotfiles" | "never" | "missing";
 }
 export interface AiCatalogTool { id: string; label: string; paths: AiCatalogPath[] }
 export function getAiToolsCatalog(): Promise<{ tools: AiCatalogTool[] }> {
