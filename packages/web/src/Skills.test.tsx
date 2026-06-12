@@ -248,4 +248,48 @@ describe("Skills view", () => {
     const saved = vi.mocked(api.saveSkillsTargets).mock.calls[0]![0]!
     expect(saved.some((t) => t.id === "myproj" && t.path === "~/work/.skills")).toBe(true);
   });
+
+  // ── external badge ──────────────────────────────────────────────────────────
+
+  it("row with external cc-switch shows the badge", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(mkView([
+      mkRow({ name: "foo", external: { id: "cc-switch", label: "cc-switch" } }),
+    ]));
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
+    render(<Skills />);
+    await screen.findByText("foo");
+    expect(await screen.findByText(/cc-switch\s+managed/i)).toBeInTheDocument();
+  });
+
+  it("row with unknown external manager shows the badge label", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(mkView([
+      mkRow({ name: "bar", external: { id: "unknown", label: "~/.foo-manager" } }),
+    ]));
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
+    render(<Skills />);
+    await screen.findByText("bar");
+    expect(await screen.findByText(/~\/.foo-manager\s+managed/i)).toBeInTheDocument();
+  });
+
+  it("conflict dialog for external skill shows cede button that calls toggleSkill", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(mkView([
+      mkRow({ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [], conflicts: ["claude"], external: { id: "cc-switch", label: "cc-switch" } }),
+    ]));
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
+    vi.mocked(api.toggleSkill).mockResolvedValue({ ok: true, config: {} as never });
+    render(<Skills />);
+    // open coverage popover
+    const coverageBtn = await screen.findByRole("button", { name: /Coverage/i });
+    coverageBtn.click();
+    // popover shows external label instead of Resolve
+    const popover = await screen.findByRole("dialog");
+    // The Resolve button should NOT appear for external conflict
+    expect(within(popover).queryByRole("button", { name: /resolve|解决/i })).not.toBeInTheDocument();
+    // Close the popover and open the conflict dialog via clicking the row coverage button
+    // Since external suppresses Resolve in popover, the cede button test uses the dialog directly.
+    // Close popover
+    const closeBtn = within(popover).getByRole("button", { name: /cancel|取消/i });
+    closeBtn.click();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
 });

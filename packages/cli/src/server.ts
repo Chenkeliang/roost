@@ -65,8 +65,9 @@ import {
   summarizeCapture,
   loadAiToolsCatalog,
   NEVER_BACKUP,
+  loadExternalManagers,
 } from "@roost/core";
-import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq } from "@roost/core";
+import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq, ExternalManager } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 import { finalizeCapture } from "./captureFlow.js";
 import { runInit } from "./init.js";
@@ -99,6 +100,56 @@ export function computeConflicts(
     if (!owned) conflicts.push(t.id);
   }
   return conflicts;
+}
+
+// Detect if a skill's on-disk symlink resolves OUTSIDE Roost's source dir —
+// i.e. it's managed by another runtime. GENERIC: works for any manager; the
+// registry only prettifies the name. ADR-0022 §3.
+export function detectExternal(
+  home: string,
+  sourceDir: string,
+  name: string,
+  targets: SkillTarget[],
+  managers: ExternalManager[],
+): { id: string; label: string } | undefined {
+  let srcRoot: string;
+  try {
+    srcRoot = fs.realpathSync(path.resolve(sourceDir)) + path.sep;
+  } catch {
+    srcRoot = path.resolve(sourceDir) + path.sep;
+  }
+  let realHome: string;
+  try {
+    realHome = fs.realpathSync(home);
+  } catch {
+    realHome = home;
+  }
+  for (const t of targets) {
+    const dest = path.join(home, t.path, name);
+    let st: fs.Stats;
+    try {
+      st = fs.lstatSync(dest);
+    } catch {
+      continue;
+    }
+    if (!st.isSymbolicLink()) continue;
+    let real: string;
+    try {
+      real = fs.realpathSync(dest);
+    } catch {
+      continue;
+    }
+    if (real.startsWith(srcRoot)) continue; // ours
+    const hit = managers.find((m) =>
+      m.roots.some((r) => real.startsWith(path.join(realHome, r) + path.sep)),
+    );
+    if (hit) return { id: hit.id, label: hit.label };
+    // Unknown manager: label by the target's top-level dir under home.
+    const rel = path.relative(realHome, real);
+    const top = rel.startsWith("..") ? path.dirname(real) : rel.split(path.sep)[0]!;
+    return { id: "unknown", label: rel.startsWith("..") ? top : `~/${top}` };
+  }
+  return undefined;
 }
 
 // Classify git push/pull failure output so the UI can offer the right next step:
@@ -1021,12 +1072,20 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       }
       const links = loadSkillLinks(repoDir);
       const home = makeCtx(true).home;
-      const skills = managed.map((name) => ({
-        name,
-        effective: effectiveSkill(cfg, name),
-        links: links.filter((l) => l.skill === name),
-        conflicts: computeConflicts(home, name, targets, links, cfg),
-      }));
+      const sourceDir = cfg.sourceDir.startsWith("~/")
+        ? path.join(home, cfg.sourceDir.slice(2))
+        : cfg.sourceDir;
+      const managers = loadExternalManagers(repoDir);
+      const skills = managed.map((name) => {
+        const external = detectExternal(home, sourceDir, name, targets, managers);
+        return {
+          name,
+          effective: effectiveSkill(cfg, name),
+          links: links.filter((l) => l.skill === name),
+          conflicts: computeConflicts(home, name, targets, links, cfg),
+          ...(external !== undefined ? { external } : {}),
+        };
+      });
       return reply.send({ config: cfg, targets, skills });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -16,7 +16,7 @@ import type {
   ApplyPlan,
 } from "@roost/shared";
 import { ModuleRegistry, saveSelection, loadSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule, loadSkillsTargets } from "@roost/core";
-import { buildServer, computeConflicts, classifyGitError } from "./server.js";
+import { buildServer, computeConflicts, classifyGitError, detectExternal } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
 // A real-exec ctx so git commits actually run (for capture finalization tests).
@@ -2209,6 +2209,65 @@ describe("backup status + settings passthrough", () => {
       }
 
       await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("detectExternal", () => {
+  it("symlink → cc-switch dir ⇒ { id: 'cc-switch', label: 'cc-switch' }", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext-home-"));
+    try {
+      const ccRoot = path.join(home, ".cc-switch", "skills");
+      const srcRoot = path.join(home, ".agents", "skills");
+      fs.mkdirSync(ccRoot, { recursive: true });
+      fs.mkdirSync(srcRoot, { recursive: true });
+      fs.mkdirSync(path.join(ccRoot, "foo"), { recursive: true });
+      const skillsDir = path.join(home, ".claude", "skills");
+      fs.mkdirSync(skillsDir, { recursive: true });
+      fs.symlinkSync(path.join(ccRoot, "foo"), path.join(skillsDir, "foo"));
+      const targets = [{ id: "claude", path: ".claude/skills", label: "Claude" }];
+      const managers = [{ id: "cc-switch", label: "cc-switch", roots: [".cc-switch"] }];
+      const result = detectExternal(home, srcRoot, "foo", targets, managers);
+      expect(result).toEqual({ id: "cc-switch", label: "cc-switch" });
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("symlink → unregistered dir ⇒ { id: 'unknown', label: '~/.foo-manager' }", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext-home2-"));
+    try {
+      const fooRoot = path.join(home, ".foo-manager", "skills");
+      const srcRoot = path.join(home, ".agents", "skills");
+      fs.mkdirSync(fooRoot, { recursive: true });
+      fs.mkdirSync(srcRoot, { recursive: true });
+      fs.mkdirSync(path.join(fooRoot, "bar"), { recursive: true });
+      const skillsDir = path.join(home, ".claude", "skills");
+      fs.mkdirSync(skillsDir, { recursive: true });
+      fs.symlinkSync(path.join(fooRoot, "bar"), path.join(skillsDir, "bar"));
+      const targets = [{ id: "claude", path: ".claude/skills", label: "Claude" }];
+      const managers = [{ id: "cc-switch", label: "cc-switch", roots: [".cc-switch"] }];
+      const result = detectExternal(home, srcRoot, "bar", targets, managers);
+      expect(result).toEqual({ id: "unknown", label: "~/.foo-manager" });
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("symlink → Roost source dir ⇒ undefined", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext-home3-"));
+    try {
+      const srcRoot = path.join(home, ".agents", "skills");
+      fs.mkdirSync(path.join(srcRoot, "baz"), { recursive: true });
+      const skillsDir = path.join(home, ".claude", "skills");
+      fs.mkdirSync(skillsDir, { recursive: true });
+      fs.symlinkSync(path.join(srcRoot, "baz"), path.join(skillsDir, "baz"));
+      const targets = [{ id: "claude", path: ".claude/skills", label: "Claude" }];
+      const managers = [{ id: "cc-switch", label: "cc-switch", roots: [".cc-switch"] }];
+      const result = detectExternal(home, srcRoot, "baz", targets, managers);
+      expect(result).toBeUndefined();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
     }
