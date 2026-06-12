@@ -31,8 +31,10 @@ semantics.
    tokens make backups worthless and purely risk-adding (research, theme D).
 3. **Runtime-manager interop = snapshot-layer contract.** (a) Managers' own
    stores are backed up as encrypted opaque assets; (b) their footprints are
-   *recognized*, not fought — skills mounted by cc-switch get an `external`
-   label instead of a conflict; (c) single-writer per mount: ownership changes
+   *recognized*, not fought — any non-Roost symlink mount gets an `external`
+   label instead of a conflict, generically (a curated, overridable
+   external-managers registry only supplies friendly names; cc-switch is the
+   default entry, unknown managers are still recognized by rule); (c) single-writer per mount: ownership changes
    only via explicit user action (重新接管 / 让给对方), reusing existing
    resolve/toggle endpoints. Roost never auto-overwrites another manager's
    mount.

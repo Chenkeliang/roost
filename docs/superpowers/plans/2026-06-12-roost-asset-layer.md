@@ -30,7 +30,13 @@ export const NEVER_BACKUP: string[]; // home-relative: [".claude.json", ".codex/
 export function loadAiToolsCatalog(repoDir: string): AiTool[]; // override roost/ai-tools-catalog.yaml replaces-by-id (mirror app-config-catalog loader)
 
 // A — core/src/modules/aitools.ts: export const aitoolsModule: SyncModule (name "aitools", selection namespace "aitools", ids = absolute target paths)
-// A — skills: GET /api/skills rows gain `external?: "cc-switch"`; web shows badge + 让给 cc-switch button (uses existing toggleSkill per-target).
+// A — skills: GET /api/skills rows gain `external?: { id: string; label: string }` — GENERIC detection
+//   (symlink target outside Roost's skills source dir ⇒ external), friendly names via a curated
+//   overridable registry: core/src/external-managers.ts
+export interface ExternalManager { id: string; label: string; roots: string[] } // home-relative roots
+export const DEFAULT_EXTERNAL_MANAGERS: ExternalManager[]; // [{ id: "cc-switch", label: "cc-switch", roots: [".cc-switch"] }]
+export function loadExternalManagers(repoDir: string): ExternalManager[]; // override roost/external-managers.yaml, replace-by-id
+// Unknown manager ⇒ { id: "unknown", label: "~/.foo-manager" } (target root shown). Web button text adapts: 让给 <label>.
 
 // B — server
 // GET  /api/file-history?path=<abs>  → { entries: { sha: string; subject: string; date: string }[] }   (≤30; unknown → { entries: [] })
@@ -425,38 +431,56 @@ it("groups candidates by tool and adds one to the aitools selection", async () =
 
 **Files:** Modify `packages/cli/src/server.ts` (skills GET route), `packages/web/src/api.ts` (SkillRow type), `packages/web/src/views/Skills.tsx`, `packages/web/src/i18n/strings.ts`; Tests `packages/cli/src/server.test.ts` + `packages/web/src/Skills.test.tsx`.
 
-- [ ] **Step 1: Server** — in the `GET /api/skills` row assembly, compute per skill:
+- [ ] **Step 1: Core registry** — create `packages/core/src/external-managers.ts` (+ append tests to `ai-tools-catalog.test.ts`'s file or a sibling): `ExternalManager`/`DEFAULT_EXTERNAL_MANAGERS`/`loadExternalManagers` exactly per Shared contracts, loader mirroring `loadAiToolsCatalog` (override `roost/external-managers.yaml`, replace-by-id, malformed → defaults). Export from core index. Test: defaults contain cc-switch; override adds `{ id: "foo", label: "Foo Manager", roots: [".foo-manager"] }`.
+
+- [ ] **Step 2: Server** — in the `GET /api/skills` row assembly, compute per skill (GENERIC — works for any manager):
 
 ```ts
-// A mount owned by another runtime manager (today: cc-switch) — a neutral fact,
-// not a conflict (ADR-0022 §3). Detected when the installed entry is a symlink
-// resolving under ~/.cc-switch/ .
-function detectExternal(home: string, name: string, targets: SkillTarget[]): "cc-switch" | undefined {
-  const ccRoot = path.join(home, ".cc-switch") + path.sep;
+// A mount owned by another runtime manager — a neutral fact, not a conflict
+// (ADR-0022 §3). GENERIC rule: the installed entry is a symlink whose target
+// resolves OUTSIDE Roost's skills source dir. The registry only prettifies the
+// name; unknown managers are still recognized and labeled by their target root.
+function detectExternal(
+  home: string,
+  sourceDir: string,
+  name: string,
+  targets: SkillTarget[],
+  managers: ExternalManager[],
+): { id: string; label: string } | undefined {
+  const srcRoot = path.resolve(sourceDir) + path.sep;
   for (const t of targets) {
     const dest = path.join(home, t.path, name);
-    try {
-      const st = fs.lstatSync(dest);
-      if (st.isSymbolicLink() && fs.realpathSync(dest).startsWith(ccRoot)) return "cc-switch";
-    } catch { /* absent */ }
+    let st: fs.Stats;
+    try { st = fs.lstatSync(dest); } catch { continue; }
+    if (!st.isSymbolicLink()) continue;
+    let real: string;
+    try { real = fs.realpathSync(dest); } catch { continue; }
+    if (real.startsWith(srcRoot)) continue; // ours
+    const hit = managers.find((m) => m.roots.some((r) => real.startsWith(path.join(home, r) + path.sep)));
+    if (hit) return { id: hit.id, label: hit.label };
+    // Unknown manager: label by the target's top-level dir under home.
+    const rel = path.relative(home, real);
+    const top = rel.startsWith("..") ? path.dirname(real) : rel.split(path.sep)[0]!;
+    return { id: "unknown", label: rel.startsWith("..") ? top : `~/${top}` };
   }
   return undefined;
 }
 ```
 
-Attach `external: detectExternal(home, name, targets)` to each skill row. Server test: create `~/.cc-switch/skills/foo` + symlink a target dir entry to it in an isolated home (reuse the skills tests' isolated-home pattern — they already use `importHome`), assert the row carries `external: "cc-switch"`.
+(`sourceDir` = the skills module's resolved source dir — reuse however the route already resolves it for links/conflicts; `managers = loadExternalManagers(repoDir)` once per request.) Attach `external` to each skill row. Server tests (isolated `importHome` pattern): (a) symlink → `~/.cc-switch/skills/foo` ⇒ `{ id: "cc-switch", label: "cc-switch" }`; (b) symlink → `~/.foo-manager/skills/bar`(未注册)⇒ `{ id: "unknown", label: "~/.foo-manager" }`; (c) symlink → Roost source ⇒ `external` undefined.
 
-- [ ] **Step 2: Web** — `SkillRow` gains `external?: "cc-switch"`. In `Skills.tsx` managed rows: when `external` is set, render a neutral gray badge `cc-switch 管理`(i18n `skills.external.ccswitch`)next to the name and suppress the conflict styling for that target. In the existing conflict resolve dialog, add a second button 「让给 cc-switch」(`skills.external.cede`)that calls the existing per-target `toggleSkill(name, target, false)` path and closes the dialog (the first button stays 重新接管 = existing resolve). i18n:
+- [ ] **Step 3: Web** — `SkillRow` gains `external?: { id: string; label: string }`. In `Skills.tsx` managed rows: when `external` is set, render a neutral gray badge `${external.label} ${t("skills.external.suffix")}`(如「cc-switch 管理」「~/.foo-manager 管理」)next to the name and suppress conflict styling for that target. In the conflict resolve dialog, add a second button `${t("skills.external.cedePrefix")}${external?.label ?? t("skills.external.other")}`(让给 cc-switch / 让给对方)calling the existing per-target `toggleSkill(name, target, false)` and closing the dialog(first button stays 重新接管 = existing resolve). i18n:
 
 ```ts
-  "skills.external.ccswitch": { en: "managed by cc-switch", zh: "cc-switch 管理" },
-  "skills.external.cede": { en: "Leave it to cc-switch", zh: "让给 cc-switch" },
+  "skills.external.suffix": { en: "managed", zh: "管理" },
+  "skills.external.cedePrefix": { en: "Leave it to ", zh: "让给 " },
+  "skills.external.other": { en: "the other manager", zh: "对方" },
 ```
 
-Web test: row with `external: "cc-switch"` shows the badge; conflict dialog shows both buttons and 让给 triggers `toggleSkill`.
+Web test: row with `external: { id: "cc-switch", label: "cc-switch" }` shows the badge; unknown-manager label renders too; conflict dialog shows both buttons and 让给 triggers `toggleSkill`.
 
-- [ ] **Step 3: Verify** — server + web suites + lint + typecheck → green.
-- [ ] **Step 4: Commit** — `git add packages/cli/src/server.ts packages/cli/src/server.test.ts packages/web/src/api.ts packages/web/src/views/Skills.tsx packages/web/src/Skills.test.tsx packages/web/src/i18n/strings.ts && git commit -m "feat(skills): external-manager badge + cede action (cc-switch interop)"`
+- [ ] **Step 4: Verify** — server + web suites + lint + typecheck → green.
+- [ ] **Step 5: Commit** — `git add packages/cli/src/server.ts packages/cli/src/server.test.ts packages/web/src/api.ts packages/web/src/views/Skills.tsx packages/web/src/Skills.test.tsx packages/web/src/i18n/strings.ts && git commit -m "feat(skills): external-manager badge + cede action (cc-switch interop)"`
 
 ---
 
@@ -686,4 +710,4 @@ program
 
 **1. Spec coverage:** C → T1(三调用方全覆盖,含 auto-backup);catalog/never-list → T2;module+registry+dedupe → T3;UI page → T4;interop badges/cede → T5;history/restore server → T6(含 `~/` 展开修订);web → T7;CLI → T8;真机+文档 → T9。Out-of-scope 清单与 spec 一致(无 LLM、无 Windsurf 等、不自动重挂载)。
 **2. Placeholder scan:** T3 的 status/apply 等五个方法以「verbatim 复刻 dotfiles 对应实现并换命名空间」交付——这是对既有代码的明确复制指令并附行号锚点,非 TBD;其余任务代码完整。
-**3. Type consistency:** `summarizeCapture` 返回型在 T1 定义、T1 三处消费;`AiTool/AiToolPath/NEVER_BACKUP` T2→T3/T4;`external?: "cc-switch"` T5 server→web 同名;`FileHistoryEntry`、`restoreFileVersion(path, sha)` T6 形状→T7 wrapper→T7 测试;restore 提交格式 `restore: <basename> @ <sha7>` T6/T8 一致;`~/` 展开规则 T6/T7/T8 一致(server 与 CLI 都展开,web 原样透传)。
+**3. Type consistency:** `summarizeCapture` 返回型在 T1 定义、T1 三处消费;`AiTool/AiToolPath/NEVER_BACKUP` T2→T3/T4;`external?: { id, label }` + `ExternalManager` 注册表 T5 server→web 同名(通用识别,未知管理器按目标根目录标注);`FileHistoryEntry`、`restoreFileVersion(path, sha)` T6 形状→T7 wrapper→T7 测试;restore 提交格式 `restore: <basename> @ <sha7>` T6/T8 一致;`~/` 展开规则 T6/T7/T8 一致(server 与 CLI 都展开,web 原样透传)。

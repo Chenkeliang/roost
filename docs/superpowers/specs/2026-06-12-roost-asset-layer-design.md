@@ -118,12 +118,16 @@ cc-switch 这类工具;Roost 负责把这一切加密备进你的仓库。"
 1. **资产备份**: cc-switch's store is a catalog entry (`data`, encrypted).
    Restore puts its files back; cc-switch keeps working. (On machines where
    `~/.cc-switch` is already under dotfiles selection, discover dedupe applies.)
-2. **产物识别 (skills)**: the skills view labels a skill whose mount content
-   resolves under `~/.cc-switch/` as 「cc-switch 管理」 (neutral badge, not a
-   conflict). Detection: server-side per skill/target — mount is a symlink whose
-   target lies under `~/.cc-switch/`, or a real dir while cc-switch's install
-   area has a same-named skill. New field on the skills response:
-   `external?: "cc-switch"` per conflict/owned entry.
+2. **产物识别 (skills) — generic, not cc-switch-specific**: any mount that is a
+   symlink whose resolved target lies OUTSIDE Roost's skills source dir gets a
+   neutral 「外部管理」 badge (never a conflict, never fought). A curated,
+   overridable **external-managers registry** (`DEFAULT_EXTERNAL_MANAGERS` in
+   core + `roost/external-managers.yaml` override — same I8 mechanism as the
+   catalogs; default entry: cc-switch at `.cc-switch`) maps known roots to
+   friendly names; unknown managers still get recognized generically and are
+   labeled by their target root (e.g. `外部管理 · ~/.foo-manager`). Real
+   directories (no attribution possible) keep the existing conflict flow. New
+   field on the skills response: `external?: { id: string; label: string }`.
 3. **写权主权 (two-button conflict)**: when a Roost-managed mount was taken
    over (existing conflict detection), the row offers 「重新接管」 (existing
    `resolveSkillConflict`: back up + relink) and 「让给 cc-switch」 (existing
