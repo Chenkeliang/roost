@@ -502,7 +502,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "skills.targets.manage": { en: "Manage targets", zh: "管理目标" },
   "skills.targets.builtin": { en: "built-in", zh: "内置" },
   "skills.targets.name": { en: "name", zh: "名称" },
-  "skills.targets.dir": { en: "directory", zh: "目录" },
+  "skills.targets.dir": { en: "directory (relative to ~, e.g. .config/foo/skills)", zh: "目录(相对家目录,如 .config/foo/skills)" },
   "skills.targets.add": { en: "Add", zh: "添加" },
   "skills.targets.save": { en: "Save", zh: "保存" },
   "skills.targets.removeNote": { en: "Removes the target from Roost. Roost-managed links into it are cleaned up on the next apply; the directory itself is never deleted.", zh: "仅从 Roost 移除该目标。其下 Roost 自建的链接在下次应用时清理;目录本身不会被删除。" },
