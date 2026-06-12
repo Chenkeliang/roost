@@ -26,6 +26,8 @@ vi.mock("./api", () => ({
   rotateKey: vi.fn().mockResolvedValue({ recipient: "age1new", rotated: [], failed: [], swapped: true }),
   getSettings: vi.fn().mockResolvedValue({ maxCaptureMB: 100 }),
   saveSettings: vi.fn().mockResolvedValue({ ok: true, maxCaptureMB: 100 }),
+  getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
+  postBrewInstall: vi.fn().mockResolvedValue({ ok: true, output: "" }),
 }));
 
 describe("Settings", () => {

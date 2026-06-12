@@ -10,6 +10,7 @@ vi.mock("./api", () => ({
   getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
   getMachines: vi.fn().mockResolvedValue({ hosts: [], states: {} }),
   getStatus: vi.fn().mockResolvedValue({ reports: [] }),
+  getDiff: vi.fn().mockResolvedValue({ diffs: [] }),
   getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: {} }),
   getModules: vi.fn().mockResolvedValue({ modules: [] }),
   getIndex: vi.fn().mockResolvedValue({ index: {} }),
@@ -45,16 +46,18 @@ describe("App", () => {
     // Multiple "Overview" buttons exist (nav item + action bar) — use getAllByRole
     expect(screen.getAllByRole("button", { name: "Overview" }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Drift" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "AI Tools" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Timeline" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
   });
 
-  it("renders the Modules group label in the sidebar", async () => {
+  it("drift and setup nav items are gone, aitools nav item appears", async () => {
     await act(async () => {
       render(<App />);
     });
-    expect(screen.getByText("Modules")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Drift" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Setup" })).toBeNull();
+    expect(screen.getByRole("button", { name: "AI Tools" })).toBeTruthy();
   });
 
   it("switches views when a sidebar nav item is clicked", async () => {
@@ -100,6 +103,16 @@ describe("App", () => {
     const actionsBtn = screen.getByRole("button", { name: "Actions" });
     fireEvent.click(actionsBtn);
     expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
+  });
+
+  it("command palette has 'View diff' command (drift replaced by sync)", async () => {
+    await act(async () => {
+      render(<App />);
+    });
+    const actionsBtn = screen.getByRole("button", { name: "Actions" });
+    fireEvent.click(actionsBtn);
+    expect(screen.getByText("View diff")).toBeTruthy();
+    expect(screen.queryByText("Open Drift")).toBeNull();
   });
 
   it("command palette closes on Escape", async () => {

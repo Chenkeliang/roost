@@ -51,7 +51,7 @@ describe("Overview", () => {
   it("renders module health section header", async () => {
     await act(async () => { render(<Overview showHud={noop} />); });
     await waitFor(() => {
-      expect(screen.getByText("Module Health")).toBeTruthy();
+      expect(screen.getByText("Backup Health")).toBeTruthy();
     });
   });
 

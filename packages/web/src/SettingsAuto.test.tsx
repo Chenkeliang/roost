@@ -13,6 +13,8 @@ vi.mock("./api", () => ({
   generateKey: vi.fn(), rotateKey: vi.fn(),
   getSettings: vi.fn().mockResolvedValue({ maxCaptureMB: 100, autoBackup: "daily", autoPush: false, checkUpdates: true }),
   saveSettings: vi.fn().mockResolvedValue({ ok: true, maxCaptureMB: 100, autoBackup: "weekly", autoPush: false, checkUpdates: true }),
+  getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
+  postBrewInstall: vi.fn().mockResolvedValue({ ok: true, output: "" }),
 }));
 vi.mock("./updateCheck", () => ({
   checkForUpdate: vi.fn().mockResolvedValue(null),

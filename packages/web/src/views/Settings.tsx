@@ -14,6 +14,7 @@ import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generate
   type GitOpResult, type KeyStatus } from "../api";
 import { openExternal } from "../openExternal";
 import { checkForUpdate } from "../updateCheck";
+import { Setup } from "./Setup";
 
 export function Settings() {
   const { t } = useT();
@@ -176,8 +177,12 @@ export function Settings() {
         {t("settings.heading")}
       </div>
 
+      {/* ── Environment check (embedded Setup) ── */}
+      <div style={sectionLabel}>{t("setup.title")}</div>
+      <Setup embedded />
+
       {/* ── Repo ── */}
-      <div style={sectionLabel}>{t("settings.repository")}</div>
+      <div style={{ ...sectionLabel, marginTop: 22 }}>{t("settings.repository")}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={row}>
           <FolderOpen size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />

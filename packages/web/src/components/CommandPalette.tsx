@@ -24,7 +24,7 @@ interface CommandPaletteProps {
   onClose: () => void;
   onCapture: () => void;
   onLoad: () => void;
-  onOpenDrift: () => void;
+  onOpenSync: () => void;
   onOpenTimeline: () => void;
   onOpenSettings: () => void;
 }
@@ -34,7 +34,7 @@ export function CommandPalette({
   onClose,
   onCapture,
   onLoad,
-  onOpenDrift,
+  onOpenSync,
   onOpenTimeline,
   onOpenSettings,
 }: CommandPaletteProps) {
@@ -60,11 +60,11 @@ export function CommandPalette({
       action: onLoad,
     },
     {
-      id: "drift",
-      label: "Open Drift",
+      id: "sync",
+      label: "View diff",
       icon: <GitDiff size={16} />,
       tileColor: "amber",
-      action: onOpenDrift,
+      action: onOpenSync,
     },
     {
       id: "timeline",

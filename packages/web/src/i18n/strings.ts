@@ -31,8 +31,6 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "nav.appconfig": { en: "App Config", zh: "应用配置" },
   "nav.env": { en: "Aliases & Env", zh: "别名与环境变量" },
   "nav.sync": { en: "Sync Review", zh: "同步复核" },
-  "nav.setup": { en: "Setup", zh: "环境检查" },
-
   // ── Setup / environment ──────────────────────────────────────────────────
   "setup.title": { en: "Environment check", zh: "环境检查" },
   "setup.loading": { en: "Checking…", zh: "检查中…" },
@@ -60,6 +58,8 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "setup.check.repo": { en: "Config repo", zh: "配置仓库" },
 
   // ── Sync Review (sync-state) ─────────────────────────────────────────────
+  "sync.view.items": { en: "Items", zh: "逐项" },
+  "sync.view.raw": { en: "Raw diff", zh: "原始 diff" },
   "sync.loading": { en: "Loading…", zh: "加载中…" },
   "sync.loadingDiff": { en: "Loading diff…", zh: "加载对比…" },
   "sync.empty": { en: "Nothing is managed yet, or nothing selected.", zh: "没有被管理的项,或尚未选择。" },
@@ -111,10 +111,8 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "sync.notice.batchDone": { en: "Batch done — resolved", zh: "批量完成:处理" },
   "sync.notice.itemsWord": { en: "item(s)", zh: "项" },
   "sync.notice.batchSuffix": { en: "(removed-in-repo kept local)", zh: "(已移除项保留本地)" },
-  "nav.drift": { en: "Drift", zh: "偏移" },
   "nav.timeline": { en: "Timeline", zh: "时间线" },
   "nav.settings": { en: "Settings", zh: "设置" },
-  "nav.modulesGroup": { en: "Modules", zh: "模块" },
   "app.docs": { en: "Docs", zh: "文档" },
 
   // ── Overview ─────────────────────────────────────────────────────────────
@@ -125,7 +123,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "overview.depsMissing": { en: "Missing required tools:", zh: "缺少必需工具:" },
   "overview.depsFix": { en: "Fix in Setup", zh: "去环境检查" },
   "overview.loading": { en: "Loading…", zh: "加载中…" },
-  "overview.moduleHealth": { en: "Module Health", zh: "模块健康度" },
+  "overview.moduleHealth": { en: "Backup Health", zh: "备份健康度" },
   "overview.blockedTitle": { en: "items blocked — potential secrets", zh: "项被拦下 —— 疑似密钥" },
   "overview.blockedHint": {
     en: "These weren't committed because they look like they contain secrets. Encrypt & retry to back them up as encrypted .age files (needs an age key).",
