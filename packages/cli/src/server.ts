@@ -869,18 +869,20 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const result = await exec.run("git", [
         "-C", repoDir,
         "log",
-        "--pretty=format:%H\x1f%s\x1f%cI",
+        "--pretty=format:%H\x1f%s\x1f%cI\x1f%b\x1e",
         "-n", "50",
       ]);
       if (result.code !== 0) {
         return reply.send({ entries: [] });
       }
       const entries = result.stdout
-        .split("\n")
-        .filter((line) => line.trim().length > 0)
-        .map((line) => {
-          const [sha, subject, date] = line.split("\x1f");
-          return { sha: sha ?? "", subject: subject ?? "", date: date ?? "" };
+        .split("\x1e")
+        .filter((rec) => rec.trim().length > 0)
+        .map((rec) => {
+          const [sha, subject, date, body] = rec.trim().split("\x1f");
+          const entry: { sha: string; subject: string; date: string; body?: string } = { sha: sha ?? "", subject: subject ?? "", date: date ?? "" };
+          if (body && body.trim()) entry.body = body.trim();
+          return entry;
         });
       return reply.send({ entries });
     } catch {
@@ -891,7 +893,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ── GET /api/file-history ────────────────────────────────────────────────────
   // Map a managed target path to its repo-relative source path; null if unmanaged.
   const sourceRelFor = async (exec: Exec, target: string): Promise<string | null> => {
-    const r = await exec.run("chezmoi", ["--source", repoDir, "source-path", target]);
+    const resolved = target.startsWith("~/") ? path.join(os.homedir(), target.slice(2)) : target;
+    const r = await exec.run("chezmoi", ["--source", repoDir, "source-path", resolved]);
     if (r.code !== 0) return null;
     const abs = r.stdout.trim();
     return abs ? path.relative(repoDir, abs) : null;

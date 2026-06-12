@@ -265,6 +265,16 @@ export interface TimelineEntry {
   sha: string;
   subject: string;
   date: string;
+  body?: string;
+}
+
+// ── Per-file history / restore (ADR-0022) ─────────────────────────────────────
+export interface FileHistoryEntry { sha: string; subject: string; date: string }
+export function getFileHistory(p: string): Promise<{ entries: FileHistoryEntry[] }> {
+  return apiFetch(`/api/file-history?path=${encodeURIComponent(p)}`);
+}
+export function restoreFileVersion(p: string, sha: string): Promise<{ ok: boolean; syncHint: boolean }> {
+  return apiFetch("/api/file-restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: p, sha }) });
 }
 
 export interface TimelineResponse {

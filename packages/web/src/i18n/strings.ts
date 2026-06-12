@@ -631,6 +631,17 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "large.remove": { en: "Stop backing up (keeps local file)", zh: "移出备份(不影响本地文件)" },
   "large.removed": { en: "Removed from backups — local file untouched.", zh: "已移出备份 —— 本地文件未受影响。" },
 
+  // ── File history / restore ────────────────────────────────────────────────
+  "history.searchPlaceholder": { en: "File path to inspect (e.g. ~/.zshrc)", zh: "要查看的文件路径(如 ~/.zshrc)" },
+  "history.show": { en: "Show history", zh: "查看历史" },
+  "history.back": { en: "All snapshots", zh: "全部快照" },
+  "history.restore": { en: "Restore this version to the repo", zh: "恢复此版本到仓库" },
+  "history.restored": { en: "Restored to the repo — apply to this machine in Sync Review.", zh: "已恢复到仓库 —— 在同步复核中应用到本机。" },
+  "history.empty": { en: "This file is not in your backups.", zh: "此文件不在备份中。" },
+  "history.restoring": { en: "Restoring…", zh: "恢复中…" },
+  "history.current": { en: "current", zh: "当前版本" },
+  "history.goSync": { en: "Open Sync Review", zh: "去同步复核" },
+
   // ── AI tools module ─────────────────────────────────────────────────────
   "nav.aitools": { en: "AI Tools", zh: "AI 工具" },
   "ai.tagline": { en: "Runtime management belongs to tools like cc-switch — Roost encrypts and version-controls all of it into your repo.", zh: "运行时管理交给 cc-switch 这类工具;Roost 负责把这一切加密、带版本地备进你的仓库。" },

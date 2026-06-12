@@ -281,7 +281,7 @@ export function App() {
           {activeTab === "aitools" && <AiTools showHud={showHud} />}
           {activeTab === "env" && <AliasesEnv showHud={showHud} />}
           {activeTab === "sync" && <SyncState onOpenSettings={() => setActiveTab("settings")} />}
-          {activeTab === "timeline" && <Timeline />}
+          {activeTab === "timeline" && <Timeline showHud={showHud} onOpenSync={() => setActiveTab("sync")} />}
           {activeTab === "settings" && <Settings />}
         </main>
       </div>
