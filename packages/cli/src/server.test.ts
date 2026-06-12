@@ -2122,4 +2122,32 @@ describe("backup status + settings passthrough", () => {
     expect((get.json() as { autoBackup: string }).autoBackup).toBe("daily");
     await server.close();
   });
+
+  it("capture commits with a changelog subject instead of 'roost: capture'", async () => {
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        if (cmd === "git" && args.join(" ").includes("status --porcelain")) return { code: 0, stdout: " M x", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const reg = new ModuleRegistry();
+    reg.register(makeFakeModule({
+      name: "dotfiles",
+      captureFn: async () => ({ module: "dotfiles", written: ["/u/.zshrc"], encrypted: [] }),
+    }));
+    // Pre-populate selection so captureAll runs the dotfiles module.
+    const sel = emptySelection();
+    sel.modules["dotfiles"] = ["/u/.zshrc"];
+    saveSelection(tmpDir, sel);
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    await server.inject({ method: "POST", url: "/api/capture" });
+    const commit = calls.find((c) => c[0] === "git" && c.includes("commit"));
+    expect(commit).toBeDefined();
+    const mIdx = commit!.indexOf("-m");
+    expect(commit![mIdx + 1]).toContain("capture: dotfiles(1)");
+    expect(commit![mIdx + 1]).toContain("/u/.zshrc");
+    await server.close();
+  });
 });

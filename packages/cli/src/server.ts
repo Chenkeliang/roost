@@ -62,6 +62,7 @@ import {
   saveRoostSettings,
   cloneRepo,
   LARGE_FILE_MB,
+  summarizeCapture,
 } from "@roost/core";
 import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -227,7 +228,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const sel = loadSelection(repoDir);
       const ctx = makeCtx(false);
       const changes = await captureAll(registry, ctx, sel);
-      await finalizeCapture(ctx.exec, repoDir, ctx.home);
+      await finalizeCapture(ctx.exec, repoDir, ctx.home, summarizeCapture(changes));
       cache.invalidateAll();
       return {
         captured: changes.reduce((n, c) => n + c.written.length + c.encrypted.length, 0),
@@ -601,7 +602,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const sel = loadSelection(repoDir);
       const ctx = makeCtx(false);
       const changes = await captureAll(registry, ctx, sel);
-      await finalizeCapture(ctx.exec, repoDir, ctx.home);
+      await finalizeCapture(ctx.exec, repoDir, ctx.home, summarizeCapture(changes));
       return reply.send({ changes });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
