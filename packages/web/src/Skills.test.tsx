@@ -281,15 +281,22 @@ describe("Skills view", () => {
     // open coverage popover
     const coverageBtn = await screen.findByRole("button", { name: /Coverage/i });
     coverageBtn.click();
-    // popover shows external label instead of Resolve
+    // popover opens; Resolve button is present even for external conflict
     const popover = await screen.findByRole("dialog");
-    // The Resolve button should NOT appear for external conflict
-    expect(within(popover).queryByRole("button", { name: /resolve|解决/i })).not.toBeInTheDocument();
-    // Close the popover and open the conflict dialog via clicking the row coverage button
-    // Since external suppresses Resolve in popover, the cede button test uses the dialog directly.
-    // Close popover
-    const closeBtn = within(popover).getByRole("button", { name: /cancel|取消/i });
-    closeBtn.click();
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const resolveBtn = within(popover).getByRole("button", { name: /resolve|解决/i });
+    // clicking Resolve closes popover and opens the conflict dialog
+    resolveBtn.click();
+    // wait for the conflict dialog (the popover closes and conflict dialog opens)
+    await waitFor(() => {
+      const dialogs = screen.queryAllByRole("dialog");
+      expect(dialogs.length).toBeGreaterThan(0);
+    });
+    const dialog = screen.getByRole("dialog");
+    // cede button must be present in the conflict dialog
+    const cedeBtn = within(dialog).getByRole("button", { name: /让给\s*cc-switch|Leave it to\s*cc-switch/i });
+    expect(cedeBtn).toBeInTheDocument();
+    // clicking cede triggers toggleSkill with enabled=false
+    cedeBtn.click();
+    await waitFor(() => expect(api.toggleSkill).toHaveBeenCalledWith("foo", false, "claude"));
   });
 });

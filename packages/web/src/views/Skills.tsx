@@ -59,11 +59,16 @@ function SkillTargetsPopover({ row, targets, busy, t, onToggle, onResolve, onClo
                   style={{ ...ic, border: 0, background: "transparent", padding: 0 }}>
                   {on ? <CheckCircle size={18} weight="fill" style={{ color: "var(--green)" }} /> : <Circle size={18} style={{ color: "var(--muted)" }} />}
                 </button>
-                <span style={{ flex: 1 }}>{tg.label}</span>
-                {st === "conflict" && !row.external ? (
+                <span style={{ flex: 1 }}>
+                  {tg.label}
+                  {row.external && (
+                    <span style={{ marginLeft: 6, fontSize: 11, color: "var(--muted)", fontWeight: 400 }}>
+                      {row.external.label} {t("skills.external.suffix")}
+                    </span>
+                  )}
+                </span>
+                {st === "conflict" ? (
                   <button onClick={() => onResolve(tg.id)} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>{t("skills.resolve.action")}</button>
-                ) : st === "conflict" && row.external ? (
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{row.external.label} {t("skills.external.suffix")}</span>
                 ) : st === "broken" ? (
                   <span style={{ color: "#f0b352", fontSize: 12 }}>{t("skills.coverage.broken")}</span>
                 ) : st === "copy" ? (
