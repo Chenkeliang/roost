@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
 import * as prompts from "@clack/prompts";
-import { createExec, createLogger, createT, defaultRegistry, loadProfiles, resolveProfile, defaultAgeKeyPath } from "@roost/core";
+import { createExec, createLogger, createT, defaultRegistry, loadProfiles, resolveProfile, defaultAgeKeyPath, commitRepo } from "@roost/core";
 import * as readline from "node:readline";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
@@ -230,6 +230,63 @@ program
   .action(async () => {
     const { repoDir, ctx } = buildCtx();
     await runDiff({ repoDir, ctx });
+  });
+
+// Map a managed target path to its repo-relative source path; null if unmanaged.
+// `~/` is expanded to the home dir (chezmoi source-path needs an absolute path).
+async function sourceRelForTarget(
+  ctx: ModuleContext,
+  repoDir: string,
+  p: string,
+): Promise<string | null> {
+  const target = p.startsWith("~/") ? path.join(ctx.home, p.slice(2)) : p;
+  const sp = await ctx.exec.run("chezmoi", ["--source", repoDir, "source-path", target]);
+  if (sp.code !== 0) return null;
+  const abs = sp.stdout.trim();
+  return abs ? path.relative(repoDir, abs) : null;
+}
+
+program
+  .command("history")
+  .description("Show a managed file's snapshot history")
+  .argument("<path>", "target file path (absolute or ~/)")
+  .action(async (p: string) => {
+    const { repoDir, ctx } = buildCtx();
+    const rel = await sourceRelForTarget(ctx, repoDir, p);
+    if (rel === null) {
+      ctx.log.error(`not managed: ${p}`);
+      process.exit(1);
+    }
+    const r = await ctx.exec.run("git", [
+      "-C", repoDir,
+      "log", "--follow", "--pretty=format:%h  %cI  %s", "-n", "30", "--", rel,
+    ]);
+    console.log(r.stdout || "(no history)");
+  });
+
+program
+  .command("restore")
+  .description("Restore a managed file's REPO version to a past snapshot (machine file untouched; apply via Sync Review)")
+  .argument("<path>", "target file path (absolute or ~/)")
+  .argument("<sha>", "snapshot sha (from `roost history`)")
+  .action(async (p: string, sha: string) => {
+    const { repoDir, ctx } = buildCtx();
+    if (!/^[0-9a-f]{7,40}$/i.test(sha)) {
+      ctx.log.error(`invalid sha: ${sha}`);
+      process.exit(1);
+    }
+    const rel = await sourceRelForTarget(ctx, repoDir, p);
+    if (rel === null) {
+      ctx.log.error(`not managed: ${p}`);
+      process.exit(1);
+    }
+    const co = await ctx.exec.run("git", ["-C", repoDir, "checkout", sha, "--", rel]);
+    if (co.code !== 0) {
+      ctx.log.error(co.stderr.trim() || "checkout failed");
+      process.exit(1);
+    }
+    await commitRepo(ctx.exec, repoDir, `restore: ${path.basename(p)} @ ${sha.slice(0, 7)}`);
+    ctx.log.info("restored in repo — run `roost load` (dry-run) or use Sync Review to apply (machine file untouched)");
   });
 
 // ── app <sub-command group> ───────────────────────────────────────────────────

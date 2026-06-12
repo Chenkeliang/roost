@@ -157,6 +157,18 @@ export function getItemDiff(module: string, id: string): Promise<ItemDiffRespons
   return apiFetch<ItemDiffResponse>(`/api/item-diff${q}`);
 }
 
+// ── AI tools catalog (ADR-0022) ───────────────────────────────────────────────
+export interface AiCatalogPath {
+  path: string;
+  kind: "memory" | "settings" | "mcp" | "data";
+  encrypt: boolean;
+  state: "selected" | "available" | "dotfiles" | "never" | "missing";
+}
+export interface AiCatalogTool { id: string; label: string; paths: AiCatalogPath[] }
+export function getAiToolsCatalog(): Promise<{ tools: AiCatalogTool[] }> {
+  return apiFetch("/api/aitools/catalog");
+}
+
 export interface SkillImportResponse {
   imported: string[];
   blocked: { id: string; reason: string; detail?: string }[];
@@ -253,6 +265,16 @@ export interface TimelineEntry {
   sha: string;
   subject: string;
   date: string;
+  body?: string;
+}
+
+// ── Per-file history / restore (ADR-0022) ─────────────────────────────────────
+export interface FileHistoryEntry { sha: string; subject: string; date: string }
+export function getFileHistory(p: string): Promise<{ entries: FileHistoryEntry[] }> {
+  return apiFetch(`/api/file-history?path=${encodeURIComponent(p)}`);
+}
+export function restoreFileVersion(p: string, sha: string): Promise<{ ok: boolean; syncHint: boolean }> {
+  return apiFetch("/api/file-restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: p, sha }) });
 }
 
 export interface TimelineResponse {
@@ -451,7 +473,7 @@ export interface SkillsConfig {
   targets: string[];
   skills: Record<string, { enabled?: boolean; targets?: string[]; method?: SkillMethod }>;
 }
-export interface SkillRow { name: string; effective: EffectiveSkill; links: SkillLink[]; conflicts: string[]; }
+export interface SkillRow { name: string; effective: EffectiveSkill; links: SkillLink[]; conflicts: string[]; external?: { id: string; label: string }; }
 export interface SkillsView { config: SkillsConfig; targets: SkillTarget[]; skills: SkillRow[]; }
 
 export function getSkills(): Promise<SkillsView> {

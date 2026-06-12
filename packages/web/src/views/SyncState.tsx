@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getSyncState, postResolve, getItemDiff } from "../api";
+import { getSyncState, postResolve, getItemDiff, getDiff } from "../api";
 import type {
   SyncStateResponse,
   SyncItem,
@@ -7,8 +7,10 @@ import type {
   SyncDirection,
   ResolveAction,
   ItemDiffResponse,
+  DiffEntry,
 } from "../api";
 import { useT } from "../i18n";
+import { DiffPane as RawDiffPane } from "../components/DiffPane";
 
 // Automation-first review surface (ADR-0016 §6). Plain-language labels via i18n;
 // raw direction enums are never shown.
@@ -250,6 +252,9 @@ export function SyncState({ onOpenSettings }: { onOpenSettings?: () => void } = 
   const [notice, setNotice] = useState<string | null>(null);
   const [policy, setPolicy] = useState<ResolveAction>("take-repo");
   const [batching, setBatching] = useState(false);
+  const [view, setView] = useState<"items" | "raw">("items");
+  const [rawDiffs, setRawDiffs] = useState<DiffEntry[] | null>(null);
+  const [rawLoading, setRawLoading] = useState(false);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -286,6 +291,20 @@ export function SyncState({ onOpenSettings }: { onOpenSettings?: () => void } = 
     [refresh, t],
   );
 
+  const fetchRawDiffs = useCallback(() => {
+    if (rawDiffs !== null || rawLoading) return;
+    setRawLoading(true);
+    getDiff()
+      .then((diffData) => setRawDiffs(diffData.diffs))
+      .catch(() => setRawDiffs([]))
+      .finally(() => setRawLoading(false));
+  }, [rawDiffs, rawLoading]);
+
+  const handleViewChange = useCallback((v: "items" | "raw") => {
+    setView(v);
+    if (v === "raw") fetchRawDiffs();
+  }, [fetchRawDiffs]);
+
   const items = data?.items ?? [];
   const auto = items.filter((i) => i.exception === null && i.direction !== "synced");
   const diverged = items.filter((i) => i.exception === "diverged");
@@ -319,10 +338,31 @@ export function SyncState({ onOpenSettings }: { onOpenSettings?: () => void } = 
     { v: "keep-local", labelKey: "sync.keepLocal" },
   ];
 
+  const viewOpts: { v: "items" | "raw"; labelKey: string }[] = [
+    { v: "items", labelKey: "sync.view.items" },
+    { v: "raw", labelKey: "sync.view.raw" },
+  ];
+
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-      <div style={{ fontSize: 12.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, marginBottom: 14 }}>
-        {t("nav.sync")}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <div style={{ fontSize: 12.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>
+          {t("nav.sync")}
+        </div>
+        <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 999, overflow: "hidden", marginLeft: "auto" }}>
+          {viewOpts.map((o) => {
+            const active = view === o.v;
+            return (
+              <button
+                key={o.v}
+                onClick={() => handleViewChange(o.v)}
+                style={{ appearance: "none", border: 0, background: active ? "var(--raise)" : "transparent", color: active ? "var(--text)" : "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "3px 11px", cursor: "pointer" }}
+              >
+                {t(o.labelKey)}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {loading && !data ? (
@@ -339,7 +379,26 @@ export function SyncState({ onOpenSettings }: { onOpenSettings?: () => void } = 
         </div>
       ) : null}
 
-      {data ? (
+      {view === "raw" ? (
+        <div>
+          {rawLoading ? (
+            <div style={{ color: "var(--muted)", fontSize: 14 }}>{t("sync.loadingDiff")}</div>
+          ) : rawDiffs === null ? (
+            <div style={{ color: "var(--muted)", fontSize: 14 }}>{t("sync.loadingDiff")}</div>
+          ) : rawDiffs.length === 0 ? (
+            <div style={{ color: "#5fd08a", fontSize: 14 }}>{t("sync.allSynced")}</div>
+          ) : (
+            rawDiffs.map((d) => (
+              <div key={d.module} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, marginBottom: 6 }}>{d.module}</div>
+                <RawDiffPane text={d.text} />
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      {view === "items" && data ? (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", marginBottom: 16, fontSize: 13.5 }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }} />

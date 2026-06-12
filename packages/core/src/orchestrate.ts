@@ -4,6 +4,7 @@ import { ModuleRegistry } from "./registry.js";
 import { recordModuleBaseline } from "./sync-baseline.js";
 import type { ModuleBaseline } from "./state.js";
 import { dotfilesModule } from "./modules/dotfiles.js";
+import { aitoolsModule } from "./modules/aitools.js";
 import { packagesModule } from "./modules/packages.js";
 import { appconfigModule } from "./modules/appconfig.js";
 import { projectsModule } from "./modules/projects.js";
@@ -17,6 +18,7 @@ import type { SyncStateReport } from "./sync-state.js";
 export function defaultRegistry(): ModuleRegistry {
   const reg = new ModuleRegistry();
   reg.register(dotfilesModule);
+  reg.register(aitoolsModule);
   reg.register(packagesModule);
   reg.register(appconfigModule);
   reg.register(projectsModule);

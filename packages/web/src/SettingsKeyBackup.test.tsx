@@ -17,6 +17,8 @@ vi.mock("./api", () => ({
   rotateKey: vi.fn(),
   getSettings: vi.fn().mockResolvedValue({ maxCaptureMB: 5 }),
   saveSettings: vi.fn(),
+  getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
+  postBrewInstall: vi.fn().mockResolvedValue({ ok: true, output: "" }),
 }));
 
 describe("Settings key backup", () => {

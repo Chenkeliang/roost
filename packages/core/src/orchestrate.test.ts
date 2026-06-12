@@ -63,7 +63,8 @@ describe("defaultRegistry", () => {
     expect(names).toContain("projects");
     expect(names).toContain("env");
     expect(names).toContain("skills");
-    expect(names).toHaveLength(6);
+    expect(names).toContain("aitools");
+    expect(names).toHaveLength(7);
   });
 });
 

@@ -16,7 +16,7 @@ import type {
   ApplyPlan,
 } from "@roost/shared";
 import { ModuleRegistry, saveSelection, loadSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule, loadSkillsTargets } from "@roost/core";
-import { buildServer, computeConflicts, classifyGitError } from "./server.js";
+import { buildServer, computeConflicts, classifyGitError, detectExternal } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
 // A real-exec ctx so git commits actually run (for capture finalization tests).
@@ -778,17 +778,18 @@ describe("buildServer", () => {
     await server.close();
   });
 
-  it("GET /api/timeline → parses git log output into entries", async () => {
+  it("GET /api/timeline → parses git log output into entries (single record, no body)", async () => {
     const sha = "abc123def456";
     const subject = "feat: add something";
     const date = "2026-05-30T10:00:00+00:00";
-    const gitLine = `${sha}\x1f${subject}\x1f${date}`;
+    // Server uses %H\x1f%s\x1f%cI\x1f%b\x1e format — body is empty here
+    const gitOutput = `${sha}\x1f${subject}\x1f${date}\x1f\x1e`;
 
     function makeGitExec(): Exec {
       return {
         async run(cmd: string, args: string[]): Promise<ExecResult> {
           if (cmd === "git" && args.includes("log")) {
-            return { code: 0, stdout: gitLine, stderr: "" };
+            return { code: 0, stdout: gitOutput, stderr: "" };
           }
           return { code: 0, stdout: "", stderr: "" };
         },
@@ -812,9 +813,32 @@ describe("buildServer", () => {
 
     const res = await server.inject({ method: "GET", url: "/api/timeline" });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { entries: { sha: string; subject: string; date: string }[] };
+    const body = res.json() as { entries: { sha: string; subject: string; date: string; body?: string }[] };
     expect(body.entries).toHaveLength(1);
-    expect(body.entries[0]).toEqual({ sha, subject, date });
+    expect(body.entries[0]).toEqual({ sha, subject, date }); // no body field when empty
+
+    await server.close();
+  });
+
+  it("GET /api/timeline → splits on \\x1e and extracts body field when present", async () => {
+    // Build output with \x1e record separator; second record has no body
+    const gitOutput =
+      "aaa111\x1ffeat: first\x1f2026-06-01T00:00:00+00:00\x1fdetails for first\x1e" +
+      "bbb222\x1ffix: second\x1f2026-06-02T00:00:00+00:00\x1f\x1e";
+
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        if (cmd === "git" && args.includes("log")) return { code: 0, stdout: gitOutput, stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "GET", url: "/api/timeline" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { entries: { sha: string; subject: string; date: string; body?: string }[] };
+    expect(body.entries).toHaveLength(2);
+    expect(body.entries[0]).toEqual({ sha: "aaa111", subject: "feat: first", date: "2026-06-01T00:00:00+00:00", body: "details for first" });
+    expect(body.entries[1]).toEqual({ sha: "bbb222", subject: "fix: second", date: "2026-06-02T00:00:00+00:00" }); // no body key
 
     await server.close();
   });
@@ -2120,6 +2144,236 @@ describe("backup status + settings passthrough", () => {
     });
     const get = await server.inject({ method: "GET", url: "/api/settings" });
     expect((get.json() as { autoBackup: string }).autoBackup).toBe("daily");
+    await server.close();
+  });
+
+  it("capture commits with a changelog subject instead of 'roost: capture'", async () => {
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        if (cmd === "git" && args.join(" ").includes("status --porcelain")) return { code: 0, stdout: " M x", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const reg = new ModuleRegistry();
+    reg.register(makeFakeModule({
+      name: "dotfiles",
+      captureFn: async () => ({ module: "dotfiles", written: ["/u/.zshrc"], encrypted: [] }),
+    }));
+    // Pre-populate selection so captureAll runs the dotfiles module.
+    const sel = emptySelection();
+    sel.modules["dotfiles"] = ["/u/.zshrc"];
+    saveSelection(tmpDir, sel);
+    const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    await server.inject({ method: "POST", url: "/api/capture" });
+    const commit = calls.find((c) => c[0] === "git" && c.includes("commit"));
+    expect(commit).toBeDefined();
+    const mIdx = commit!.indexOf("-m");
+    expect(commit![mIdx + 1]).toContain("capture: dotfiles(1)");
+    expect(commit![mIdx + 1]).toContain("/u/.zshrc");
+    await server.close();
+  });
+
+  it("GET /api/aitools/catalog → available, dotfiles, never states", async () => {
+    // Build a controlled temp home so the endpoint's state derivation is fully exercised.
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aicat-home-"));
+    try {
+      // .claude/CLAUDE.md exists + not in any selection → state "available"
+      fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+      fs.writeFileSync(path.join(home, ".claude", "CLAUDE.md"), "# test");
+      // .claude/settings.json exists + added to dotfiles selection → state "dotfiles"
+      fs.writeFileSync(path.join(home, ".claude", "settings.json"), "{}");
+      const sel = emptySelection();
+      sel.modules["dotfiles"] = [path.join(home, ".claude", "settings.json")];
+      saveSelection(tmpDir, sel);
+      // .claude.json exists → always state "never" (credential file in NEVER_BACKUP)
+      fs.writeFileSync(path.join(home, ".claude.json"), "{}");
+
+      const reg = new ModuleRegistry();
+      // Inject home via makeCtx so the catalog endpoint uses our temp home (not os.homedir()).
+      const ctx = (dryRun: boolean): ModuleContext => ({
+        repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
+      });
+      const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: ctx });
+      const res = await server.inject({ method: "GET", url: "/api/aitools/catalog" });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { tools: { id: string; label: string; paths: { path: string; state: string }[] }[] };
+      expect(Array.isArray(body.tools)).toBe(true);
+      expect(body.tools.length).toBeGreaterThan(0);
+
+      // claude-code tool must exist
+      const claudeCode = body.tools.find((t) => t.id === "claude-code");
+      expect(claudeCode).toBeDefined();
+
+      // Flatten all paths for easy lookup by absolute path
+      const allPaths = body.tools.flatMap((t) => t.paths);
+      const byPath = (rel: string) => allPaths.find((p) => p.path === path.join(home, rel));
+
+      // .claude/CLAUDE.md — exists, not in any selection → "available"
+      const claudeMd = byPath(".claude/CLAUDE.md");
+      expect(claudeMd).toBeDefined();
+      expect(claudeMd!.state).toBe("available");
+
+      // .claude/settings.json — in dotfiles selection → "dotfiles"
+      const settings = byPath(".claude/settings.json");
+      expect(settings).toBeDefined();
+      expect(settings!.state).toBe("dotfiles");
+
+      // .claude.json — credential in NEVER_BACKUP → "never"
+      const claudeJson = byPath(".claude.json");
+      expect(claudeJson).toBeDefined();
+      expect(claudeJson!.state).toBe("never");
+
+      // All states are within the valid enum
+      const validStates = new Set(["selected", "available", "dotfiles", "never", "missing"]);
+      for (const p of allPaths) {
+        expect(validStates.has(p.state)).toBe(true);
+      }
+
+      await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("detectExternal", () => {
+  it("symlink → cc-switch dir ⇒ { id: 'cc-switch', label: 'cc-switch' }", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext-home-"));
+    try {
+      const ccRoot = path.join(home, ".cc-switch", "skills");
+      const srcRoot = path.join(home, ".agents", "skills");
+      fs.mkdirSync(ccRoot, { recursive: true });
+      fs.mkdirSync(srcRoot, { recursive: true });
+      fs.mkdirSync(path.join(ccRoot, "foo"), { recursive: true });
+      const skillsDir = path.join(home, ".claude", "skills");
+      fs.mkdirSync(skillsDir, { recursive: true });
+      fs.symlinkSync(path.join(ccRoot, "foo"), path.join(skillsDir, "foo"));
+      const targets = [{ id: "claude", path: ".claude/skills", label: "Claude" }];
+      const managers = [{ id: "cc-switch", label: "cc-switch", roots: [".cc-switch"] }];
+      const result = detectExternal(home, srcRoot, "foo", targets, managers);
+      expect(result).toEqual({ id: "cc-switch", label: "cc-switch" });
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("symlink → unregistered dir ⇒ { id: 'unknown', label: '~/.foo-manager' }", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext-home2-"));
+    try {
+      const fooRoot = path.join(home, ".foo-manager", "skills");
+      const srcRoot = path.join(home, ".agents", "skills");
+      fs.mkdirSync(fooRoot, { recursive: true });
+      fs.mkdirSync(srcRoot, { recursive: true });
+      fs.mkdirSync(path.join(fooRoot, "bar"), { recursive: true });
+      const skillsDir = path.join(home, ".claude", "skills");
+      fs.mkdirSync(skillsDir, { recursive: true });
+      fs.symlinkSync(path.join(fooRoot, "bar"), path.join(skillsDir, "bar"));
+      const targets = [{ id: "claude", path: ".claude/skills", label: "Claude" }];
+      const managers = [{ id: "cc-switch", label: "cc-switch", roots: [".cc-switch"] }];
+      const result = detectExternal(home, srcRoot, "bar", targets, managers);
+      expect(result).toEqual({ id: "unknown", label: "~/.foo-manager" });
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("symlink → Roost source dir ⇒ undefined", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ext-home3-"));
+    try {
+      const srcRoot = path.join(home, ".agents", "skills");
+      fs.mkdirSync(path.join(srcRoot, "baz"), { recursive: true });
+      const skillsDir = path.join(home, ".claude", "skills");
+      fs.mkdirSync(skillsDir, { recursive: true });
+      fs.symlinkSync(path.join(srcRoot, "baz"), path.join(skillsDir, "baz"));
+      const targets = [{ id: "claude", path: ".claude/skills", label: "Claude" }];
+      const managers = [{ id: "cc-switch", label: "cc-switch", roots: [".cc-switch"] }];
+      const result = detectExternal(home, srcRoot, "baz", targets, managers);
+      expect(result).toBeUndefined();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── file history + restore (ADR-0022 §5) ─────────────────────────────────────
+describe("file history + restore (ADR-0022 §5)", () => {
+  it("GET /api/file-history maps a target path to its source and lists commits", async () => {
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        if (cmd === "chezmoi" && args.includes("source-path")) return { code: 0, stdout: path.join(tmpDir, "dot_zshrc") + "\n", stderr: "" };
+        if (cmd === "git" && args.includes("log")) return { code: 0, stdout: "abc1234\x1fcapture: dotfiles(1)\x1f2026-06-12T10:00:00+08:00", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "GET", url: `/api/file-history?path=${encodeURIComponent("/u/.zshrc")}` });
+    const body = res.json() as { entries: { sha: string; subject: string }[] };
+    expect(body.entries[0]).toMatchObject({ sha: "abc1234", subject: "capture: dotfiles(1)" });
+    expect(calls.some((c) => c[0] === "git" && c.includes("--follow"))).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/file-restore checks out the source at the sha and commits a restore message — machine file untouched", async () => {
+    const machineFile = path.join(tmpDir, "machine-zshrc");
+    fs.writeFileSync(machineFile, "local content", "utf8");
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        if (cmd === "chezmoi" && args.includes("source-path")) return { code: 0, stdout: path.join(tmpDir, "dot_zshrc") + "\n", stderr: "" };
+        if (cmd === "git" && args.join(" ").includes("status --porcelain")) return { code: 0, stdout: " M dot_zshrc", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({
+      method: "POST", url: "/api/file-restore",
+      payload: { path: machineFile, sha: "abc1234def" }, headers: { "content-type": "application/json" },
+    });
+    expect((res.json() as { ok: boolean; syncHint: boolean }).syncHint).toBe(true);
+    expect(calls.some((c) => c[0] === "git" && c.includes("checkout") && c.includes("abc1234def"))).toBe(true);
+    const commit = calls.find((c) => c[0] === "git" && c.includes("commit"));
+    expect(commit![commit!.indexOf("-m") + 1]).toBe("restore: machine-zshrc @ abc1234");
+    expect(fs.readFileSync(machineFile, "utf8")).toBe("local content"); // never touched
+    await server.close();
+  });
+
+  it("file-history for an unmanaged path returns empty entries", async () => {
+    const exec: Exec = { async run(cmd: string): Promise<ExecResult> { return cmd === "chezmoi" ? { code: 1, stdout: "", stderr: "not managed" } : { code: 0, stdout: "", stderr: "" }; } };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "GET", url: `/api/file-history?path=${encodeURIComponent("/u/.unknown")}` });
+    expect((res.json() as { entries: unknown[] }).entries).toEqual([]);
+    await server.close();
+  });
+
+  it("GET /api/file-history expands ~/… paths to absolute before calling chezmoi", async () => {
+    // The web client sends raw '~/.zshrc'; sourceRelFor must expand it via os.homedir()
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        if (cmd === "chezmoi" && args.includes("source-path")) return { code: 0, stdout: path.join(tmpDir, "dot_zshrc") + "\n", stderr: "" };
+        if (cmd === "git" && args.includes("log")) return { code: 0, stdout: "def5678\x1fcapture: dotfiles(2)\x1f2026-06-12T09:00:00+08:00", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    // Pass tilde path as the web client would
+    const res = await server.inject({ method: "GET", url: `/api/file-history?path=${encodeURIComponent("~/.zshrc")}` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { entries: { sha: string; subject: string }[] };
+    expect(body.entries[0]).toMatchObject({ sha: "def5678", subject: "capture: dotfiles(2)" });
+    // chezmoi must have been called with the expanded absolute path, not the tilde form
+    const chezmoiCall = calls.find((c) => c[0] === "chezmoi" && c.includes("source-path"));
+    expect(chezmoiCall).toBeDefined();
+    const pathArg = chezmoiCall![chezmoiCall!.length - 1];
+    expect(pathArg).not.toContain("~");
+    expect(pathArg).toBe(path.join(os.homedir(), ".zshrc"));
     await server.close();
   });
 });

@@ -8,41 +8,37 @@ import { Hud, type HudMessage } from "./components/Hud";
 import { Overview } from "./views/Overview";
 import { Manage } from "./views/Manage";
 import { AliasesEnv } from "./views/AliasesEnv";
-import { Drift } from "./views/Drift";
 import { Timeline } from "./views/Timeline";
 import { Settings } from "./views/Settings";
 import { Projects } from "./views/Projects";
 import { Packages } from "./views/Packages";
 import { Dotfiles } from "./views/Dotfiles";
 import { AppConfig } from "./views/AppConfig";
-import { Skills } from "./views/Skills";
+import { AiTools } from "./views/AiTools";
 import { SyncState } from "./views/SyncState";
-import { Setup } from "./views/Setup";
 import { openExternal } from "./openExternal";
 
-type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "skills" | "env" | "sync" | "drift" | "timeline" | "setup" | "settings";
+type Tab = "overview" | "manage" | "projects" | "packages" | "dotfiles" | "appconfig" | "aitools" | "env" | "sync" | "timeline" | "settings";
 
 type NavItem = { id: Tab; labelKey: string };
 
-// Top-level item shown above the Modules group.
-const TOP_NAV: NavItem[] = [{ id: "overview", labelKey: "nav.overview" }];
-
-// "Modules" group — the SyncModule-backed rich pages.
-const MODULE_NAV: NavItem[] = [
-  { id: "dotfiles", labelKey: "nav.dotfiles" },
-  { id: "packages", labelKey: "nav.packages" },
-  { id: "projects", labelKey: "nav.projects" },
-  { id: "appconfig", labelKey: "nav.appconfig" },
-  { id: "skills", labelKey: "skills.title" },
-  { id: "env", labelKey: "nav.env" },
+// Three-segment nav: main / content / tail — no group headings.
+const NAV_MAIN: NavItem[] = [
+  { id: "overview", labelKey: "nav.overview" },
+  { id: "sync", labelKey: "nav.sync" },
+  { id: "timeline", labelKey: "nav.timeline" },
 ];
 
-// Cross-module / system items below the divider.
-const TAIL_NAV: NavItem[] = [
-  { id: "sync", labelKey: "nav.sync" },
-  { id: "drift", labelKey: "nav.drift" },
-  { id: "timeline", labelKey: "nav.timeline" },
-  { id: "setup", labelKey: "nav.setup" },
+const NAV_CONTENT: NavItem[] = [
+  { id: "aitools", labelKey: "nav.aitools" },
+  { id: "dotfiles", labelKey: "nav.dotfiles" },
+  { id: "env", labelKey: "nav.env" },
+  { id: "packages", labelKey: "nav.packages" },
+  { id: "appconfig", labelKey: "nav.appconfig" },
+  { id: "projects", labelKey: "nav.projects" },
+];
+
+const NAV_TAIL: NavItem[] = [
   { id: "settings", labelKey: "nav.settings" },
 ];
 
@@ -231,48 +227,34 @@ export function App() {
             Roost
           </div>
 
-          {/* Top-level */}
-          {TOP_NAV.map((item) => (
+          {/* Main segment */}
+          {NAV_MAIN.map((item) => (
             <NavButton
               key={item.id}
               label={t(item.labelKey)}
               active={activeTab === item.id}
               onClick={() => setActiveTab(item.id)}
-            />
-          ))}
-
-          {/* Modules group */}
-          <div
-            style={{
-              textTransform: "uppercase",
-              letterSpacing: ".06em",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--muted)",
-              padding: "14px 12px 6px",
-            }}
-          >
-            {t("nav.modulesGroup")}
-          </div>
-          {MODULE_NAV.map((item) => (
-            <NavButton
-              key={item.id}
-              label={t(item.labelKey)}
-              active={activeTab === item.id}
-              onClick={() => setActiveTab(item.id)}
-              indent
             />
           ))}
 
           {/* Divider */}
-          <div
-            style={{
-              height: 1,
-              background: "var(--border-soft)",
-              margin: "12px 8px",
-            }}
-          />
-          {TAIL_NAV.map((item) => (
+          <div style={{ height: 1, background: "var(--border-soft)", margin: "8px 8px" }} />
+
+          {/* Content segment */}
+          {NAV_CONTENT.map((item) => (
+            <NavButton
+              key={item.id}
+              label={t(item.labelKey)}
+              active={activeTab === item.id}
+              onClick={() => setActiveTab(item.id)}
+            />
+          ))}
+
+          {/* Divider */}
+          <div style={{ height: 1, background: "var(--border-soft)", margin: "8px 8px" }} />
+
+          {/* Tail segment */}
+          {NAV_TAIL.map((item) => (
             <NavButton
               key={item.id}
               label={t(item.labelKey)}
@@ -288,7 +270,7 @@ export function App() {
             <Overview
               showHud={showHud}
               onOpenSync={() => setActiveTab("sync")}
-              onOpenSetup={() => setActiveTab("setup")}
+              onOpenSetup={() => setActiveTab("settings")}
             />
           )}
           {activeTab === "manage" && <Manage showHud={showHud} />}
@@ -296,12 +278,10 @@ export function App() {
           {activeTab === "packages" && <Packages showHud={showHud} />}
           {activeTab === "dotfiles" && <Dotfiles showHud={showHud} />}
           {activeTab === "appconfig" && <AppConfig showHud={showHud} />}
-          {activeTab === "skills" && <Skills />}
+          {activeTab === "aitools" && <AiTools showHud={showHud} />}
           {activeTab === "env" && <AliasesEnv showHud={showHud} />}
           {activeTab === "sync" && <SyncState onOpenSettings={() => setActiveTab("settings")} />}
-          {activeTab === "setup" && <Setup onOpenSettings={() => setActiveTab("settings")} />}
-          {activeTab === "drift" && <Drift />}
-          {activeTab === "timeline" && <Timeline />}
+          {activeTab === "timeline" && <Timeline showHud={showHud} onOpenSync={() => setActiveTab("sync")} />}
           {activeTab === "settings" && <Settings />}
         </main>
       </div>
@@ -316,7 +296,7 @@ export function App() {
         onLoad={() => {
           setActiveTab("overview");
         }}
-        onOpenDrift={() => setActiveTab("drift")}
+        onOpenSync={() => setActiveTab("sync")}
         onOpenTimeline={() => setActiveTab("timeline")}
         onOpenSettings={() => setActiveTab("settings")}
       />

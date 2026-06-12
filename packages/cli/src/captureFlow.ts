@@ -10,7 +10,7 @@ import { writeState, readState, commitRepo, STATE_SCHEMA_VERSION } from "@roost/
  * `home` is accepted for symmetry with the capture context; the host identity
  * comes from the OS hostname (the state file key).
  */
-export async function finalizeCapture(exec: Exec, repoDir: string, _home: string): Promise<void> {
+export async function finalizeCapture(exec: Exec, repoDir: string, _home: string, message?: { subject: string; body: string }): Promise<void> {
   const host = os.hostname();
   // Preserve any existing per-module baseline (written by a prior load) — do NOT
   // wipe it, or the next status() loses its three-way reference point.
@@ -29,5 +29,8 @@ export async function finalizeCapture(exec: Exec, repoDir: string, _home: string
     lastSeen: now,
     modules: prevModules,
   });
-  await commitRepo(exec, repoDir, "roost: capture");
+  const msg = message && message.subject !== "roost: capture"
+    ? (message.body ? `${message.subject}\n\n${message.body}` : message.subject)
+    : "roost: capture";
+  await commitRepo(exec, repoDir, msg);
 }

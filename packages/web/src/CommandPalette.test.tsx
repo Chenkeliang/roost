@@ -12,7 +12,7 @@ describe("CommandPalette", () => {
         onClose={noop}
         onCapture={noop}
         onLoad={noop}
-        onOpenDrift={noop}
+        onOpenSync={noop}
         onOpenTimeline={noop}
         onOpenSettings={noop}
       />
@@ -27,7 +27,7 @@ describe("CommandPalette", () => {
         onClose={noop}
         onCapture={noop}
         onLoad={noop}
-        onOpenDrift={noop}
+        onOpenSync={noop}
         onOpenTimeline={noop}
         onOpenSettings={noop}
       />
@@ -35,7 +35,8 @@ describe("CommandPalette", () => {
     expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
     expect(screen.getByText("Capture")).toBeTruthy();
     expect(screen.getByText("Load (dry-run)")).toBeTruthy();
-    expect(screen.getByText("Open Drift")).toBeTruthy();
+    expect(screen.getByText("View diff")).toBeTruthy();
+    expect(screen.queryByText("Open Drift")).toBeNull();
   });
 
   it("filters commands by query", () => {
@@ -45,14 +46,14 @@ describe("CommandPalette", () => {
         onClose={noop}
         onCapture={noop}
         onLoad={noop}
-        onOpenDrift={noop}
+        onOpenSync={noop}
         onOpenTimeline={noop}
         onOpenSettings={noop}
       />
     );
     const input = screen.getByPlaceholderText("Search commands…");
-    fireEvent.change(input, { target: { value: "drift" } });
-    expect(screen.getByText("Open Drift")).toBeTruthy();
+    fireEvent.change(input, { target: { value: "diff" } });
+    expect(screen.getByText("View diff")).toBeTruthy();
     expect(screen.queryByText("Capture")).toBeNull();
   });
 
@@ -64,7 +65,7 @@ describe("CommandPalette", () => {
         onClose={onClose}
         onCapture={noop}
         onLoad={noop}
-        onOpenDrift={noop}
+        onOpenSync={noop}
         onOpenTimeline={noop}
         onOpenSettings={noop}
       />
@@ -82,7 +83,7 @@ describe("CommandPalette", () => {
         onClose={onClose}
         onCapture={onCapture}
         onLoad={noop}
-        onOpenDrift={noop}
+        onOpenSync={noop}
         onOpenTimeline={noop}
         onOpenSettings={noop}
       />

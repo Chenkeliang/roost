@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, Circle, UploadSimple, Wrench, DotsThree } from "@phosphor-icons/react";
+import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, Circle, UploadSimple, Wrench, DotsThree, Tag } from "@phosphor-icons/react";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
@@ -59,9 +59,23 @@ function SkillTargetsPopover({ row, targets, busy, t, onToggle, onResolve, onClo
                   style={{ ...ic, border: 0, background: "transparent", padding: 0 }}>
                   {on ? <CheckCircle size={18} weight="fill" style={{ color: "var(--green)" }} /> : <Circle size={18} style={{ color: "var(--muted)" }} />}
                 </button>
-                <span style={{ flex: 1 }}>{tg.label}</span>
+                <span style={{ flex: 1 }}>
+                  {tg.label}
+                  {row.external && (
+                    <span style={{ marginLeft: 6, fontSize: 11, color: "var(--muted)", fontWeight: 400 }}>
+                      {row.external.label} {t("skills.external.suffix")}
+                    </span>
+                  )}
+                </span>
                 {st === "conflict" ? (
                   <button onClick={() => onResolve(tg.id)} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>{t("skills.resolve.action")}</button>
+                ) : st === "broken" && row.external ? (
+                  // Externally-managed symlink: server never surfaces it as a conflict
+                  // (computeConflicts skips symlinks), so this is the only reachable path
+                  // to the cede action for a real external skill. ADR-0022 §3.
+                  <button onClick={() => { onToggle(tg.id, false); onClose(); }} style={{ ...ic, padding: "6px 12px", fontSize: 13 }}>
+                    {t("skills.external.cedePrefix")}{row.external.label ?? t("skills.external.other")}
+                  </button>
                 ) : st === "broken" ? (
                   <span style={{ color: "#f0b352", fontSize: 12 }}>{t("skills.coverage.broken")}</span>
                 ) : st === "copy" ? (
@@ -403,6 +417,12 @@ export function Skills() {
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                           <Stack size={14} style={{ color: "var(--muted)" }} />
                           <span className="mono">{row.name}</span>
+                          {row.external && (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--muted)", background: "var(--raise)", border: "1px solid var(--border-soft)", borderRadius: 4, padding: "1px 5px" }}>
+                              <Tag size={10} />
+                              {row.external.label} {t("skills.external.suffix")}
+                            </span>
+                          )}
                         </span>
                       </td>
                       <td style={{ ...cellPad, opacity: row.effective.enabled ? 1 : 0.5 }}>
@@ -587,29 +607,42 @@ export function Skills() {
         );
       })()}
 
-      {pending && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }}
-        >
-          <div style={{ ...card, maxWidth: 420, width: "100%", padding: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Warning size={16} weight="fill" style={{ color: "var(--accent)" }} />
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{t("skills.resolve.action")}</span>
-            </div>
-            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.5, color: "var(--muted)" }}>{t("skills.resolve.confirm")}</p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => setPending(null)} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 14 }}>
-                {t("skills.resolve.cancel")}
-              </button>
-              <button onClick={() => void confirmResolve()} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 14, color: "#fff", background: "var(--accent)", borderColor: "var(--accent)" }}>
-                {t("skills.resolve.confirmAction")}
-              </button>
+      {pending && (() => {
+        const pendingRow = skills.find((s) => s.name === pending.skill);
+        const ext = pendingRow?.external;
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }}
+          >
+            <div style={{ ...card, maxWidth: 420, width: "100%", padding: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <Warning size={16} weight="fill" style={{ color: "var(--accent)" }} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{t("skills.resolve.action")}</span>
+              </div>
+              <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.5, color: "var(--muted)" }}>{t("skills.resolve.confirm")}</p>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button onClick={() => setPending(null)} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 14 }}>
+                  {t("skills.resolve.cancel")}
+                </button>
+                {ext && (
+                  <button
+                    onClick={() => { void onToggleTarget(pendingRow!, pending.target, false); setPending(null); }}
+                    disabled={resolving}
+                    style={{ ...ic, padding: "6px 12px", fontSize: 14 }}
+                  >
+                    {t("skills.external.cedePrefix")}{ext.label ?? t("skills.external.other")}
+                  </button>
+                )}
+                <button onClick={() => void confirmResolve()} disabled={resolving} style={{ ...ic, padding: "6px 12px", fontSize: 14, color: "#fff", background: "var(--accent)", borderColor: "var(--accent)" }}>
+                  {t("skills.resolve.confirmAction")}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {confirmAdopt && (
         <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }}>

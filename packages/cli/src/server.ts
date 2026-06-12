@@ -62,8 +62,13 @@ import {
   saveRoostSettings,
   cloneRepo,
   LARGE_FILE_MB,
+  summarizeCapture,
+  loadAiToolsCatalog,
+  NEVER_BACKUP,
+  loadExternalManagers,
+  commitRepo,
 } from "@roost/core";
-import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq } from "@roost/core";
+import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq, ExternalManager } from "@roost/core";
 import { createTtlCache } from "./cache.js";
 import { finalizeCapture } from "./captureFlow.js";
 import { runInit } from "./init.js";
@@ -96,6 +101,56 @@ export function computeConflicts(
     if (!owned) conflicts.push(t.id);
   }
   return conflicts;
+}
+
+// Detect if a skill's on-disk symlink resolves OUTSIDE Roost's source dir —
+// i.e. it's managed by another runtime. GENERIC: works for any manager; the
+// registry only prettifies the name. ADR-0022 §3.
+export function detectExternal(
+  home: string,
+  sourceDir: string,
+  name: string,
+  targets: SkillTarget[],
+  managers: ExternalManager[],
+): { id: string; label: string } | undefined {
+  let srcRoot: string;
+  try {
+    srcRoot = fs.realpathSync(path.resolve(sourceDir)) + path.sep;
+  } catch {
+    srcRoot = path.resolve(sourceDir) + path.sep;
+  }
+  let realHome: string;
+  try {
+    realHome = fs.realpathSync(home);
+  } catch {
+    realHome = home;
+  }
+  for (const t of targets) {
+    const dest = path.join(home, t.path, name);
+    let st: fs.Stats;
+    try {
+      st = fs.lstatSync(dest);
+    } catch {
+      continue;
+    }
+    if (!st.isSymbolicLink()) continue;
+    let real: string;
+    try {
+      real = fs.realpathSync(dest);
+    } catch {
+      continue;
+    }
+    if (real.startsWith(srcRoot)) continue; // ours
+    const hit = managers.find((m) =>
+      m.roots.some((r) => real.startsWith(path.join(realHome, r) + path.sep)),
+    );
+    if (hit) return { id: hit.id, label: hit.label };
+    // Unknown manager: label by the target's top-level dir under home.
+    const rel = path.relative(realHome, real);
+    const top = rel.startsWith("..") ? path.dirname(real) : rel.split(path.sep)[0]!;
+    return { id: "unknown", label: rel.startsWith("..") ? top : `~/${top}` };
+  }
+  return undefined;
 }
 
 // Classify git push/pull failure output so the UI can offer the right next step:
@@ -227,7 +282,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const sel = loadSelection(repoDir);
       const ctx = makeCtx(false);
       const changes = await captureAll(registry, ctx, sel);
-      await finalizeCapture(ctx.exec, repoDir, ctx.home);
+      await finalizeCapture(ctx.exec, repoDir, ctx.home, summarizeCapture(changes));
       cache.invalidateAll();
       return {
         captured: changes.reduce((n, c) => n + c.written.length + c.encrypted.length, 0),
@@ -601,7 +656,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const sel = loadSelection(repoDir);
       const ctx = makeCtx(false);
       const changes = await captureAll(registry, ctx, sel);
-      await finalizeCapture(ctx.exec, repoDir, ctx.home);
+      await finalizeCapture(ctx.exec, repoDir, ctx.home, summarizeCapture(changes));
       return reply.send({ changes });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -814,22 +869,70 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const result = await exec.run("git", [
         "-C", repoDir,
         "log",
-        "--pretty=format:%H\x1f%s\x1f%cI",
+        "--pretty=format:%H\x1f%s\x1f%cI\x1f%b\x1e",
         "-n", "50",
       ]);
       if (result.code !== 0) {
         return reply.send({ entries: [] });
       }
       const entries = result.stdout
-        .split("\n")
-        .filter((line) => line.trim().length > 0)
-        .map((line) => {
-          const [sha, subject, date] = line.split("\x1f");
-          return { sha: sha ?? "", subject: subject ?? "", date: date ?? "" };
+        .split("\x1e")
+        .filter((rec) => rec.trim().length > 0)
+        .map((rec) => {
+          const [sha, subject, date, body] = rec.trim().split("\x1f");
+          const entry: { sha: string; subject: string; date: string; body?: string } = { sha: sha ?? "", subject: subject ?? "", date: date ?? "" };
+          if (body && body.trim()) entry.body = body.trim();
+          return entry;
         });
       return reply.send({ entries });
     } catch {
       return reply.send({ entries: [] });
+    }
+  });
+
+  // ── GET /api/file-history ────────────────────────────────────────────────────
+  // Map a managed target path to its repo-relative source path; null if unmanaged.
+  const sourceRelFor = async (exec: Exec, target: string): Promise<string | null> => {
+    const resolved = target.startsWith("~/") ? path.join(os.homedir(), target.slice(2)) : target;
+    const r = await exec.run("chezmoi", ["--source", repoDir, "source-path", resolved]);
+    if (r.code !== 0) return null;
+    const abs = r.stdout.trim();
+    return abs ? path.relative(repoDir, abs) : null;
+  };
+
+  server.get<{ Querystring: { path?: string } }>("/api/file-history", async (req, reply) => {
+    const target = req.query.path?.trim();
+    if (!target) return reply.status(400).send({ error: "path is required" });
+    const exec = makeCtx(true).exec;
+    const rel = await sourceRelFor(exec, target);
+    if (!rel) return reply.send({ entries: [] });
+    const r = await exec.run("git", ["-C", repoDir, "log", "--follow", "--pretty=format:%H\x1f%s\x1f%cI", "-n", "30", "--", rel]);
+    if (r.code !== 0) return reply.send({ entries: [] });
+    const entries = r.stdout.split("\n").filter((l) => l.trim()).map((l) => {
+      const [sha, subject, date] = l.split("\x1f");
+      return { sha: sha ?? "", subject: subject ?? "", date: date ?? "" };
+    });
+    return reply.send({ entries });
+  });
+
+  // ── POST /api/file-restore ────────────────────────────────────────────────────
+  // Repo-side only (ADR-0022 §5): rewrites the REPO version; the machine copy is
+  // untouched — applying goes through the existing load/Sync Review gates (I7).
+  server.post<{ Body: { path?: string; sha?: string } }>("/api/file-restore", async (req, reply) => {
+    const target = req.body?.path?.trim();
+    const sha = req.body?.sha?.trim();
+    if (!target || !sha || !/^[0-9a-f]{7,40}$/i.test(sha)) return reply.status(400).send({ error: "path and sha are required" });
+    try {
+      cache.invalidateAll();
+      const exec = makeCtx(false).exec;
+      const rel = await sourceRelFor(exec, target);
+      if (!rel) return reply.status(400).send({ error: "path is not managed" });
+      const co = await exec.run("git", ["-C", repoDir, "checkout", sha, "--", rel]);
+      if (co.code !== 0) return reply.status(500).send({ error: co.stderr.trim() || "checkout failed" });
+      await commitRepo(exec, repoDir, `restore: ${path.basename(target)} @ ${sha.slice(0, 7)}`);
+      return reply.send({ ok: true, syncHint: true });
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
     }
   });
 
@@ -1018,12 +1121,20 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       }
       const links = loadSkillLinks(repoDir);
       const home = makeCtx(true).home;
-      const skills = managed.map((name) => ({
-        name,
-        effective: effectiveSkill(cfg, name),
-        links: links.filter((l) => l.skill === name),
-        conflicts: computeConflicts(home, name, targets, links, cfg),
-      }));
+      const sourceDir = cfg.sourceDir.startsWith("~/")
+        ? path.join(home, cfg.sourceDir.slice(2))
+        : cfg.sourceDir;
+      const managers = loadExternalManagers(repoDir);
+      const skills = managed.map((name) => {
+        const external = detectExternal(home, sourceDir, name, targets, managers);
+        return {
+          name,
+          effective: effectiveSkill(cfg, name),
+          links: links.filter((l) => l.skill === name),
+          conflicts: computeConflicts(home, name, targets, links, cfg),
+          ...(external !== undefined ? { external } : {}),
+        };
+      });
       return reply.send({ config: cfg, targets, skills });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1235,6 +1346,47 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     saveSkillsTargets(repoDir, targets);
     cache.invalidateAll();
     return reply.send({ ok: true });
+  });
+
+  // ── GET /api/aitools/catalog ─────────────────────────────────────────────────
+  // Full catalog with per-path state so the UI can show transparency rows
+  // (dotfiles-managed grayed, credentials visibly never-backed-up). ADR-0022.
+  server.get("/api/aitools/catalog", async (_req, reply) => {
+    const cat = loadAiToolsCatalog(repoDir);
+    const sel = loadSelection(repoDir);
+    const selected = new Set(sel.modules["aitools"] ?? []);
+    const dotfilesSel = new Set(sel.modules["dotfiles"] ?? []);
+    const home = makeCtx(true).home;
+    const neverAbs = new Set(NEVER_BACKUP.map((r) => path.join(home, r)));
+    // Hard-map of credential files to their owning tool id (prefix match is fragile for these).
+    const neverOwner: Record<string, string> = {
+      ".claude.json": "claude-code",
+      ".codex/auth.json": "codex",
+      ".gemini/.env": "gemini",
+    };
+    const tools = cat.map((t) => ({
+      id: t.id,
+      label: t.label,
+      paths: t.paths.map((p) => {
+        const abs = path.join(home, p.path);
+        const exists = fs.existsSync(abs);
+        const state: "selected" | "available" | "dotfiles" | "never" | "missing" = neverAbs.has(abs) ? "never"
+          : !exists ? "missing"
+          : selected.has(abs) ? "selected"
+          : dotfilesSel.has(abs) ? "dotfiles"
+          : "available";
+        return { path: abs, kind: p.kind, encrypt: p.encrypt ?? false, state };
+      }),
+    }));
+    // Append credential (never-backup) files under their owning tool.
+    for (const rel of NEVER_BACKUP) {
+      const abs = path.join(home, rel);
+      if (!fs.existsSync(abs)) continue;
+      const ownerId = neverOwner[rel];
+      const owner = ownerId ? tools.find((t) => t.id === ownerId) : tools[0];
+      owner?.paths.push({ path: abs, kind: "data" as const, encrypt: false, state: "never" as const });
+    }
+    return reply.send({ tools });
   });
 
   // ── /api/settings ─────────────────────────────────────────────────────────────

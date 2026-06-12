@@ -31,8 +31,6 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "nav.appconfig": { en: "App Config", zh: "应用配置" },
   "nav.env": { en: "Aliases & Env", zh: "别名与环境变量" },
   "nav.sync": { en: "Sync Review", zh: "同步复核" },
-  "nav.setup": { en: "Setup", zh: "环境检查" },
-
   // ── Setup / environment ──────────────────────────────────────────────────
   "setup.title": { en: "Environment check", zh: "环境检查" },
   "setup.loading": { en: "Checking…", zh: "检查中…" },
@@ -60,6 +58,8 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "setup.check.repo": { en: "Config repo", zh: "配置仓库" },
 
   // ── Sync Review (sync-state) ─────────────────────────────────────────────
+  "sync.view.items": { en: "Items", zh: "逐项" },
+  "sync.view.raw": { en: "Raw diff", zh: "原始 diff" },
   "sync.loading": { en: "Loading…", zh: "加载中…" },
   "sync.loadingDiff": { en: "Loading diff…", zh: "加载对比…" },
   "sync.empty": { en: "Nothing is managed yet, or nothing selected.", zh: "没有被管理的项,或尚未选择。" },
@@ -111,10 +111,8 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "sync.notice.batchDone": { en: "Batch done — resolved", zh: "批量完成:处理" },
   "sync.notice.itemsWord": { en: "item(s)", zh: "项" },
   "sync.notice.batchSuffix": { en: "(removed-in-repo kept local)", zh: "(已移除项保留本地)" },
-  "nav.drift": { en: "Drift", zh: "偏移" },
   "nav.timeline": { en: "Timeline", zh: "时间线" },
   "nav.settings": { en: "Settings", zh: "设置" },
-  "nav.modulesGroup": { en: "Modules", zh: "模块" },
   "app.docs": { en: "Docs", zh: "文档" },
 
   // ── Overview ─────────────────────────────────────────────────────────────
@@ -125,7 +123,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "overview.depsMissing": { en: "Missing required tools:", zh: "缺少必需工具:" },
   "overview.depsFix": { en: "Fix in Setup", zh: "去环境检查" },
   "overview.loading": { en: "Loading…", zh: "加载中…" },
-  "overview.moduleHealth": { en: "Module Health", zh: "模块健康度" },
+  "overview.moduleHealth": { en: "Backup Health", zh: "备份健康度" },
   "overview.blockedTitle": { en: "items blocked — potential secrets", zh: "项被拦下 —— 疑似密钥" },
   "overview.blockedHint": {
     en: "These weren't committed because they look like they contain secrets. Encrypt & retry to back them up as encrypted .age files (needs an age key).",
@@ -486,6 +484,9 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "skills.adopt.remove": { en: "Remove", zh: "移出" },
   "skills.adopt.removeTitle": { en: "Remove from management?", zh: "移出管理?" },
   "skills.adopt.removeNote": { en: "Roost stops tracking this skill (removes it from the repo and its records). Your local skill files and links are left untouched — nothing is deleted.", zh: "Roost 停止跟踪此 skill(从仓库与记录中移除)。你本地的 skill 文件与链接保持不变——不会删除任何东西。" },
+  "skills.external.suffix": { en: "managed", zh: "管理" },
+  "skills.external.cedePrefix": { en: "Leave it to ", zh: "让给 " },
+  "skills.external.other": { en: "the other manager", zh: "对方" },
   "skills.coverage.title": { en: "Coverage", zh: "覆盖" },
   "skills.coverage.broken": { en: "broken", zh: "断链" },
   "skills.coverage.conflict": { en: "conflict", zh: "冲突" },
@@ -629,4 +630,29 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "large.keep": { en: "Keep backing up (don't remind again)", zh: "保留备份(不再提醒)" },
   "large.remove": { en: "Stop backing up (keeps local file)", zh: "移出备份(不影响本地文件)" },
   "large.removed": { en: "Removed from backups — local file untouched.", zh: "已移出备份 —— 本地文件未受影响。" },
+
+  // ── File history / restore ────────────────────────────────────────────────
+  "history.searchPlaceholder": { en: "File path to inspect (e.g. ~/.zshrc)", zh: "要查看的文件路径(如 ~/.zshrc)" },
+  "history.show": { en: "Show history", zh: "查看历史" },
+  "history.back": { en: "All snapshots", zh: "全部快照" },
+  "history.restore": { en: "Restore this version to the repo", zh: "恢复此版本到仓库" },
+  "history.restored": { en: "Restored to the repo — apply to this machine in Sync Review.", zh: "已恢复到仓库 —— 在同步复核中应用到本机。" },
+  "history.empty": { en: "This file is not in your backups.", zh: "此文件不在备份中。" },
+  "history.restoring": { en: "Restoring…", zh: "恢复中…" },
+  "history.current": { en: "current", zh: "当前版本" },
+  "history.goSync": { en: "Open Sync Review", zh: "去同步复核" },
+
+  // ── AI tools module ─────────────────────────────────────────────────────
+  "nav.aitools": { en: "AI Tools", zh: "AI 工具" },
+  "ai.tagline": { en: "Runtime management belongs to tools like cc-switch — Roost encrypts and version-controls all of it into your repo.", zh: "运行时管理交给 cc-switch 这类工具;Roost 负责把这一切加密、带版本地备进你的仓库。" },
+  "ai.kind.memory": { en: "memory", zh: "记忆" },
+  "ai.kind.settings": { en: "settings", zh: "设置" },
+  "ai.kind.mcp": { en: "MCP", zh: "MCP" },
+  "ai.kind.data": { en: "data", zh: "数据" },
+  "ai.encrypted": { en: "encrypted", zh: "加密" },
+  "ai.empty": { en: "No AI tool configs discovered on this machine.", zh: "本机未发现可纳管的 AI 工具配置。" },
+  "ai.managedByDotfiles": { en: "managed under Dotfiles", zh: "已在 dotfiles 管理" },
+  "ai.neverNote": { en: "credential file — never backed up (session tokens; backing up only adds risk)", zh: "凭据文件 — 永不备份(会话令牌,备份只增风险)" },
+  "ai.tab.backup": { en: "Config backup", zh: "配置备份" },
+  "ai.tab.skills": { en: "Skills", zh: "Skills" },
 };
