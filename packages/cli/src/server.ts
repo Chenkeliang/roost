@@ -1356,7 +1356,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const sel = loadSelection(repoDir);
     const selected = new Set(sel.modules["aitools"] ?? []);
     const dotfilesSel = new Set(sel.modules["dotfiles"] ?? []);
-    const home = makeCtx(true).home;
+    const ctx = makeCtx(true);
+    const home = ctx.home;
+    // Selected-but-not-yet-captured must NOT look backed up: split via what
+    // chezmoi actually manages. On failure fall back to null (no false alarms).
+    let managedAbs: Set<string> | null = null;
+    try {
+      const rels = await createChezmoi(ctx.exec, { sourceDir: repoDir }).managed();
+      managedAbs = new Set(rels.map((r) => path.join(home, r)));
+    } catch {
+      managedAbs = null;
+    }
     const neverAbs = new Set(NEVER_BACKUP.map((r) => path.join(home, r)));
     // Hard-map of credential files to their owning tool id (prefix match is fragile for these).
     const neverOwner: Record<string, string> = {
@@ -1370,9 +1380,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       paths: t.paths.map((p) => {
         const abs = path.join(home, p.path);
         const exists = fs.existsSync(abs);
-        const state: "selected" | "available" | "dotfiles" | "never" | "missing" = neverAbs.has(abs) ? "never"
+        const state: "selected" | "pending" | "available" | "dotfiles" | "never" | "missing" = neverAbs.has(abs) ? "never"
           : !exists ? "missing"
-          : selected.has(abs) ? "selected"
+          : selected.has(abs) ? (managedAbs === null || managedAbs.has(abs) ? "selected" : "pending")
           : dotfilesSel.has(abs) ? "dotfiles"
           : "available";
         return { path: abs, kind: p.kind, encrypt: p.encrypt ?? false, state };

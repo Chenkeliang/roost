@@ -94,7 +94,13 @@ function PathRow({
       )}
       {state === "selected" && (
         <>
-          <span style={{ ...ic, color: "var(--green)", borderColor: "var(--green)", cursor: "default" }}>{t("common.added")}</span>
+          <span style={{ ...ic, color: "var(--green)", borderColor: "var(--green)", cursor: "default" }}>{t("ai.state.backedUp")}</span>
+          <button onClick={() => onRemove(p.path)} style={{ ...ic, color: "var(--red)" }}>{t("common.remove")}</button>
+        </>
+      )}
+      {state === "pending" && (
+        <>
+          <span style={{ ...ic, color: "var(--amber)", borderColor: "var(--amber)", cursor: "default" }}>{t("ai.state.pending")}</span>
           <button onClick={() => onRemove(p.path)} style={{ ...ic, color: "var(--red)" }}>{t("common.remove")}</button>
         </>
       )}
@@ -173,7 +179,7 @@ export function AiBackup({ showHud }: AiBackupProps) {
       ) : (
         visibleTools.map((tool) => {
           const visiblePaths = tool.paths.filter((p) => p.state !== "missing");
-          const managedCount = tool.paths.filter((p) => p.state === "selected").length;
+          const managedCount = tool.paths.filter((p) => p.state === "selected" || p.state === "pending").length;
           const availableCount = tool.paths.filter((p) => p.state === "available").length;
           return (
             <div key={tool.id} style={card}>

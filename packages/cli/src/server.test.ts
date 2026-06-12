@@ -2175,6 +2175,38 @@ describe("backup status + settings passthrough", () => {
     await server.close();
   });
 
+  it("GET /api/aitools/catalog → selected (captured) vs pending (not yet captured)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aicat-pend-"));
+    try {
+      fs.mkdirSync(path.join(home, ".codex"), { recursive: true });
+      fs.writeFileSync(path.join(home, ".codex", "config.toml"), "x=1");
+      fs.mkdirSync(path.join(home, ".gemini"), { recursive: true });
+      fs.writeFileSync(path.join(home, ".gemini", "GEMINI.md"), "# m");
+      // both in the aitools selection; only config.toml is already chezmoi-managed
+      const sel = emptySelection();
+      sel.modules["aitools"] = [path.join(home, ".codex", "config.toml"), path.join(home, ".gemini", "GEMINI.md")];
+      saveSelection(tmpDir, sel);
+      const exec: Exec = {
+        async run(cmd: string, args: string[]): Promise<ExecResult> {
+          if (cmd === "chezmoi" && args.includes("managed")) return { code: 0, stdout: ".codex/config.toml\n", stderr: "" };
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      };
+      const ctx = (dryRun: boolean): ModuleContext => ({
+        repoDir: tmpDir, home, profile: "base", dryRun, exec,
+        log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
+      });
+      const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
+      const res = await server.inject({ method: "GET", url: "/api/aitools/catalog" });
+      const all = (res.json() as { tools: { paths: { path: string; state: string }[] }[] }).tools.flatMap((t) => t.paths);
+      expect(all.find((p) => p.path === path.join(home, ".codex", "config.toml"))!.state).toBe("selected");
+      expect(all.find((p) => p.path === path.join(home, ".gemini", "GEMINI.md"))!.state).toBe("pending");
+      await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it("GET /api/aitools/catalog → available, dotfiles, never states", async () => {
     // Build a controlled temp home so the endpoint's state derivation is fully exercised.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aicat-home-"));

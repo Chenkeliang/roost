@@ -644,7 +644,9 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
 
   // ── AI tools module ─────────────────────────────────────────────────────
   "nav.aitools": { en: "AI Tools", zh: "AI 工具" },
-  "ai.tagline": { en: "Runtime management belongs to tools like cc-switch — Roost encrypts and version-controls all of it into your repo.", zh: "运行时管理交给 cc-switch 这类工具;Roost 负责把这一切加密、带版本地备进你的仓库。" },
+  "ai.tagline": { en: "Back up your AI tool configs — memory files, settings, MCP — encrypted and versioned into your own repo.", zh: "把你的 AI 工具配置(记忆、设置、MCP)加密、带版本地备进你自己的仓库。" },
+  "ai.state.pending": { en: "pending capture", zh: "待捕获" },
+  "ai.state.backedUp": { en: "backed up", zh: "已备份" },
   "ai.kind.memory": { en: "memory", zh: "记忆" },
   "ai.kind.settings": { en: "settings", zh: "设置" },
   "ai.kind.mcp": { en: "MCP", zh: "MCP" },
