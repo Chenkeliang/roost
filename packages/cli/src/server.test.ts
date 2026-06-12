@@ -778,17 +778,18 @@ describe("buildServer", () => {
     await server.close();
   });
 
-  it("GET /api/timeline → parses git log output into entries", async () => {
+  it("GET /api/timeline → parses git log output into entries (single record, no body)", async () => {
     const sha = "abc123def456";
     const subject = "feat: add something";
     const date = "2026-05-30T10:00:00+00:00";
-    const gitLine = `${sha}\x1f${subject}\x1f${date}`;
+    // Server uses %H\x1f%s\x1f%cI\x1f%b\x1e format — body is empty here
+    const gitOutput = `${sha}\x1f${subject}\x1f${date}\x1f\x1e`;
 
     function makeGitExec(): Exec {
       return {
         async run(cmd: string, args: string[]): Promise<ExecResult> {
           if (cmd === "git" && args.includes("log")) {
-            return { code: 0, stdout: gitLine, stderr: "" };
+            return { code: 0, stdout: gitOutput, stderr: "" };
           }
           return { code: 0, stdout: "", stderr: "" };
         },
@@ -812,9 +813,32 @@ describe("buildServer", () => {
 
     const res = await server.inject({ method: "GET", url: "/api/timeline" });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { entries: { sha: string; subject: string; date: string }[] };
+    const body = res.json() as { entries: { sha: string; subject: string; date: string; body?: string }[] };
     expect(body.entries).toHaveLength(1);
-    expect(body.entries[0]).toEqual({ sha, subject, date });
+    expect(body.entries[0]).toEqual({ sha, subject, date }); // no body field when empty
+
+    await server.close();
+  });
+
+  it("GET /api/timeline → splits on \\x1e and extracts body field when present", async () => {
+    // Build output with \x1e record separator; second record has no body
+    const gitOutput =
+      "aaa111\x1ffeat: first\x1f2026-06-01T00:00:00+00:00\x1fdetails for first\x1e" +
+      "bbb222\x1ffix: second\x1f2026-06-02T00:00:00+00:00\x1f\x1e";
+
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        if (cmd === "git" && args.includes("log")) return { code: 0, stdout: gitOutput, stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "GET", url: "/api/timeline" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { entries: { sha: string; subject: string; date: string; body?: string }[] };
+    expect(body.entries).toHaveLength(2);
+    expect(body.entries[0]).toEqual({ sha: "aaa111", subject: "feat: first", date: "2026-06-01T00:00:00+00:00", body: "details for first" });
+    expect(body.entries[1]).toEqual({ sha: "bbb222", subject: "fix: second", date: "2026-06-02T00:00:00+00:00" }); // no body key
 
     await server.close();
   });
@@ -2324,6 +2348,32 @@ describe("file history + restore (ADR-0022 §5)", () => {
     const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
     const res = await server.inject({ method: "GET", url: `/api/file-history?path=${encodeURIComponent("/u/.unknown")}` });
     expect((res.json() as { entries: unknown[] }).entries).toEqual([]);
+    await server.close();
+  });
+
+  it("GET /api/file-history expands ~/… paths to absolute before calling chezmoi", async () => {
+    // The web client sends raw '~/.zshrc'; sourceRelFor must expand it via os.homedir()
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        if (cmd === "chezmoi" && args.includes("source-path")) return { code: 0, stdout: path.join(tmpDir, "dot_zshrc") + "\n", stderr: "" };
+        if (cmd === "git" && args.includes("log")) return { code: 0, stdout: "def5678\x1fcapture: dotfiles(2)\x1f2026-06-12T09:00:00+08:00", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    // Pass tilde path as the web client would
+    const res = await server.inject({ method: "GET", url: `/api/file-history?path=${encodeURIComponent("~/.zshrc")}` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { entries: { sha: string; subject: string }[] };
+    expect(body.entries[0]).toMatchObject({ sha: "def5678", subject: "capture: dotfiles(2)" });
+    // chezmoi must have been called with the expanded absolute path, not the tilde form
+    const chezmoiCall = calls.find((c) => c[0] === "chezmoi" && c.includes("source-path"));
+    expect(chezmoiCall).toBeDefined();
+    const pathArg = chezmoiCall![chezmoiCall!.length - 1];
+    expect(pathArg).not.toContain("~");
+    expect(pathArg).toBe(path.join(os.homedir(), ".zshrc"));
     await server.close();
   });
 });

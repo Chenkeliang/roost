@@ -195,7 +195,7 @@ export function Timeline({ showHud, onOpenSync }: TimelineProps) {
   const [historyPath, setHistoryPath] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<FileHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [restoringShа, setRestoringShа] = useState<string | null>(null);
+  const [restoringSha, setRestoringSha] = useState<string | null>(null);
   const [restoredNotice, setRestoredNotice] = useState(false);
 
   useEffect(() => {
@@ -223,14 +223,16 @@ export function Timeline({ showHud, onOpenSync }: TimelineProps) {
 
   const handleRestore = (sha: string) => {
     if (!historyPath) return;
-    setRestoringShа(sha);
+    setRestoringSha(sha);
     restoreFileVersion(historyPath, sha)
-      .then(() => {
-        setRestoredNotice(true);
-        if (showHud) showHud({ text: t("history.restored"), type: "success" });
+      .then(({ ok }) => {
+        if (ok) {
+          setRestoredNotice(true);
+          if (showHud) showHud({ text: t("history.restored"), type: "success" });
+        }
       })
       .catch(() => {})
-      .finally(() => setRestoringShа(null));
+      .finally(() => setRestoringSha(null));
   };
 
   const handleBack = () => {
@@ -376,7 +378,7 @@ export function Timeline({ showHud, onOpenSync }: TimelineProps) {
                   entry={entry}
                   isCurrent={idx === 0}
                   onRestore={handleRestore}
-                  restoring={restoringShа === entry.sha}
+                  restoring={restoringSha === entry.sha}
                 />
               ))}
             </section>
