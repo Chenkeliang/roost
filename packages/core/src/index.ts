@@ -170,6 +170,7 @@ export type {
   SkillMethod,
 } from "./skills-config.js";
 export { skillsModule, resolveSkillConflict, materializeSource, unadoptSkills } from "./modules/skills.js";
+export { aitoolsModule } from "./modules/aitools.js";
 export { DEFAULT_ROOST_SETTINGS, loadRoostSettings, saveRoostSettings } from "./settings.js";
 export { summarizeCapture } from "./capture-summary.js";
 export { DEFAULT_AI_TOOLS_CATALOG, NEVER_BACKUP, loadAiToolsCatalog } from "./ai-tools-catalog.js";
