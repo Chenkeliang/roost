@@ -2273,3 +2273,57 @@ describe("detectExternal", () => {
     }
   });
 });
+
+// ── file history + restore (ADR-0022 §5) ─────────────────────────────────────
+describe("file history + restore (ADR-0022 §5)", () => {
+  it("GET /api/file-history maps a target path to its source and lists commits", async () => {
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        if (cmd === "chezmoi" && args.includes("source-path")) return { code: 0, stdout: path.join(tmpDir, "dot_zshrc") + "\n", stderr: "" };
+        if (cmd === "git" && args.includes("log")) return { code: 0, stdout: "abc1234\x1fcapture: dotfiles(1)\x1f2026-06-12T10:00:00+08:00", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "GET", url: `/api/file-history?path=${encodeURIComponent("/u/.zshrc")}` });
+    const body = res.json() as { entries: { sha: string; subject: string }[] };
+    expect(body.entries[0]).toMatchObject({ sha: "abc1234", subject: "capture: dotfiles(1)" });
+    expect(calls.some((c) => c[0] === "git" && c.includes("--follow"))).toBe(true);
+    await server.close();
+  });
+
+  it("POST /api/file-restore checks out the source at the sha and commits a restore message — machine file untouched", async () => {
+    const machineFile = path.join(tmpDir, "machine-zshrc");
+    fs.writeFileSync(machineFile, "local content", "utf8");
+    const calls: string[][] = [];
+    const exec: Exec = {
+      async run(cmd: string, args: string[]): Promise<ExecResult> {
+        calls.push([cmd, ...args]);
+        if (cmd === "chezmoi" && args.includes("source-path")) return { code: 0, stdout: path.join(tmpDir, "dot_zshrc") + "\n", stderr: "" };
+        if (cmd === "git" && args.join(" ").includes("status --porcelain")) return { code: 0, stdout: " M dot_zshrc", stderr: "" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({
+      method: "POST", url: "/api/file-restore",
+      payload: { path: machineFile, sha: "abc1234def" }, headers: { "content-type": "application/json" },
+    });
+    expect((res.json() as { ok: boolean; syncHint: boolean }).syncHint).toBe(true);
+    expect(calls.some((c) => c[0] === "git" && c.includes("checkout") && c.includes("abc1234def"))).toBe(true);
+    const commit = calls.find((c) => c[0] === "git" && c.includes("commit"));
+    expect(commit![commit!.indexOf("-m") + 1]).toBe("restore: machine-zshrc @ abc1234");
+    expect(fs.readFileSync(machineFile, "utf8")).toBe("local content"); // never touched
+    await server.close();
+  });
+
+  it("file-history for an unmanaged path returns empty entries", async () => {
+    const exec: Exec = { async run(cmd: string): Promise<ExecResult> { return cmd === "chezmoi" ? { code: 1, stdout: "", stderr: "not managed" } : { code: 0, stdout: "", stderr: "" }; } };
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => ({ ...makeCtx(tmpDir, d), exec }) });
+    const res = await server.inject({ method: "GET", url: `/api/file-history?path=${encodeURIComponent("/u/.unknown")}` });
+    expect((res.json() as { entries: unknown[] }).entries).toEqual([]);
+    await server.close();
+  });
+});

@@ -66,6 +66,7 @@ import {
   loadAiToolsCatalog,
   NEVER_BACKUP,
   loadExternalManagers,
+  commitRepo,
 } from "@roost/core";
 import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq, ExternalManager } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -884,6 +885,51 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.send({ entries });
     } catch {
       return reply.send({ entries: [] });
+    }
+  });
+
+  // ── GET /api/file-history ────────────────────────────────────────────────────
+  // Map a managed target path to its repo-relative source path; null if unmanaged.
+  const sourceRelFor = async (exec: Exec, target: string): Promise<string | null> => {
+    const r = await exec.run("chezmoi", ["--source", repoDir, "source-path", target]);
+    if (r.code !== 0) return null;
+    const abs = r.stdout.trim();
+    return abs ? path.relative(repoDir, abs) : null;
+  };
+
+  server.get<{ Querystring: { path?: string } }>("/api/file-history", async (req, reply) => {
+    const target = req.query.path?.trim();
+    if (!target) return reply.status(400).send({ error: "path is required" });
+    const exec = makeCtx(true).exec;
+    const rel = await sourceRelFor(exec, target);
+    if (!rel) return reply.send({ entries: [] });
+    const r = await exec.run("git", ["-C", repoDir, "log", "--follow", "--pretty=format:%H\x1f%s\x1f%cI", "-n", "30", "--", rel]);
+    if (r.code !== 0) return reply.send({ entries: [] });
+    const entries = r.stdout.split("\n").filter((l) => l.trim()).map((l) => {
+      const [sha, subject, date] = l.split("\x1f");
+      return { sha: sha ?? "", subject: subject ?? "", date: date ?? "" };
+    });
+    return reply.send({ entries });
+  });
+
+  // ── POST /api/file-restore ────────────────────────────────────────────────────
+  // Repo-side only (ADR-0022 §5): rewrites the REPO version; the machine copy is
+  // untouched — applying goes through the existing load/Sync Review gates (I7).
+  server.post<{ Body: { path?: string; sha?: string } }>("/api/file-restore", async (req, reply) => {
+    const target = req.body?.path?.trim();
+    const sha = req.body?.sha?.trim();
+    if (!target || !sha || !/^[0-9a-f]{7,40}$/i.test(sha)) return reply.status(400).send({ error: "path and sha are required" });
+    try {
+      cache.invalidateAll();
+      const exec = makeCtx(false).exec;
+      const rel = await sourceRelFor(exec, target);
+      if (!rel) return reply.status(400).send({ error: "path is not managed" });
+      const co = await exec.run("git", ["-C", repoDir, "checkout", sha, "--", rel]);
+      if (co.code !== 0) return reply.status(500).send({ error: co.stderr.trim() || "checkout failed" });
+      await commitRepo(exec, repoDir, `restore: ${path.basename(target)} @ ${sha.slice(0, 7)}`);
+      return reply.send({ ok: true, syncHint: true });
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
     }
   });
 
