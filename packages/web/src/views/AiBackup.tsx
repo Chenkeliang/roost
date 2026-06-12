@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { Lock, Prohibit } from "@phosphor-icons/react";
+import { Lock, Prohibit, CaretRight } from "@phosphor-icons/react";
 import type { HudMessage } from "../components/Hud";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getAiToolsCatalog, addSelection, removeSelection } from "../api";
+import { getFilePreview, getAiToolsCatalog, addSelection, removeSelection } from "../api";
 import type { AiCatalogTool, AiCatalogPath } from "../api";
 
 export interface AiBackupProps { showHud?: (m: HudMessage) => void }
@@ -61,6 +61,8 @@ function PathRow({
   const { t } = useT();
   const { state } = p;
 
+  const [preview, setPreview] = useState<{ open: boolean; loading: boolean; content?: string; reason?: string }>({ open: false, loading: false });
+
   if (state === "missing") return null;
 
   const dimStyle: React.CSSProperties = state === "dotfiles" || state === "never"
@@ -68,21 +70,39 @@ function PathRow({
     : {};
 
   const fileName = p.path.split("/").pop() ?? p.path;
+  // Inline preview: encrypted/credential entries are not previewable (I6).
+  const previewable = state !== "never" && !p.encrypt;
+  const togglePreview = async () => {
+    if (!previewable) return;
+    if (preview.open) { setPreview((q) => ({ ...q, open: false })); return; }
+    if (preview.content !== undefined || preview.reason) { setPreview((q) => ({ ...q, open: true })); return; }
+    setPreview({ open: true, loading: true });
+    try {
+      const r = await getFilePreview(p.path);
+      setPreview({ open: true, loading: false, content: r.ok ? r.content : undefined, reason: r.ok ? undefined : (r.reason ?? "failed") });
+    } catch {
+      setPreview({ open: true, loading: false, reason: "failed" });
+    }
+  };
 
   return (
+    <div role="row" style={{ borderBottom: "1px solid var(--border-soft)", ...dimStyle }}>
     <div
-      role="row"
       style={{
         display: "flex",
         alignItems: "center",
         gap: 8,
         padding: "8px 14px",
-        borderBottom: "1px solid var(--border-soft)",
         fontSize: 13.5,
-        ...dimStyle,
       }}
     >
-      <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.path}>
+      <span
+        className="mono"
+        style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: previewable ? "pointer" : "default" }}
+        title={p.path}
+        onClick={() => void togglePreview()}
+      >
+        {previewable && <CaretRight size={10} style={{ marginRight: 5, transform: preview.open ? "rotate(90deg)" : "none", transition: "transform .12s" }} />}
         {fileName}
       </span>
       <KindChip kind={p.kind} />
@@ -113,6 +133,16 @@ function PathRow({
           {t("ai.neverNote")}
         </span>
       )}
+    </div>
+    {preview.open && (
+      <div style={{ margin: "0 14px 10px", padding: "8px 10px", background: "var(--raise)", border: "1px solid var(--border-soft)", borderRadius: 7, fontSize: 12, maxHeight: 260, overflow: "auto" }}>
+        {preview.loading
+          ? <span style={{ color: "var(--muted)" }}>{t("ai.preview.loading")}</span>
+          : preview.reason
+            ? <span style={{ color: "var(--muted)" }}>{t(`ai.preview.${preview.reason === "too-large" ? "tooLarge" : preview.reason}`)}</span>
+            : <pre className="mono" style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "var(--text)" }}>{preview.content}</pre>}
+      </div>
+    )}
     </div>
   );
 }

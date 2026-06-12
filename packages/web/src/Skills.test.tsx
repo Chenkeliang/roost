@@ -246,7 +246,8 @@ describe("Skills view", () => {
     within(dialog).getByRole("button", { name: /Save|保存/ }).click();
     await waitFor(() => expect(api.saveSkillsTargets).toHaveBeenCalled());
     const saved = vi.mocked(api.saveSkillsTargets).mock.calls[0]![0]!
-    expect(saved.some((t) => t.id === "myproj" && t.path === "~/work/.skills")).toBe(true);
+    // "~/" input is normalized away on save — stored home-relative like the builtins.
+    expect(saved.some((t) => t.id === "myproj" && t.path === "work/.skills")).toBe(true);
   });
 
   // ── external badge ──────────────────────────────────────────────────────────

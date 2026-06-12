@@ -165,6 +165,10 @@ export interface AiCatalogPath {
   state: "selected" | "pending" | "available" | "dotfiles" | "never" | "missing";
 }
 export interface AiCatalogTool { id: string; label: string; paths: AiCatalogPath[] }
+export function getFilePreview(p: string): Promise<{ ok: boolean; content?: string; reason?: "encrypted" | "binary" | "too-large" | "failed" }> {
+  return apiFetch(`/api/file-preview?path=${encodeURIComponent(p)}`);
+}
+
 export function getAiToolsCatalog(): Promise<{ tools: AiCatalogTool[] }> {
   return apiFetch("/api/aitools/catalog");
 }

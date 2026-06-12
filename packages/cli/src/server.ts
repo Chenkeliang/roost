@@ -1348,6 +1348,31 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return reply.send({ ok: true });
   });
 
+  // ── GET /api/file-preview ─────────────────────────────────────────────────────
+  // Read-only text preview of a LOCAL file. Hard limits (I6): credential files
+  // and catalog encrypt-marked entries are refused — secrets never show in UI.
+  server.get<{ Querystring: { path?: string } }>("/api/file-preview", async (req, reply) => {
+    const p = req.query.path?.trim();
+    if (!p) return reply.status(400).send({ error: "path is required" });
+    const home = makeCtx(true).home;
+    const abs = p.startsWith("~/") ? path.join(home, p.slice(2)) : p;
+    if (NEVER_BACKUP.some((rel) => path.join(home, rel) === abs)) {
+      return reply.send({ ok: false, reason: "encrypted" });
+    }
+    const encryptMarked = loadAiToolsCatalog(repoDir).some((t) =>
+      t.paths.some((e) => e.encrypt === true && path.join(home, e.path) === abs),
+    );
+    if (encryptMarked) return reply.send({ ok: false, reason: "encrypted" });
+    let st: fs.Stats;
+    try { st = fs.lstatSync(abs); } catch { return reply.send({ ok: false, reason: "failed" }); }
+    if (!st.isFile()) return reply.send({ ok: false, reason: "failed" });
+    if (st.size > 256 * 1024) return reply.send({ ok: false, reason: "too-large" });
+    let buf: Buffer;
+    try { buf = fs.readFileSync(abs); } catch { return reply.send({ ok: false, reason: "failed" }); }
+    if (buf.subarray(0, 8192).includes(0)) return reply.send({ ok: false, reason: "binary" });
+    return reply.send({ ok: true, content: buf.toString("utf8") });
+  });
+
   // ── GET /api/aitools/catalog ─────────────────────────────────────────────────
   // Full catalog with per-path state so the UI can show transparency rows
   // (dotfiles-managed grayed, credentials visibly never-backed-up). ADR-0022.

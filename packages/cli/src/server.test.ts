@@ -2207,6 +2207,31 @@ describe("backup status + settings passthrough", () => {
     }
   });
 
+  it("GET /api/file-preview → text ok; encrypted-marked and credentials refused; binary refused", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-prev-"));
+    try {
+      fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+      fs.writeFileSync(path.join(home, ".claude", "CLAUDE.md"), "# hello");
+      fs.writeFileSync(path.join(home, ".claude", "settings.local.json"), "{\"k\":\"v\"}"); // catalog encrypt:true
+      fs.writeFileSync(path.join(home, ".claude.json"), "{}"); // credential
+      fs.writeFileSync(path.join(home, "bin.dat"), Buffer.from([1, 0, 2, 0]));
+      const ctx = (dryRun: boolean): ModuleContext => ({
+        repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
+      });
+      const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
+      const get = async (p: string) =>
+        (await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(p)}` })).json() as { ok: boolean; content?: string; reason?: string };
+      expect(await get(path.join(home, ".claude", "CLAUDE.md"))).toEqual({ ok: true, content: "# hello" });
+      expect((await get(path.join(home, ".claude", "settings.local.json"))).reason).toBe("encrypted");
+      expect((await get(path.join(home, ".claude.json"))).reason).toBe("encrypted");
+      expect((await get(path.join(home, "bin.dat"))).reason).toBe("binary");
+      await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it("GET /api/aitools/catalog → available, dotfiles, never states", async () => {
     // Build a controlled temp home so the endpoint's state derivation is fully exercised.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aicat-home-"));

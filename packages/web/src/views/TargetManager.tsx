@@ -21,7 +21,9 @@ export function TargetManager({ initial, t, onClose, onSaved }: {
     if (!id) { setErr(t("skills.targets.errEmptyName")); return; }
     if (!dir.trim()) { setErr(t("skills.targets.errEmptyDir")); return; }
     if (targetsRef.current.some((x) => x.id === id)) { setErr(`${id} ${t("skills.targets.errDuplicate")}`); return; }
-    const next = [...targetsRef.current, { id, path: dir.trim(), label: name.trim() }];
+    // Stored home-relative; accept "~/" input and normalize it away.
+    const normalized = dir.trim().replace(/^~\//, "").replace(/\/+$/, "");
+    const next = [...targetsRef.current, { id, path: normalized, label: name.trim() }];
     targetsRef.current = next;
     setTargets(next);
     setName(""); setDir(""); setErr(null);

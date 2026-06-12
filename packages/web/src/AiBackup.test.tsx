@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { within } from "@testing-library/react";
 import { AiBackup } from "./views/AiBackup";
 import * as api from "./api";
 
 vi.mock("./api", () => ({
+  getFilePreview: vi.fn().mockResolvedValue({ ok: true, content: "# preview body" }),
   getAiToolsCatalog: vi.fn().mockResolvedValue({
     tools: [
       {
@@ -87,4 +88,17 @@ describe("AiBackup", () => {
       ),
     );
   });
+
+  it("clicking a plain row's filename shows an inline preview; encrypted rows are not clickable", async () => {
+    render(<AiBackup />);
+    const name = await screen.findByText("CLAUDE.md");
+    fireEvent.click(name);
+    expect(await screen.findByText("# preview body")).toBeInTheDocument();
+    expect(api.getFilePreview).toHaveBeenCalledTimes(1);
+    // encrypted row: clicking must not fetch
+    const enc = screen.getByText("settings.local.json");
+    fireEvent.click(enc);
+    expect(api.getFilePreview).toHaveBeenCalledTimes(1);
+  });
+
 });
