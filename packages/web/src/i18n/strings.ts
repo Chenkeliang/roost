@@ -629,4 +629,18 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "large.keep": { en: "Keep backing up (don't remind again)", zh: "保留备份(不再提醒)" },
   "large.remove": { en: "Stop backing up (keeps local file)", zh: "移出备份(不影响本地文件)" },
   "large.removed": { en: "Removed from backups — local file untouched.", zh: "已移出备份 —— 本地文件未受影响。" },
+
+  // ── AI tools module ─────────────────────────────────────────────────────
+  "nav.aitools": { en: "AI Tools", zh: "AI 工具" },
+  "ai.tagline": { en: "Runtime management belongs to tools like cc-switch — Roost encrypts and version-controls all of it into your repo.", zh: "运行时管理交给 cc-switch 这类工具;Roost 负责把这一切加密、带版本地备进你的仓库。" },
+  "ai.kind.memory": { en: "memory", zh: "记忆" },
+  "ai.kind.settings": { en: "settings", zh: "设置" },
+  "ai.kind.mcp": { en: "MCP", zh: "MCP" },
+  "ai.kind.data": { en: "data", zh: "数据" },
+  "ai.encrypted": { en: "encrypted", zh: "加密" },
+  "ai.empty": { en: "No AI tool configs discovered on this machine.", zh: "本机未发现可纳管的 AI 工具配置。" },
+  "ai.managedByDotfiles": { en: "managed under Dotfiles", zh: "已在 dotfiles 管理" },
+  "ai.neverNote": { en: "credential file — never backed up (session tokens; backing up only adds risk)", zh: "凭据文件 — 永不备份(会话令牌,备份只增风险)" },
+  "ai.tab.backup": { en: "Config backup", zh: "配置备份" },
+  "ai.tab.skills": { en: "Skills", zh: "Skills" },
 };

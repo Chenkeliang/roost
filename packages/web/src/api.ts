@@ -157,6 +157,18 @@ export function getItemDiff(module: string, id: string): Promise<ItemDiffRespons
   return apiFetch<ItemDiffResponse>(`/api/item-diff${q}`);
 }
 
+// ── AI tools catalog (ADR-0022) ───────────────────────────────────────────────
+export interface AiCatalogPath {
+  path: string;
+  kind: "memory" | "settings" | "mcp" | "data";
+  encrypt: boolean;
+  state: "selected" | "available" | "dotfiles" | "never" | "missing";
+}
+export interface AiCatalogTool { id: string; label: string; paths: AiCatalogPath[] }
+export function getAiToolsCatalog(): Promise<{ tools: AiCatalogTool[] }> {
+  return apiFetch("/api/aitools/catalog");
+}
+
 export interface SkillImportResponse {
   imported: string[];
   blocked: { id: string; reason: string; detail?: string }[];

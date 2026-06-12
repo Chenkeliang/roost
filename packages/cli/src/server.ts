@@ -63,6 +63,8 @@ import {
   cloneRepo,
   LARGE_FILE_MB,
   summarizeCapture,
+  loadAiToolsCatalog,
+  NEVER_BACKUP,
 } from "@roost/core";
 import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -1236,6 +1238,47 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     saveSkillsTargets(repoDir, targets);
     cache.invalidateAll();
     return reply.send({ ok: true });
+  });
+
+  // ── GET /api/aitools/catalog ─────────────────────────────────────────────────
+  // Full catalog with per-path state so the UI can show transparency rows
+  // (dotfiles-managed grayed, credentials visibly never-backed-up). ADR-0022.
+  server.get("/api/aitools/catalog", async (_req, reply) => {
+    const cat = loadAiToolsCatalog(repoDir);
+    const sel = loadSelection(repoDir);
+    const selected = new Set(sel.modules["aitools"] ?? []);
+    const dotfilesSel = new Set(sel.modules["dotfiles"] ?? []);
+    const home = os.homedir();
+    const neverAbs = new Set(NEVER_BACKUP.map((r) => path.join(home, r)));
+    // Hard-map of credential files to their owning tool id (prefix match is fragile for these).
+    const neverOwner: Record<string, string> = {
+      ".claude.json": "claude-code",
+      ".codex/auth.json": "codex",
+      ".gemini/.env": "gemini",
+    };
+    const tools = cat.map((t) => ({
+      id: t.id,
+      label: t.label,
+      paths: t.paths.map((p) => {
+        const abs = path.join(home, p.path);
+        const exists = fs.existsSync(abs);
+        const state: "selected" | "available" | "dotfiles" | "never" | "missing" = neverAbs.has(abs) ? "never"
+          : !exists ? "missing"
+          : selected.has(abs) ? "selected"
+          : dotfilesSel.has(abs) ? "dotfiles"
+          : "available";
+        return { path: abs, kind: p.kind, encrypt: p.encrypt ?? false, state };
+      }),
+    }));
+    // Append credential (never-backup) files under their owning tool.
+    for (const rel of NEVER_BACKUP) {
+      const abs = path.join(home, rel);
+      if (!fs.existsSync(abs)) continue;
+      const ownerId = neverOwner[rel];
+      const owner = ownerId ? tools.find((t) => t.id === ownerId) : tools[0];
+      owner?.paths.push({ path: abs, kind: "data" as const, encrypt: false, state: "never" as const });
+    }
+    return reply.send({ tools });
   });
 
   // ── /api/settings ─────────────────────────────────────────────────────────────
