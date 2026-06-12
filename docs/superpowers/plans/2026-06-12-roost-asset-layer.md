@@ -711,3 +711,139 @@ program
 **1. Spec coverage:** C → T1(三调用方全覆盖,含 auto-backup);catalog/never-list → T2;module+registry+dedupe → T3;UI page → T4;interop badges/cede → T5;history/restore server → T6(含 `~/` 展开修订);web → T7;CLI → T8;真机+文档 → T9。Out-of-scope 清单与 spec 一致(无 LLM、无 Windsurf 等、不自动重挂载)。
 **2. Placeholder scan:** T3 的 status/apply 等五个方法以「verbatim 复刻 dotfiles 对应实现并换命名空间」交付——这是对既有代码的明确复制指令并附行号锚点,非 TBD;其余任务代码完整。
 **3. Type consistency:** `summarizeCapture` 返回型在 T1 定义、T1 三处消费;`AiTool/AiToolPath/NEVER_BACKUP` T2→T3/T4;`external?: { id, label }` + `ExternalManager` 注册表 T5 server→web 同名(通用识别,未知管理器按目标根目录标注);`FileHistoryEntry`、`restoreFileVersion(path, sha)` T6 形状→T7 wrapper→T7 测试;restore 提交格式 `restore: <basename> @ <sha7>` T6/T8 一致;`~/` 展开规则 T6/T7/T8 一致(server 与 CLI 都展开,web 原样透传)。
+
+---
+
+# 修订 R1(2026-06-12 交互定稿)— 实施者必读
+
+本节**覆盖**上文与之冲突的内容。执行顺序:**T1 → T2 → T3 → T4(按 R1 改)→ T10(新)→ T5 → T6 → T7(按 R1 改)→ T8 → T9**。
+
+## R1-A:Task 4 改为「AiBackup 组件 + catalog 端点」(不挂导航,T10 挂)
+
+**Files:** Create `packages/web/src/views/AiBackup.tsx` + `packages/web/src/AiBackup.test.tsx`; Modify `packages/cli/src/server.ts`(+`server.test.ts`)、`packages/web/src/api.ts`、`packages/web/src/i18n/strings.ts`。**不改 App.tsx**(路由/导航属 T10)。
+
+1. **服务端新端点**(替代用通用 discover 驱动页面;通用 discover 行为不变):
+
+```ts
+  // ── GET /api/aitools/catalog ──────────────────────────────────────────────────
+  // Full catalog with per-path state so the UI can show transparency rows
+  // (dotfiles-managed grayed, credentials visibly never-backed-up). ADR-0022.
+  server.get("/api/aitools/catalog", async (_req, reply) => {
+    const cat = loadAiToolsCatalog(repoDir);
+    const sel = loadSelection(repoDir);
+    const selected = new Set(sel.modules["aitools"] ?? []);
+    const dotfilesSel = new Set(sel.modules["dotfiles"] ?? []);
+    const home = os.homedir();
+    const neverAbs = new Set(NEVER_BACKUP.map((r) => path.join(home, r)));
+    const tools = cat.map((t) => ({
+      id: t.id,
+      label: t.label,
+      paths: t.paths.flatMap((p) => {
+        const abs = path.join(home, p.path);
+        const exists = fs.existsSync(abs);
+        const state = neverAbs.has(abs) ? "never"
+          : !exists ? "missing"
+          : selected.has(abs) ? "selected"
+          : dotfilesSel.has(abs) ? "dotfiles"
+          : "available";
+        return [{ path: abs, kind: p.kind, encrypt: p.encrypt ?? false, state }];
+      }),
+    }));
+    // credentials are not catalog entries — append them per owning tool by prefix match
+    for (const rel of NEVER_BACKUP) {
+      const abs = path.join(home, rel);
+      if (!fs.existsSync(abs)) continue;
+      const owner = tools.find((t) => cat.find((c) => c.id === t.id)!.paths.some((p) => path.join(home, p.path).startsWith(path.dirname(abs))))
+        ?? tools[0];
+      owner?.paths.push({ path: abs, kind: "data", encrypt: false, state: "never" });
+    }
+    return reply.send({ tools });
+  });
+```
+
+   归属兜底:`.claude.json` → claude-code、`.codex/auth.json` → codex、`.gemini/.env` → gemini——若 prefix 匹配不可靠,直接用这三条硬映射替换上面的 owner 查找(以测试断言为准,实现者择稳)。
+   Server test:临时 home 内造 `.claude/CLAUDE.md`(available)、把某路径加进 dotfiles selection(dotfiles)、造 `.claude.json`(never),断言三种 state;missing 不返回…(注:missing 仍返回但 state="missing",由前端隐藏——按上面实现,两种皆可,测试与实现一致即可,推荐返回+前端隐藏,信息完整)。
+
+2. **api.ts**:
+
+```ts
+export interface AiCatalogPath { path: string; kind: "memory" | "settings" | "mcp" | "data"; encrypt: boolean; state: "selected" | "available" | "dotfiles" | "never" | "missing" }
+export interface AiCatalogTool { id: string; label: string; paths: AiCatalogPath[] }
+export function getAiToolsCatalog(): Promise<{ tools: AiCatalogTool[] }> {
+  return apiFetch("/api/aitools/catalog");
+}
+```
+
+3. **AiBackup.tsx**:按工具分组渲染(组头=label+可纳管计数);每行 mono 路径 + kind chip(`ai.kind.*`)+ encrypt 时 Phosphor `Lock` 小标(`ai.encrypted`);state 渲染:
+   - `available` → coral「添加」(`addSelection("aitools", path)` → 刷新 + Hud);
+   - `selected` → 绿色「✓ 已纳管」+ ghost「移除」(`removeSelection`);
+   - `dotfiles` → 整行 `opacity:.55` + 注「已在 dotfiles 管理」(`ai.managedByDotfiles`);
+   - `never` → 整行灰 + 「🚫」用 Phosphor `Prohibit` 图标 + `ai.neverNote`;
+   - `missing` → 不渲染。
+   顶部 tagline(`ai.tagline`)。组件 props `{ showHud?: (m: HudMessage) => void }`。
+4. **i18n 增补**(在 Task 4 原有 `ai.*` 基础上,删除不再使用的 `ai.empty` 若无处可用则保留作全空状态):
+
+```ts
+  "ai.managedByDotfiles": { en: "managed under Dotfiles", zh: "已在 dotfiles 管理" },
+  "ai.neverNote": { en: "credential file — never backed up (session tokens; backing up only adds risk)", zh: "凭据文件 — 永不备份(会话令牌,备份只增风险)" },
+  "ai.tab.backup": { en: "Config backup", zh: "配置备份" },
+  "ai.tab.skills": { en: "Skills", zh: "Skills" },
+```
+
+5. 测试:mock `getAiToolsCatalog` 返回四种 state 各一,断言:available 行点添加调 `addSelection`;dotfiles/never 行灰显且无按钮;missing 不出现。验证门照旧(tests+lint+`pnpm -r typecheck`),提交信息 `feat(web): AiBackup tab content + aitools catalog endpoint`。
+
+## R1-B:新 Task 10 —「IA 重组」(在 T4 之后执行)
+
+**Files:** Create `packages/web/src/views/AiTools.tsx`(容器)、`packages/web/src/components/DiffPane.tsx`(从 Drift 提取);Modify `packages/web/src/App.tsx`、`packages/web/src/views/SyncState.tsx`、`packages/web/src/views/Settings.tsx`、`packages/web/src/components/CommandPalette.tsx`、`packages/web/src/i18n/strings.ts`;Delete `packages/web/src/views/Drift.tsx`;Tests:`packages/web/src/AiTools.test.tsx` + 受影响的 `App.test.tsx`/`Skills.test.tsx` 修正。
+
+1. **AiTools 容器**:
+
+```tsx
+import { useState } from "react";
+import { useT } from "../i18n";
+import type { HudMessage } from "../components/Hud";
+import { AiBackup } from "./AiBackup";
+import { Skills } from "./Skills";
+
+export function AiTools({ showHud }: { showHud?: (m: HudMessage) => void }) {
+  const { t } = useT();
+  const [tab, setTab] = useState<"backup" | "skills">("backup");
+  const tabBtn = (active: boolean): React.CSSProperties => ({ appearance: "none", fontFamily: "var(--font)", fontSize: 13, fontWeight: active ? 600 : 400, padding: "6px 14px", borderRadius: 8, cursor: "pointer", background: active ? "var(--raise)" : "transparent", border: active ? "1px solid var(--border)" : "1px solid transparent", color: active ? "var(--text)" : "var(--muted)" });
+  return (
+    <div>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px", display: "flex", gap: 6, marginBottom: 14 }}>
+        <button onClick={() => setTab("backup")} style={tabBtn(tab === "backup")}>{t("ai.tab.backup")}</button>
+        <button onClick={() => setTab("skills")} style={tabBtn(tab === "skills")}>{t("ai.tab.skills")}</button>
+      </div>
+      {tab === "backup" ? <AiBackup showHud={showHud} /> : <Skills />}
+    </div>
+  );
+}
+```
+
+   (核对 Skills 组件实际 props——若它要求 showHud 等则透传。)
+2. **侧边栏终稿**(App.tsx):去掉「模块」组标题渲染与 `nav.modulesGroup` 使用;三段结构:
+   `NAV_MAIN = [overview, sync, timeline]` · `NAV_CONTENT = [aitools, dotfiles, env, packages, appconfig, projects]`(**顺序即此**)· `NAV_TAIL = [settings]`;段间细分隔线沿用现有样式。`Tab` union:去掉 `"drift" | "setup" | "skills"`,加 `"aitools"`;路由:`{activeTab === "aitools" && <AiTools showHud={showHud} />}`;删除 Drift/Setup/Skills 三条路由(Setup 组件保留,见 4)。
+3. **同步复核吸收偏移**:提取 Drift.tsx 的 `DiffPane` 到 `components/DiffPane.tsx`;SyncState 工具栏加视图切换(`sync.view.items` 默认 |「原始 diff」`sync.view.raw`),raw 视图= Drift 原逻辑(getStatus 模块列表 + getDiff 渲染 DiffPane);删除 Drift.tsx 与 `nav.drift`;⌘K 的 drift 命令改为打开 sync(文案沿用「查看差异」语义,改 key 为现有 sync 文案)。
+4. **设置嵌入环境检查**:Settings 顶部(Repo 区之前)加 `sectionLabel t("setup.title")` + `<Setup embedded />`;删除 `nav.setup` 与侧边栏项;Overview 的 `onOpenSetup` 与引导里的跳转改为 `setActiveTab("settings")`(Overview props 不变,App 传入的回调改向)。
+5. **改名**:`overview.moduleHealth` 值改为 `{ en: "Backup Health", zh: "备份健康度" }`(key 不动,避免连锁);新增
+
+```ts
+  "sync.view.items": { en: "Items", zh: "逐项" },
+  "sync.view.raw": { en: "Raw diff", zh: "原始 diff" },
+```
+
+   删除 strings 中 `nav.drift`、`nav.setup`、`nav.modulesGroup`(grep 确认零引用后)。
+6. 测试:AiTools 容器双标签切换渲染两个子组件;App 级:aitools 入口出现、drift/setup 入口消失、⌘K drift 命令落到 sync;受影响旧测试(若有直接 render Skills 路由断言)就地修正。提交 `feat(web): IA restructure — AI Tools container, sidebar flatten, drift/setup merges`。
+
+## R1-C:Task 7 修订(Timeline 交互)
+
+在 Task 7 原内容上叠加:
+1. **timeline 端点带 body**:`/api/timeline` 的 pretty 改为 `--pretty=format:%H%x1f%s%x1f%cI%x1f%b%x1e`,按 `\x1e` 切记录再按 `\x1f` 取字段,`TimelineEntry` 增 `body?: string`(api.ts 同步);web 提交行可点击展开 body(等宽小字块,行内 `▾/▴`);
+2. **文件历史**:列表第一条(最新)渲染禁用态「`history.current`(当前版本)」代替恢复按钮;
+3. **恢复成功**提示行加「`history.goSync`(去同步复核)」按钮 → Timeline 新增可选 prop `onOpenSync?: () => void`(App 传 `() => setActiveTab("sync")`);
+4. i18n 增:`"history.current": { en: "current", zh: "当前版本" }`、`"history.goSync": { en: "Open Sync Review", zh: "去同步复核" }`;
+5. 对应测试:展开行显示 body;最新条无恢复按钮;成功后点 goSync 触发 onOpenSync。
+
+## R1 自审
+- 四种 state 的命名在 R1-A 服务端/类型/UI/测试一致;`ai.tab.*` 在 R1-A 定义、R1-B 消费;DiffPane 提取后 Drift 删除无悬挂引用(grep `from "./Drift"`);`onOpenSetup` 改道后 Overview/引导不破(props 名不变);执行顺序保证 AiBackup 先于容器存在。

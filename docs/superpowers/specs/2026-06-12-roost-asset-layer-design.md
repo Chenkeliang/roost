@@ -105,13 +105,35 @@ refuses them defensively even if hand-added to selection (blocked reason
   generic endpoints (`/api/discover`, `/api/status`, capture/load) light up
   automatically.
 
-### UI
+### UI & IA (finalized with the user, 2026-06-12)
 
-New sidebar page **AI 工具** (between Skills and Aliases & Env): the standard
-discover/selected two-tab layout (reuse the `common.*` patterns from
-Dotfiles), grouped by tool with the `kind` shown as a chip and 🔐 marker for
-encrypt entries. Copy includes the asset-layer one-liner: "运行时管理交给
-cc-switch 这类工具;Roost 负责把这一切加密备进你的仓库。"
+**Sidebar (13 → 10 items, no group headers, thin dividers only):**
+总览 · 同步复核 · 时间线 ─ **AI 工具 · Dotfiles · 别名与环境变量 · 软件包 ·
+应用配置 · 项目** ─ 设置. Consolidations: 「偏移」merges into 同步复核 (a
+「原始 diff」 view reusing Drift's DiffPane); 「环境检查」 embeds into 设置
+(the `embedded` Setup); Skills loses its sidebar entry and becomes a tab.
+Overview's 「模块健康度」 renames to 「备份健康度」; ⌘K and Overview jump
+targets retarget accordingly.
+
+**AI 工具 container page** — two tabs: 「配置备份」 (new) and 「Skills」 (the
+existing Skills view embedded unchanged; both modules stay separate under the
+hood). The 配置备份 tab is driven by a dedicated `GET /api/aitools/catalog`
+endpoint returning every catalog path with a computed state —
+`selected | available | dotfiles | never | missing` — so the UI can show
+**transparency rows**: dotfiles-managed entries appear grayed with
+「已在 dotfiles 管理」, and existing credential files appear grayed with
+「🚫 凭据文件 — 永不备份」 (the security promise made visible, not silent).
+`missing` paths are hidden. Encrypt markers come from the catalog (lock chip).
+Tagline: "运行时管理交给 cc-switch 这类工具;Roost 负责把这一切加密、带版本地
+备进你的仓库。"
+
+**Timeline interactions:** commit rows are expandable (subject → body file
+list, so Timeline is a real changelog browser); in file-history mode the
+newest entry shows a disabled 「当前版本」 instead of a restore button;
+restore success shows an inline notice with a 「去同步复核」 jump
+(Timeline gains `onOpenSync`), always stating the machine file was untouched.
+Restores need no confirm dialog — every restore is itself a new commit, so
+history is the undo.
 
 ### Interop contract (the answer to "怎么衔接 cc-switch")
 
