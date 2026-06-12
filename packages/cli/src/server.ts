@@ -1248,7 +1248,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const sel = loadSelection(repoDir);
     const selected = new Set(sel.modules["aitools"] ?? []);
     const dotfilesSel = new Set(sel.modules["dotfiles"] ?? []);
-    const home = os.homedir();
+    const home = makeCtx(true).home;
     const neverAbs = new Set(NEVER_BACKUP.map((r) => path.join(home, r)));
     // Hard-map of credential files to their owning tool id (prefix match is fragile for these).
     const neverOwner: Record<string, string> = {

@@ -2152,46 +2152,62 @@ describe("backup status + settings passthrough", () => {
   });
 
   it("GET /api/aitools/catalog → available, dotfiles, never states", async () => {
-    // Set up a temporary home with some files present.
+    // Build a controlled temp home so the endpoint's state derivation is fully exercised.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aicat-home-"));
     try {
-      // Create an available file (.claude/CLAUDE.md)
+      // .claude/CLAUDE.md exists + not in any selection → state "available"
       fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
       fs.writeFileSync(path.join(home, ".claude", "CLAUDE.md"), "# test");
-      // Create .claude.json (never-backup credential)
-      fs.writeFileSync(path.join(home, ".claude.json"), "{}");
-      // Add .claude/settings.json to the dotfiles selection so it becomes "dotfiles"
+      // .claude/settings.json exists + added to dotfiles selection → state "dotfiles"
       fs.writeFileSync(path.join(home, ".claude", "settings.json"), "{}");
       const sel = emptySelection();
       sel.modules["dotfiles"] = [path.join(home, ".claude", "settings.json")];
       saveSelection(tmpDir, sel);
+      // .claude.json exists → always state "never" (credential file in NEVER_BACKUP)
+      fs.writeFileSync(path.join(home, ".claude.json"), "{}");
 
       const reg = new ModuleRegistry();
-      // Override os.homedir in the server by using a custom makeCtx that sets home
-      // The server uses os.homedir() directly for catalog, so we need to override.
-      // We test by calling the endpoint and examining which states show up.
+      // Inject home via makeCtx so the catalog endpoint uses our temp home (not os.homedir()).
       const ctx = (dryRun: boolean): ModuleContext => ({
         repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
         log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
       });
-      // The endpoint uses os.homedir() so we can only verify the response structure
-      // with the real home. But we can test that the endpoint returns 200 + { tools }.
       const server = buildServer({ repoDir: tmpDir, registry: reg, makeCtx: ctx });
       const res = await server.inject({ method: "GET", url: "/api/aitools/catalog" });
       expect(res.statusCode).toBe(200);
-      const body = res.json() as { tools: { id: string; label: string; paths: { state: string }[] }[] };
+      const body = res.json() as { tools: { id: string; label: string; paths: { path: string; state: string }[] }[] };
       expect(Array.isArray(body.tools)).toBe(true);
       expect(body.tools.length).toBeGreaterThan(0);
-      // claude-code tool should exist
+
+      // claude-code tool must exist
       const claudeCode = body.tools.find((t) => t.id === "claude-code");
       expect(claudeCode).toBeDefined();
-      // All paths have a valid state
+
+      // Flatten all paths for easy lookup by absolute path
+      const allPaths = body.tools.flatMap((t) => t.paths);
+      const byPath = (rel: string) => allPaths.find((p) => p.path === path.join(home, rel));
+
+      // .claude/CLAUDE.md — exists, not in any selection → "available"
+      const claudeMd = byPath(".claude/CLAUDE.md");
+      expect(claudeMd).toBeDefined();
+      expect(claudeMd!.state).toBe("available");
+
+      // .claude/settings.json — in dotfiles selection → "dotfiles"
+      const settings = byPath(".claude/settings.json");
+      expect(settings).toBeDefined();
+      expect(settings!.state).toBe("dotfiles");
+
+      // .claude.json — credential in NEVER_BACKUP → "never"
+      const claudeJson = byPath(".claude.json");
+      expect(claudeJson).toBeDefined();
+      expect(claudeJson!.state).toBe("never");
+
+      // All states are within the valid enum
       const validStates = new Set(["selected", "available", "dotfiles", "never", "missing"]);
-      for (const tool of body.tools) {
-        for (const p of tool.paths) {
-          expect(validStates.has(p.state)).toBe(true);
-        }
+      for (const p of allPaths) {
+        expect(validStates.has(p.state)).toBe(true);
       }
+
       await server.close();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
