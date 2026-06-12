@@ -69,6 +69,13 @@ function SkillTargetsPopover({ row, targets, busy, t, onToggle, onResolve, onClo
                 </span>
                 {st === "conflict" ? (
                   <button onClick={() => onResolve(tg.id)} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>{t("skills.resolve.action")}</button>
+                ) : st === "broken" && row.external ? (
+                  // Externally-managed symlink: server never surfaces it as a conflict
+                  // (computeConflicts skips symlinks), so this is the only reachable path
+                  // to the cede action for a real external skill. ADR-0022 §3.
+                  <button onClick={() => { onToggle(tg.id, false); onClose(); }} style={{ ...ic, padding: "6px 12px", fontSize: 13 }}>
+                    {t("skills.external.cedePrefix")}{row.external.label ?? t("skills.external.other")}
+                  </button>
                 ) : st === "broken" ? (
                   <span style={{ color: "#f0b352", fontSize: 12 }}>{t("skills.coverage.broken")}</span>
                 ) : st === "copy" ? (

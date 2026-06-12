@@ -271,9 +271,12 @@ describe("Skills view", () => {
     expect(await screen.findByText(/~\/.foo-manager\s+managed/i)).toBeInTheDocument();
   });
 
-  it("conflict dialog for external skill shows cede button that calls toggleSkill", async () => {
+  it("external skill shows cede button in coverage popover (no conflict needed) that calls toggleSkill", async () => {
+    // Real server path: computeConflicts skips symlinks, so an externally-managed
+    // skill never appears in `conflicts`. The cede action must be reachable from
+    // the coverage popover directly (broken status + external set). ADR-0022 §3.
     vi.mocked(api.getSkills).mockResolvedValue(mkView([
-      mkRow({ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [], conflicts: ["claude"], external: { id: "cc-switch", label: "cc-switch" } }),
+      mkRow({ name: "foo", effective: { enabled: true, targets: ["claude"], method: "symlink" }, links: [], conflicts: [], external: { id: "cc-switch", label: "cc-switch" } }),
     ]));
     vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
     vi.mocked(api.toggleSkill).mockResolvedValue({ ok: true, config: {} as never });
@@ -281,21 +284,11 @@ describe("Skills view", () => {
     // open coverage popover
     const coverageBtn = await screen.findByRole("button", { name: /Coverage/i });
     coverageBtn.click();
-    // popover opens; Resolve button is present even for external conflict
+    // popover opens; cede button is present directly (no conflict dialog needed)
     const popover = await screen.findByRole("dialog");
-    const resolveBtn = within(popover).getByRole("button", { name: /resolve|解决/i });
-    // clicking Resolve closes popover and opens the conflict dialog
-    resolveBtn.click();
-    // wait for the conflict dialog (the popover closes and conflict dialog opens)
-    await waitFor(() => {
-      const dialogs = screen.queryAllByRole("dialog");
-      expect(dialogs.length).toBeGreaterThan(0);
-    });
-    const dialog = screen.getByRole("dialog");
-    // cede button must be present in the conflict dialog
-    const cedeBtn = within(dialog).getByRole("button", { name: /让给\s*cc-switch|Leave it to\s*cc-switch/i });
+    const cedeBtn = within(popover).getByRole("button", { name: /让给\s*cc-switch|Leave it to\s*cc-switch/i });
     expect(cedeBtn).toBeInTheDocument();
-    // clicking cede triggers toggleSkill with enabled=false
+    // clicking cede triggers toggleSkill with enabled=false and closes popover
     cedeBtn.click();
     await waitFor(() => expect(api.toggleSkill).toHaveBeenCalledWith("foo", false, "claude"));
   });
