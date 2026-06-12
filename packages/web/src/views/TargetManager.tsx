@@ -41,7 +41,8 @@ export function TargetManager({ initial, t, onClose, onSaved }: {
           {targets.map((tg) => (
             <div key={tg.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: "1px solid var(--border-soft)", fontSize: 12.5 }}>
               <span style={{ width: 110 }}>{tg.label}</span>
-              <span className="mono" style={{ flex: 1, color: "var(--muted)" }}>{tg.path}</span>
+              {/* Target paths are stored home-relative; show them as the user thinks of them. */}
+              <span className="mono" style={{ flex: 1, color: "var(--muted)" }}>{tg.path.startsWith("/") ? tg.path : `~/${tg.path}`}</span>
               {BUILTIN.has(tg.id)
                 ? <span style={{ color: "var(--muted)", fontSize: 11 }}>{t("skills.targets.builtin")}</span>
                 : <button aria-label={`remove target ${tg.id}`} onClick={() => { const next = targetsRef.current.filter((x) => x.id !== tg.id); targetsRef.current = next; setTargets(next); }} style={{ ...ic, border: 0, color: "var(--accent)" }}><Trash size={14} /></button>}
