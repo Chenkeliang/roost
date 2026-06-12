@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getSyncState, postResolve, getItemDiff, getStatus, getDiff } from "../api";
+import { getSyncState, postResolve, getItemDiff, getDiff } from "../api";
 import type {
   SyncStateResponse,
   SyncItem,
@@ -294,8 +294,8 @@ export function SyncState({ onOpenSettings }: { onOpenSettings?: () => void } = 
   const fetchRawDiffs = useCallback(() => {
     if (rawDiffs !== null || rawLoading) return;
     setRawLoading(true);
-    Promise.all([getStatus(), getDiff()])
-      .then(([, diffData]) => setRawDiffs(diffData.diffs))
+    getDiff()
+      .then((diffData) => setRawDiffs(diffData.diffs))
       .catch(() => setRawDiffs([]))
       .finally(() => setRawLoading(false));
   }, [rawDiffs, rawLoading]);
