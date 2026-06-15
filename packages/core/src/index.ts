@@ -174,8 +174,8 @@ export { skillsModule, resolveSkillConflict, materializeSource, unadoptSkills } 
 export { aitoolsModule } from "./modules/aitools.js";
 export { DEFAULT_ROOST_SETTINGS, loadRoostSettings, saveRoostSettings } from "./settings.js";
 export { summarizeCapture } from "./capture-summary.js";
-export { DEFAULT_AI_TOOLS_CATALOG, NEVER_BACKUP, loadAiToolsCatalog } from "./ai-tools-catalog.js";
+export { DEFAULT_AI_TOOLS_CATALOG, loadAiToolsCatalog, effectivePolicy, aiPathPolicies } from "./ai-tools-catalog.js";
 export { DEFAULT_EXTERNAL_MANAGERS, loadExternalManagers } from "./external-managers.js";
 export type { ExternalManager } from "./external-managers.js";
-export type { AiToolPath, AiTool } from "./ai-tools-catalog.js";
+export type { AiToolPath, AiTool, AiPolicy } from "./ai-tools-catalog.js";
 export type { RoostSettings, AutoBackupFreq } from "./settings.js";
