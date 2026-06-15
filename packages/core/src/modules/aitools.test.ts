@@ -94,3 +94,44 @@ describe("aitools module", () => {
     expect(fs.existsSync(cred)).toBe(true); // local file untouched
   });
 });
+
+describe("aitools policy capture (ADR-0023)", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aitools-policy-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("skip-policy path is blocked (managed) and not captured; local file untouched", async () => {
+    const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
+    const cred = path.join(home, ".claude.json"); fs.writeFileSync(cred, "{}", "utf8");
+    let sel = emptySelection(); sel = addItem(sel, "aitools", cred);
+    const { exec, calls } = makeFakeExec([]);
+    const cs = await aitoolsModule.capture(makeCtx({ exec, home, repoDir }), sel);
+    expect(cs.blockedDetail?.some((b) => b.id === cred && b.reason === "managed")).toBe(true);
+    expect(calls.some((c) => c.cmd === "chezmoi" && c.args.includes("add") && c.args.includes(cred))).toBe(false);
+    expect(fs.existsSync(cred)).toBe(true);
+  });
+
+  it("encrypt-policy path adds with --encrypt; plain path runs scanner then plain add", async () => {
+    const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
+    fs.mkdirSync(path.join(home, "Library/Application Support/Claude"), { recursive: true });
+    const mcp = path.join(home, "Library/Application Support/Claude/claude_desktop_config.json"); fs.writeFileSync(mcp, "{}", "utf8");
+    fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+    const mem = path.join(home, ".claude/CLAUDE.md"); fs.writeFileSync(mem, "# notes", "utf8");
+    // Create age key so ensureChezmoiAgeConfig returns ready:true
+    fs.mkdirSync(path.join(home, ".config", "sops", "age"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".config", "sops", "age", "keys.txt"), "AGE-SECRET-KEY-X");
+    let sel = emptySelection(); sel = addItem(sel, "aitools", mcp); sel = addItem(sel, "aitools", mem);
+    const { exec, calls } = makeFakeExec(Array.from({ length: 12 }, () => ({ code: 0, stdout: "age1recipientkey", stderr: "" })));
+    const cs = await aitoolsModule.capture(makeCtx({ exec, home, repoDir }), sel);
+    const encAdd = calls.find((c) => c.cmd === "chezmoi" && c.args.includes("add") && c.args.includes(mcp));
+    expect(encAdd!.args).toContain("--encrypt");
+    expect(cs.written).toContain(mem);     // plain
+    expect(cs.encrypted).toContain(mcp);   // encrypt
+  });
+});
