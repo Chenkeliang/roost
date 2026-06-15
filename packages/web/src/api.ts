@@ -173,6 +173,10 @@ export function getAiToolsCatalog(): Promise<{ tools: AiCatalogTool[] }> {
   return apiFetch("/api/aitools/catalog");
 }
 
+export function addAiCustom(body: { path: string; label?: string; kind?: string; policy?: string }): Promise<{ ok: boolean }> {
+  return apiFetch("/api/aitools/custom", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+}
+
 export interface SkillImportResponse {
   imported: string[];
   blocked: { id: string; reason: string; detail?: string }[];
