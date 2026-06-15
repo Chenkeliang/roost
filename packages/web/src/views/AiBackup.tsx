@@ -91,7 +91,7 @@ function PathRow({
         title={p.path}
         onClick={() => void toggle()}
       >
-        {previewable && <PreviewCaret open={preview.open} />}
+        <PreviewCaret open={preview.open} placeholder={!previewable} />
         {fileName}
       </span>
       <KindChip kind={p.kind} />
