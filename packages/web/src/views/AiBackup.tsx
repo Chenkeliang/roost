@@ -1,129 +1,91 @@
 import { useState, useEffect, useCallback } from "react";
-import { Lock, Prohibit } from "@phosphor-icons/react";
+import { Lock, Prohibit, CaretRight, CaretDown, FileText, GearSix, Plugs, Plus, CheckCircle } from "@phosphor-icons/react";
 import type { HudMessage } from "../components/Hud";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getAiToolsCatalog, addSelection, removeSelection } from "../api";
+import { getAiToolsCatalog, addSelection, removeSelection, addAiCustom } from "../api";
 import type { AiCatalogTool, AiCatalogPath } from "../api";
-import { useFilePreview, PreviewCaret, FilePreviewPane } from "../components/FilePreview";
 
 export interface AiBackupProps { showHud?: (m: HudMessage) => void }
 
-const card: React.CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--border-soft)",
-  borderRadius: "var(--rc)",
-  overflow: "hidden",
-  marginBottom: 16,
-};
-const ic: React.CSSProperties = {
-  appearance: "none",
-  border: "1px solid var(--border)",
-  background: "var(--raise)",
-  color: "var(--muted)",
-  fontFamily: "var(--font)",
-  fontSize: 12.5,
-  padding: "3px 8px",
-  borderRadius: 6,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-};
+function KindIcon({ kind, state }: { kind: AiCatalogPath["kind"]; state: AiCatalogPath["state"] }) {
+  const c = "var(--muted)";
+  if (state === "never") return <Prohibit size={14} style={{ color: c, flexShrink: 0 }} />;
+  if (kind === "memory") return <FileText size={14} style={{ color: c, flexShrink: 0 }} />;
+  if (kind === "mcp") return <Plugs size={14} style={{ color: c, flexShrink: 0 }} />;
+  if (kind === "data") return <FileText size={14} style={{ color: c, flexShrink: 0 }} />;
+  return <GearSix size={14} style={{ color: c, flexShrink: 0 }} />;
+}
 
-function KindChip({ kind }: { kind: AiCatalogPath["kind"] }) {
-  const { t } = useT();
+function Dots({ done, total }: { done: number; total: number }) {
   return (
-    <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 4, background: "var(--raise)", color: "var(--muted)", border: "1px solid var(--border-soft)", fontFamily: "var(--font)" }}>
-      {t(`ai.kind.${kind}`)}
+    <span style={{ display: "inline-flex", gap: 4 }}>
+      {Array.from({ length: total }).map((_, i) => (
+        <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: i < done ? "var(--green)" : "var(--border)" }} />
+      ))}
     </span>
   );
 }
 
-function EncryptChip() {
+function ToolCard({ tool, onAdd, onRemove }: { tool: AiCatalogTool; onAdd: (p: string) => void; onRemove: (p: string) => void }) {
   const { t } = useT();
-  return (
-    <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 4, background: "var(--raise)", color: "var(--muted)", border: "1px solid var(--border-soft)", fontFamily: "var(--font)", display: "inline-flex", alignItems: "center", gap: 3 }}>
-      <Lock size={10} weight="bold" />
-      {t("ai.encrypted")}
-    </span>
-  );
-}
+  const visible = tool.paths.filter((p) => p.state !== "missing");
+  const dotfilesOnly = visible.length > 0 && visible.every((p) => p.state === "dotfiles");
+  const backable = visible.filter((p) => p.state !== "never" && p.state !== "dotfiles");
+  const done = backable.filter((p) => p.state === "selected").length;
+  const total = backable.length;
+  const [open, setOpen] = useState(false);
 
-function PathRow({
-  p,
-  onAdd,
-  onRemove,
-}: {
-  p: AiCatalogPath;
-  onAdd: (path: string) => void;
-  onRemove: (path: string) => void;
-}) {
-  const { t } = useT();
-  const { state } = p;
+  // All paths missing → tool not installed; render a dimmed, non-interactive row
+  // so the "All supported" toggle actually reveals undetected catalog entries.
+  if (visible.length === 0) {
+    return (
+      <div style={{ borderBottom: "1px solid var(--border-soft)", opacity: 0.45 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 2px" }}>
+          <CaretRight size={13} style={{ color: "var(--muted)" }} />
+          <span style={{ fontSize: 13, fontWeight: 500 }}>{tool.label}</span>
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)" }}>{t("ai.notInstalled")}</span>
+        </div>
+      </div>
+    );
+  }
 
-  // Hooks must be called unconditionally (before any early return).
-  const previewable = state !== "never" && !p.encrypt;
-  const { preview, toggle } = useFilePreview(p.path, previewable);
-
-  if (state === "missing") return null;
-
-  const dimStyle: React.CSSProperties = state === "dotfiles" || state === "never"
-    ? { opacity: 0.55 }
-    : {};
-
-  const fileName = p.path.split("/").pop() ?? p.path;
+  const stateEl = (p: AiCatalogPath) => {
+    if (p.state === "selected") return <span style={{ color: "var(--green)", fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4 }}><CheckCircle size={13} />{t("ai.state.backedUp")}</span>;
+    if (p.state === "pending") return <span style={{ color: "var(--amber)", fontSize: 11.5 }}>{t("ai.state.pending")}</span>;
+    if (p.state === "never") return <span style={{ color: "var(--muted)", fontSize: 11.5 }}>{t("ai.state.never")}</span>;
+    if (p.state === "dotfiles") return <span style={{ color: "var(--muted)", fontSize: 11.5 }}>{t("ai.managedByDotfiles")}</span>;
+    return <button onClick={() => onAdd(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--accent)", fontSize: 11.5, cursor: "pointer", fontFamily: "var(--font)" }}>{t("ai.state.add")}</button>;
+  };
 
   return (
-    <div role="row" style={{ borderBottom: "1px solid var(--border-soft)", ...dimStyle }}>
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 14px",
-        fontSize: 13.5,
-      }}
-    >
-      <span
-        className="mono"
-        style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: previewable ? "pointer" : "default" }}
-        title={p.path}
-        onClick={() => void toggle()}
-      >
-        <PreviewCaret open={preview.open} placeholder={!previewable} />
-        {fileName}
-      </span>
-      <KindChip kind={p.kind} />
-      {p.encrypt && <EncryptChip />}
-      {state === "available" && (
-        <button onClick={() => onAdd(p.path)} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
-          {t("common.add")}
-        </button>
+    <div style={{ borderBottom: "1px solid var(--border-soft)" }}>
+      <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 2px", cursor: "pointer" }}>
+        {open ? <CaretDown size={13} style={{ color: "var(--muted)" }} /> : <CaretRight size={13} style={{ color: "var(--muted)" }} />}
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{tool.label}</span>
+        {dotfilesOnly
+          ? <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)" }}>{t("ai.managedByDotfiles")}</span>
+          : <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 9 }}><Dots done={done} total={total} /><span style={{ fontSize: 11, color: done === total && total > 0 ? "var(--green)" : "var(--muted)", minWidth: 26, textAlign: "right" }}>{done}/{total}</span></span>}
+      </div>
+      {open && (
+        <div style={{ marginLeft: 9, borderLeft: "1px solid var(--border-soft)" }}>
+          {visible.map((p) => (
+            <div key={p.path} role="row" style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px 9px 18px", borderTop: "1px solid var(--border-soft)", fontSize: 12.5, opacity: p.state === "never" || p.state === "dotfiles" ? 0.5 : 1 }}>
+              <KindIcon kind={p.kind} state={p.state} />
+              <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 400, color: "var(--text)" }}>{p.path.split("/").pop()}</span>
+              {p.encrypt && <Lock size={12} style={{ color: "var(--amber)", flexShrink: 0 }} />}
+              {p.state === "selected" || p.state === "pending"
+                ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{stateEl(p)}<button onClick={() => onRemove(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--muted)", fontSize: 11.5, cursor: "pointer" }}>{t("common.remove")}</button></span>
+                : stateEl(p)}
+            </div>
+          ))}
+          {backable.some((p) => p.state === "available") && (
+            <div style={{ padding: "8px 2px 12px 18px", textAlign: "right" }}>
+              <button onClick={() => backable.filter((p) => p.state === "available").forEach((p) => onAdd(p.path))} style={{ appearance: "none", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e", fontWeight: 600, fontSize: 11.5, padding: "4px 11px", borderRadius: 7, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><Plus size={12} weight="bold" />{t("ai.addAll")}</button>
+            </div>
+          )}
+        </div>
       )}
-      {state === "selected" && (
-        <>
-          <span style={{ ...ic, color: "var(--green)", borderColor: "var(--green)", cursor: "default" }}>{t("ai.state.backedUp")}</span>
-          <button onClick={() => onRemove(p.path)} style={{ ...ic, color: "var(--red)" }}>{t("common.remove")}</button>
-        </>
-      )}
-      {state === "pending" && (
-        <>
-          <span style={{ ...ic, color: "var(--amber)", borderColor: "var(--amber)", cursor: "default" }}>{t("ai.state.pending")}</span>
-          <button onClick={() => onRemove(p.path)} style={{ ...ic, color: "var(--red)" }}>{t("common.remove")}</button>
-        </>
-      )}
-      {state === "dotfiles" && (
-        <span style={{ fontSize: 12, color: "var(--muted)" }}>{t("ai.managedByDotfiles")}</span>
-      )}
-      {state === "never" && (
-        <span style={{ fontSize: 12, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <Prohibit size={12} />
-          {t("ai.neverNote")}
-        </span>
-      )}
-    </div>
-    <FilePreviewPane preview={preview} />
     </div>
   );
 }
@@ -131,85 +93,51 @@ function PathRow({
 export function AiBackup({ showHud }: AiBackupProps) {
   const { t } = useT();
   const [tools, setTools] = useState<AiCatalogTool[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [customPath, setCustomPath] = useState("");
+  const [customLabel, setCustomLabel] = useState("");
 
   const load = useCallback(async () => {
-    const { tools: ts } = await getAiToolsCatalog();
-    setTools(ts);
+    try { const { tools: ts } = await getAiToolsCatalog(); setTools(ts); } catch { setTools([]); }
   }, []);
+  useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => {
-    void (async () => {
-      try { await load(); } finally { setLoading(false); }
-    })();
-  }, [load]);
+  const onAdd = useCallback(async (p: string) => { await addSelection("aitools", p); showHud?.({ text: t("common.added"), type: "success" }); void load(); }, [load, showHud, t]);
+  const onRemove = useCallback(async (p: string) => { await removeSelection("aitools", p); void load(); }, [load]);
+  const onSaveCustom = useCallback(async () => {
+    if (!customPath.trim()) return;
+    await addAiCustom({ path: customPath.trim(), label: customLabel.trim() || undefined });
+    setAdding(false); setCustomPath(""); setCustomLabel(""); void load();
+  }, [customPath, customLabel, load]);
 
-  const handleAdd = useCallback(async (absPath: string) => {
-    try {
-      await addSelection("aitools", absPath);
-      await load();
-      showHud?.({ text: `Added ${absPath.split("/").pop() ?? absPath}`, type: "success" });
-    } catch (e) {
-      showHud?.({ text: e instanceof Error ? e.message : "Add failed", type: "error" });
-    }
-  }, [load, showHud]);
+  if (tools === null) return <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}><Skeleton height={48} /><Skeleton height={48} /></div>;
 
-  const handleRemove = useCallback(async (absPath: string) => {
-    try {
-      await removeSelection("aitools", absPath);
-      await load();
-      showHud?.({ text: `Removed ${absPath.split("/").pop() ?? absPath}`, type: "success" });
-    } catch (e) {
-      showHud?.({ text: e instanceof Error ? e.message : "Remove failed", type: "error" });
-    }
-  }, [load, showHud]);
-
-  if (loading) {
-    return (
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-        <div style={card}>
-          {[1, 2, 3].map((i) => (
-            <div key={i} style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-soft)" }}>
-              <Skeleton width={320} height={14} />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const visibleTools = (tools ?? []).filter((t) => t.paths.some((p) => p.state !== "missing"));
+  const detected = tools.filter((tl) => tl.paths.some((p) => p.state !== "missing"));
+  const undetected = tools.filter((tl) => tl.paths.every((p) => p.state === "missing"));
+  const list = showAll ? [...detected, ...undetected] : detected;
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
-      <p style={{ color: "var(--muted)", fontSize: 13.5, lineHeight: 1.55, margin: "0 0 16px", maxWidth: 720 }}>
-        {t("ai.tagline")}
-      </p>
-      {visibleTools.length === 0 ? (
-        <p style={{ color: "var(--muted)", fontSize: 13.5 }}>{t("ai.empty")}</p>
-      ) : (
-        visibleTools.map((tool) => {
-          const visiblePaths = tool.paths.filter((p) => p.state !== "missing");
-          const managedCount = tool.paths.filter((p) => p.state === "selected" || p.state === "pending").length;
-          const availableCount = tool.paths.filter((p) => p.state === "available").length;
-          return (
-            <div key={tool.id} style={card}>
-              <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>{tool.label}</span>
-                {managedCount > 0 && (
-                  <span style={{ fontSize: 12, color: "var(--green)" }}>{managedCount} {t("common.managed")}</span>
-                )}
-                {availableCount > 0 && (
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{availableCount} {t("common.discovered")}</span>
-                )}
-              </div>
-              {visiblePaths.map((p) => (
-                <PathRow key={p.path} p={p} onAdd={handleAdd} onRemove={handleRemove} />
-              ))}
-            </div>
-          );
-        })
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0 10px" }}>
+        <span style={{ fontSize: 12, color: "var(--muted)", flex: 1 }}>{t("ai.tagline")}</span>
+        <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden" }}>
+          <button onClick={() => setShowAll(false)} style={{ appearance: "none", border: "none", fontSize: 11, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font)", background: !showAll ? "var(--raise)" : "transparent", color: !showAll ? "var(--text)" : "var(--muted)" }}>{t("ai.detected")} {detected.length}</button>
+          <button onClick={() => setShowAll(true)} style={{ appearance: "none", border: "none", fontSize: 11, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font)", background: showAll ? "var(--raise)" : "transparent", color: showAll ? "var(--text)" : "var(--muted)" }}>{t("ai.all")} {tools.length}</button>
+        </div>
+        <button onClick={() => setAdding(!adding)} style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontSize: 11.5, padding: "4px 10px", borderRadius: 7, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font)" }}><Plus size={13} />{t("ai.addTool")}</button>
+      </div>
+      {adding && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder={t("ai.custom.labelPh")} style={{ width: 140, appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--font)", fontSize: 12.5, padding: "6px 10px", borderRadius: 6 }} />
+          <input value={customPath} onChange={(e) => setCustomPath(e.target.value)} placeholder={t("ai.custom.pathPh")} style={{ flex: 1, appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 12.5, padding: "6px 10px", borderRadius: 6 }} />
+          <button onClick={() => void onSaveCustom()} disabled={!customPath.trim()} style={{ appearance: "none", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e", fontWeight: 600, fontSize: 12.5, padding: "6px 12px", borderRadius: 6, cursor: "pointer", opacity: customPath.trim() ? 1 : 0.5 }}>{t("ai.custom.save")}</button>
+        </div>
       )}
+      <div>
+        {list.length === 0 && <p style={{ color: "var(--muted)", fontSize: 13.5 }}>{t("ai.empty")}</p>}
+        {list.map((tl) => <ToolCard key={tl.id} tool={tl} onAdd={onAdd} onRemove={onRemove} />)}
+      </div>
     </div>
   );
 }

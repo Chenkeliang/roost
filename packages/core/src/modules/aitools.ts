@@ -1,6 +1,6 @@
-// AI tools config module (ADR-0022): catalog-driven capture of AI tool configs.
+// AI tools config module (ADR-0023): policy-driven capture of AI tool configs.
 // Mechanics mirror dotfiles (chezmoi-backed); ownership of skills dirs stays
-// with the skills module; credentials are never backed up.
+// with the skills module; skip-policy credentials are never backed up (I6).
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
@@ -16,28 +16,27 @@ import type {
   BlockedItem,
 } from "@roost/shared";
 import { createChezmoi } from "../adapters/chezmoi.js";
-import { loadAiToolsCatalog, NEVER_BACKUP } from "../ai-tools-catalog.js";
+import { loadAiToolsCatalog, aiPathPolicies } from "../ai-tools-catalog.js";
 import { loadSelection } from "../selection.js";
 import { ensureChezmoiAgeConfig } from "../chezmoi-config.js";
 import { scanPathForSecrets } from "./dotfiles.js";
-
-const isNever = (home: string, id: string): boolean =>
-  NEVER_BACKUP.some((rel) => path.join(home, rel) === id);
 
 export const aitoolsModule: SyncModule = {
   name: "aitools",
 
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const cat = loadAiToolsCatalog(ctx.repoDir);
+    const policies = aiPathPolicies(ctx.repoDir, ctx.home);
     const dotfilesSel = new Set(loadSelection(ctx.repoDir).modules["dotfiles"] ?? []);
     const out: Candidate[] = [];
     for (const tool of cat) {
       for (const p of tool.paths) {
         const abs = path.join(ctx.home, p.path);
-        if (isNever(ctx.home, abs)) continue;
+        if (policies.get(abs) === "skip") continue;
         if (!fs.existsSync(abs)) continue;
         if (dotfilesSel.has(abs)) continue; // single owner: already under dotfiles
-        out.push({ id: abs, path: abs, category: p.kind, recommendation: p.encrypt ? "encrypt" : "track", note: `${tool.label} · ${p.kind}${p.encrypt ? " · encrypted" : ""}` });
+        const enc = policies.get(abs) === "encrypt";
+        out.push({ id: abs, path: abs, category: p.kind, recommendation: enc ? "encrypt" : "track", note: `${tool.label} · ${p.kind}${enc ? " · encrypted" : ""}` });
       }
     }
     return out;
@@ -45,10 +44,7 @@ export const aitoolsModule: SyncModule = {
 
   async capture(ctx: ModuleContext, sel: Selection): Promise<ChangeSet> {
     const ids = sel.modules["aitools"] ?? [];
-    const cat = loadAiToolsCatalog(ctx.repoDir);
-    const encryptSet = new Set(
-      cat.flatMap((t) => t.paths.filter((p) => p.encrypt).map((p) => path.join(ctx.home, p.path))),
-    );
+    const policies = aiPathPolicies(ctx.repoDir, ctx.home);
     const chezmoi = createChezmoi(ctx.exec, { sourceDir: ctx.repoDir });
     const written: string[] = [];
     const encrypted: string[] = [];
@@ -56,33 +52,22 @@ export const aitoolsModule: SyncModule = {
     const blockedDetail: BlockedItem[] = [];
     let ageReady: boolean | null = null;
     for (const id of ids) {
-      if (isNever(ctx.home, id)) {
+      const policy = policies.get(id) ?? "plain";
+      if (policy === "skip") {
         blocked.push(id);
-        blockedDetail.push({ id, reason: "managed", detail: "credential/session file — never backed up" });
+        blockedDetail.push({ id, reason: "managed", detail: "凭据 / 会话文件 — 永不备份" });
         continue;
       }
       if (!fs.existsSync(id)) continue;
-      if (encryptSet.has(id)) {
-        if (ageReady === null) {
-          ageReady = (await ensureChezmoiAgeConfig(ctx.exec, { home: ctx.home, repoDir: ctx.repoDir })).ready;
-        }
-        if (!ageReady) {
-          blocked.push(id);
-          blockedDetail.push({ id, reason: "error", detail: "no age key" });
-          continue;
-        }
-        await chezmoi.add(id, { encrypt: true });
-        encrypted.push(id);
-        continue;
+      if (policy === "encrypt") {
+        if (ageReady === null) ageReady = (await ensureChezmoiAgeConfig(ctx.exec, { home: ctx.home, repoDir: ctx.repoDir })).ready;
+        if (!ageReady) { blocked.push(id); blockedDetail.push({ id, reason: "error", detail: "no age key" }); continue; }
+        await chezmoi.add(id, { encrypt: true }); encrypted.push(id); continue;
       }
+      // plain — scanner backstop (I6) unchanged
       const scan = scanPathForSecrets(id, { maxBytes: 100 * 1024 * 1024 });
-      if (scan.secretFiles.length > 0) {
-        blocked.push(id);
-        blockedDetail.push({ id, reason: "secret", detail: `${scan.secretFiles.length} file(s)` });
-        continue;
-      }
-      await chezmoi.add(id, { encrypt: false });
-      written.push(id);
+      if (scan.secretFiles.length > 0) { blocked.push(id); blockedDetail.push({ id, reason: "secret", detail: `${scan.secretFiles.length} file(s)` }); continue; }
+      await chezmoi.add(id, { encrypt: false }); written.push(id);
     }
     return { module: "aitools", written, encrypted, blocked, blockedDetail };
   },

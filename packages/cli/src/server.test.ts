@@ -15,7 +15,7 @@ import type {
   Candidate,
   ApplyPlan,
 } from "@roost/shared";
-import { ModuleRegistry, saveSelection, loadSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule, loadSkillsTargets } from "@roost/core";
+import { ModuleRegistry, saveSelection, loadSelection, emptySelection, addItem, defaultRegistry, createExec, saveEnvData, skillsModule, loadSkillsTargets, loadAiToolsCatalog } from "@roost/core";
 import { buildServer, computeConflicts, classifyGitError, detectExternal } from "./server.js";
 import { ensureGitRepo } from "./gitRepo.js";
 
@@ -2371,6 +2371,30 @@ describe("backup status + settings passthrough", () => {
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
     }
+  });
+
+  it("catalog endpoint: skip-policy paths report state never; plain/encrypt unaffected", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aipol-"));
+    try {
+      fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+      fs.writeFileSync(path.join(home, ".claude/CLAUDE.md"), "# x");
+      fs.writeFileSync(path.join(home, ".claude.json"), "{}"); // skip entry
+      const ctx = (d: boolean): ModuleContext => ({ repoDir: tmpDir, home, profile: "base", dryRun: d, exec: makeFakeExec(), log: { info(){}, warn(){}, error(){} }, t: (k: string) => k });
+      const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
+      const all = (await (await server.inject({ method: "GET", url: "/api/aitools/catalog" })).json() as { tools: { paths: { path: string; state: string }[] }[] }).tools.flatMap((t) => t.paths);
+      expect(all.find((p) => p.path === path.join(home, ".claude.json"))!.state).toBe("never");
+      expect(all.find((p) => p.path === path.join(home, ".claude/CLAUDE.md"))!.state).toBe("available");
+      await server.close();
+    } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  });
+
+  it("POST /api/aitools/custom writes the override and dedupes", async () => {
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "POST", url: "/api/aitools/custom", payload: { label: "MyTool", path: "~/.mytool/config.json", kind: "settings" }, headers: { "content-type": "application/json" } });
+    expect(res.statusCode).toBe(200);
+    const cat = loadAiToolsCatalog(tmpDir);
+    expect(cat.some((t) => t.paths.some((p) => p.path === ".mytool/config.json"))).toBe(true);
+    await server.close();
   });
 });
 

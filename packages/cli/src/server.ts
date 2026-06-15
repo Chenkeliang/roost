@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import * as crypto from "node:crypto";
+import * as yaml from "js-yaml";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import type { FastifyInstance } from "fastify";
@@ -64,7 +65,7 @@ import {
   LARGE_FILE_MB,
   summarizeCapture,
   loadAiToolsCatalog,
-  NEVER_BACKUP,
+  aiPathPolicies,
   loadExternalManagers,
   commitRepo,
   scanPathForSecrets,
@@ -1359,13 +1360,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!p) return reply.status(400).send({ error: "path is required" });
     const home = makeCtx(true).home;
     const abs = p.startsWith("~/") ? path.join(home, p.slice(2)) : p;
-    if (NEVER_BACKUP.some((rel) => path.join(home, rel) === abs)) {
+    const previewPolicy = aiPathPolicies(repoDir, home).get(abs);
+    if (previewPolicy === "skip" || previewPolicy === "encrypt") {
       return reply.send({ ok: false, reason: "encrypted" });
     }
-    const encryptMarked = loadAiToolsCatalog(repoDir).some((t) =>
-      t.paths.some((e) => e.encrypt === true && path.join(home, e.path) === abs),
-    );
-    if (encryptMarked) return reply.send({ ok: false, reason: "encrypted" });
     // A dotfile the user marked for encryption (it has secrets) — its LOCAL copy
     // is plaintext, so previewing it would leak secrets (I6). Refuse.
     const dotEncrypt = loadSelection(repoDir).modules["dotfiles-encrypt"] ?? [];
@@ -1387,7 +1385,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   // ── GET /api/aitools/catalog ─────────────────────────────────────────────────
   // Full catalog with per-path state so the UI can show transparency rows
-  // (dotfiles-managed grayed, credentials visibly never-backed-up). ADR-0022.
+  // (dotfiles-managed grayed, skip-policy entries visibly never-backed-up). ADR-0023.
   server.get("/api/aitools/catalog", async (_req, reply) => {
     const cat = loadAiToolsCatalog(repoDir);
     const sel = loadSelection(repoDir);
@@ -1404,36 +1402,45 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     } catch {
       managedAbs = null;
     }
-    const neverAbs = new Set(NEVER_BACKUP.map((r) => path.join(home, r)));
-    // Hard-map of credential files to their owning tool id (prefix match is fragile for these).
-    const neverOwner: Record<string, string> = {
-      ".claude.json": "claude-code",
-      ".codex/auth.json": "codex",
-      ".gemini/.env": "gemini",
-    };
+    const policies = aiPathPolicies(repoDir, home);
     const tools = cat.map((t) => ({
-      id: t.id,
-      label: t.label,
+      id: t.id, label: t.label,
       paths: t.paths.map((p) => {
         const abs = path.join(home, p.path);
+        const policy = policies.get(abs) ?? "plain";
         const exists = fs.existsSync(abs);
-        const state: "selected" | "pending" | "available" | "dotfiles" | "never" | "missing" = neverAbs.has(abs) ? "never"
+        const state: "selected" | "pending" | "available" | "dotfiles" | "never" | "missing" =
+          policy === "skip" ? "never"
           : !exists ? "missing"
           : selected.has(abs) ? (managedAbs === null || managedAbs.has(abs) ? "selected" : "pending")
           : dotfilesSel.has(abs) ? "dotfiles"
           : "available";
-        return { path: abs, kind: p.kind, encrypt: p.encrypt ?? false, state };
+        return { path: abs, kind: p.kind, encrypt: policy === "encrypt", state };
       }),
     }));
-    // Append credential (never-backup) files under their owning tool.
-    for (const rel of NEVER_BACKUP) {
-      const abs = path.join(home, rel);
-      if (!fs.existsSync(abs)) continue;
-      const ownerId = neverOwner[rel];
-      const owner = ownerId ? tools.find((t) => t.id === ownerId) : tools[0];
-      owner?.paths.push({ path: abs, kind: "data" as const, encrypt: false, state: "never" as const });
-    }
     return reply.send({ tools });
+  });
+
+  // ── POST /api/aitools/custom ─────────────────────────────────────────────────
+  // Self-serve: add a tool/path to roost/ai-tools-catalog.yaml (override file). I8.
+  server.post<{ Body: { label?: string; path?: string; kind?: string; policy?: string } }>("/api/aitools/custom", async (req, reply) => {
+    const raw = req.body?.path?.trim();
+    if (!raw) return reply.status(400).send({ error: "path is required" });
+    const rel = raw.replace(/^~\//, "").replace(/^\/+/, "").replace(/\/+$/, "");
+    const kind = ["memory", "settings", "mcp", "data"].includes(req.body?.kind ?? "") ? req.body!.kind! : "settings";
+    const policy = ["plain", "encrypt", "skip"].includes(req.body?.policy ?? "") ? req.body!.policy : undefined;
+    const label = req.body?.label?.trim() || "自定义";
+    const id = "custom-" + rel.replace(/[^a-zA-Z0-9]+/g, "-").replace(/(^-|-$)/g, "").toLowerCase();
+    const file = path.join(repoDir, "roost", "ai-tools-catalog.yaml");
+    let doc: { tools: { id: string; label: string; paths: { path: string; kind: string; policy?: string }[] }[] } = { tools: [] };
+    try { if (fs.existsSync(file)) { const parsed = yaml.load(fs.readFileSync(file, "utf8")); if (parsed && typeof parsed === "object" && Array.isArray((parsed as { tools?: unknown }).tools)) doc = parsed as typeof doc; } } catch { doc = { tools: [] }; }
+    let tool = doc.tools.find((tt) => tt.id === id);
+    if (!tool) { tool = { id, label, paths: [] }; doc.tools.push(tool); }
+    if (!tool.paths.some((pp) => pp.path === rel)) tool.paths.push({ path: rel, kind, ...(policy ? { policy } : {}) });
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, yaml.dump(doc), "utf8");
+    cache.invalidateAll();
+    return reply.send({ ok: true });
   });
 
   // ── /api/settings ─────────────────────────────────────────────────────────────
