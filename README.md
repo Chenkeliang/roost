@@ -46,12 +46,13 @@
 
 ### 亮点
 
-- **同步复核** —— git 式呈现本机与仓库的差异(*已同步 / 仓库较新 / 本地较新 / 冲突*)。安全变更自动处理,只有真冲突才问你。逐项两栏对比、批量应用、每次覆盖都先备份。
-- **历史与回滚** —— 每次备份都是一条可读的变更日志提交(`capture: dotfiles(2) packages(1)`,正文含逐文件清单)。在时间线里查看任意文件的历史(或 `roost history <路径>`),一键把某个旧版本恢复到仓库(`roost restore <路径> <sha>`)—— 恢复只改**仓库**副本,本机文件原封不动,直到你在同步复核里应用。
-- **文件预览** —— 在 AI 工具页与 Dotfiles 页,点文件名即可内联预览内容(加密项、凭据、含密钥的文件不显形)。
-- **与运行时管理器共处** —— [cc-switch](https://github.com/farion1231/cc-switch) 这类工具管理「你此刻在用哪个供应商」;Roost 是它们下面那层加密、带版本的资产层:把它们的数据库整体加密备份(cc-switch 的库以 age 加密入库),把它们管理的 skill 挂载标为「外部管理」而非争抢,绝不动别的管理器的文件。
-- **自动备份与保鲜** —— 可选的每日 / 每周自动捕获;总览横幅在「有新版本 / 另一台机推送了 / 本地未推送 / 超 7 天未备份」时提醒;大文件先拦后问,绝不让仓库膨胀。
-- **第二台机引导** —— `roost clone`、doctor 预检硬门,以及一个**环境检查**页:缺的工具用 Homebrew 一键安装。
+- **换机迁移,克隆即恢复** —— 新 Mac 上克隆仓库,环境检查自动补齐缺的工具,逐项恢复全套配置。
+- **AI 工具配置纳管** —— 备份 Claude Code / Codex / Gemini 等的记忆、设置、MCP 配置;敏感项加密、会话令牌永不入库。与 cc-switch 这类供应商切换器并存:它们管「此刻用哪个」,Roost 在底下把这一切加密备份,不争抢文件。
+- **同步复核:本机 vs 仓库逐项比对** —— 安全项自动合、冲突才问你、覆盖前先备份;逐项或整模块 diff 随你看。
+- **版本历史 + 文件级回滚** —— 每次备份是一条可读的变更日志提交;翻任意文件历史,一键把旧版本恢复到仓库。
+- **内联文件预览** —— 点文件名直接看内容;加密项、凭据、含密钥的文件不显形。
+- **自动备份 + 保鲜提醒** —— 每日 / 每周自动备;落后 / 未推送 / 超 7 天未备时横幅提醒;大文件先拦,仓库不膨胀。
+- **Skills 跨 IDE 分发管理** —— 一眼看全各工具覆盖度,从文件夹 / zip / git 纳入,自定义分发目标。
 - **Skills 管理** —— 按工具覆盖度一目了然;从**本地文件夹 / .zip / git 地址**纳入已有 skill(过密钥/体积门);可自定义分发目标目录。
 
 ### 安装桌面应用
@@ -125,13 +126,13 @@ pnpm --dir website dev
 
 ### Highlights
 
-- **Sync Review** — a git-like view of how this machine differs from your repo (*in sync / repo-newer / local-newer / conflict*). Safe changes auto-resolve; only real conflicts ask you. Per-item two-column diff, batch apply, every overwrite backed up.
-- **Second-machine onboarding** — `roost clone`, a doctor pre-flight gate, and an **Environment check** page that one-click-installs missing tools via Homebrew.
-- **Skills management** — coverage per tool at a glance; adopt existing skills from a **local folder / .zip / git URL** (secret/size gated); add custom distribution-target directories.
-- **History & rollback** — every capture is a readable changelog commit (`capture: dotfiles(2) packages(1)` with a per-file body). Browse any file's history in the Timeline (or `roost history <path>`) and restore a past version with one click (`roost restore <path> <sha>`) — the restore rewrites only the **repo** copy; your machine file is untouched until you apply it through Sync Review.
-- **File preview** — on the AI Tools and Dotfiles pages, click a file name to preview its contents inline (encrypted entries, credentials, and secret-bearing files are never shown).
-- **Plays nice with runtime managers** — tools like [cc-switch](https://github.com/farion1231/cc-switch) manage *which provider you're using right now*; Roost is the encrypted, versioned layer underneath: it backs up their data stores (cc-switch's database ships age-encrypted), labels their skill mounts as externally managed instead of fighting for them, and never touches another manager's files.
-- **Auto-backup & freshness** — optional daily/weekly auto-capture; Overview banners nudge you when a new version is out, another machine pushed, local work is unpushed, or it's been 7+ days; large files are gated before they can bloat the repo.
+- **New Mac, clone and restore** — clone your repo on the new machine; an Environment Check installs missing tools, then you restore your whole setup per item.
+- **AI tool configs, managed** — back up Claude Code / Codex / Gemini memory files, settings, and MCP config; sensitive entries encrypted, session tokens never stored. It lives alongside provider-switchers like cc-switch — they pick *which provider you use now*; Roost backs it all up underneath, encrypted, without fighting for the files.
+- **Sync Review: item-by-item, machine vs repo** — safe changes auto-merge, only real conflicts ask you, every overwrite is backed up first; per-item or whole-module diff.
+- **Version history + per-file rollback** — every backup is a readable changelog commit; browse any file's history and restore an old version to the repo in one click.
+- **Inline file preview** — click a file to see its contents; encrypted, credential, and secret-bearing files are never shown.
+- **Auto-backup + freshness nudges** — daily/weekly auto-capture; banners when you're behind, unpushed, or overdue; large files gated so the repo never bloats.
+- **Skills, distributed across IDEs** — coverage per tool at a glance; adopt from a folder / zip / git URL, with custom distribution targets.
 
 ### Install the desktop app
 
