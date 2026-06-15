@@ -4,7 +4,6 @@ import { AiBackup } from "./views/AiBackup";
 import * as api from "./api";
 
 vi.mock("./api", () => ({
-  getFilePreview: vi.fn().mockResolvedValue({ ok: true, content: "# preview body" }),
   getAiToolsCatalog: vi.fn().mockResolvedValue({ tools: [] }),
   addSelection: vi.fn().mockResolvedValue({}),
   removeSelection: vi.fn().mockResolvedValue({}),
@@ -35,7 +34,9 @@ describe("AiBackup", () => {
     vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [ { id: "claude-code", label: "Claude Code", paths: [ { path: "/h/.claude/settings.json", kind: "settings", encrypt: false, state: "available" } ] } ] });
     render(<AiBackup />);
     fireEvent.click(await screen.findByText("Claude Code"));
-    fireEvent.click(await screen.findByRole("button", { name: /Add|添加/ }));
+    // Per-row "Add" link (not "Add tool" header button or "Add all" bulk button)
+    const row = (await screen.findByText("settings.json")).closest("[role='row']") as HTMLElement;
+    fireEvent.click(row.querySelector("button")!);
     await waitFor(() => expect(api.addSelection).toHaveBeenCalledWith("aitools", "/h/.claude/settings.json"));
   });
 
@@ -46,5 +47,17 @@ describe("AiBackup", () => {
     fireEvent.change(screen.getByPlaceholderText(/Path|路径/), { target: { value: "~/.x/c.json" } });
     fireEvent.click(screen.getByRole("button", { name: /^Add$|^添加$/ }));
     await waitFor(() => expect(api.addAiCustom).toHaveBeenCalledWith(expect.objectContaining({ path: "~/.x/c.json" })));
+  });
+
+  it("add-tool button visible when catalog has detected tools (populated case)", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [
+      { id: "claude-code", label: "Claude Code", paths: [
+        { path: "/h/.claude/CLAUDE.md", kind: "memory", encrypt: false, state: "selected" },
+        { path: "/h/.claude/settings.json", kind: "settings", encrypt: false, state: "available" },
+      ]},
+    ] });
+    render(<AiBackup />);
+    // Button must be present even though the catalog is populated (non-empty list)
+    expect(await screen.findByRole("button", { name: /Add tool|添加工具/ })).toBeInTheDocument();
   });
 });

@@ -45,8 +45,6 @@ function ToolCard({ tool, onAdd, onRemove }: { tool: AiCatalogTool; onAdd: (p: s
     return <button onClick={() => onAdd(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--accent)", fontSize: 11.5, cursor: "pointer", fontFamily: "var(--font)" }}>{t("ai.state.add")}</button>;
   };
 
-  const availableCount = backable.filter((p) => p.state === "available").length;
-
   return (
     <div style={{ borderBottom: "1px solid var(--border-soft)" }}>
       <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 2px", cursor: "pointer" }}>
@@ -68,7 +66,7 @@ function ToolCard({ tool, onAdd, onRemove }: { tool: AiCatalogTool; onAdd: (p: s
                 : stateEl(p)}
             </div>
           ))}
-          {availableCount > 1 && (
+          {backable.some((p) => p.state === "available") && (
             <div style={{ padding: "8px 2px 12px 18px", textAlign: "right" }}>
               <button onClick={() => backable.filter((p) => p.state === "available").forEach((p) => onAdd(p.path))} style={{ appearance: "none", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e", fontWeight: 600, fontSize: 11.5, padding: "4px 11px", borderRadius: 7, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><Plus size={12} weight="bold" />{t("ai.addAll")}</button>
             </div>
@@ -114,7 +112,7 @@ export function AiBackup({ showHud }: AiBackupProps) {
           <button onClick={() => setShowAll(false)} style={{ appearance: "none", border: "none", fontSize: 11, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font)", background: !showAll ? "var(--raise)" : "transparent", color: !showAll ? "var(--text)" : "var(--muted)" }}>{t("ai.detected")} {detected.length}</button>
           <button onClick={() => setShowAll(true)} style={{ appearance: "none", border: "none", fontSize: 11, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font)", background: showAll ? "var(--raise)" : "transparent", color: showAll ? "var(--text)" : "var(--muted)" }}>{t("ai.all")} {tools.length}</button>
         </div>
-        {list.length === 0 && <button onClick={() => setAdding(!adding)} style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontSize: 11.5, padding: "4px 10px", borderRadius: 7, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font)" }}><Plus size={13} />{t("ai.addTool")}</button>}
+        <button onClick={() => setAdding(!adding)} style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontSize: 11.5, padding: "4px 10px", borderRadius: 7, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font)" }}><Plus size={13} />{t("ai.addTool")}</button>
       </div>
       {adding && (
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
