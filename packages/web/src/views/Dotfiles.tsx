@@ -7,6 +7,7 @@ import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
 import { getIndex, getDotfiles, getDiscoverModule, addSelection, removeSelection, getSelection } from "../api";
+import { useFilePreview, PreviewCaret, FilePreviewPane } from "../components/FilePreview";
 
 interface DotfilesProps { showHud?: (m: HudMessage) => void; }
 type Category = "shell" | "git" | "editor" | "other";
@@ -27,6 +28,50 @@ function CategoryIcon({ category }: { category: Category }) {
   if (category === "git") return <GitBranch size={14} style={{ color: "var(--muted)" }} />;
   if (category === "editor") return <Pencil size={14} style={{ color: "var(--muted)" }} />;
   return <File size={14} style={{ color: "var(--muted)" }} />;
+}
+
+function SelectedDotfileRow({ p, captured, onRemove, t }: { p: string; captured: boolean; onRemove: (p: string) => void; t: (k: string) => string }) {
+  const { preview, toggle } = useFilePreview(p, true);
+  return (
+    <div role="row" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", fontSize: 14 }}>
+        <CategoryIcon category={categorize(p)} />
+        <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }} onClick={() => void toggle()}>
+          <PreviewCaret open={preview.open} />{p}
+        </span>
+        <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 12.5 }}>{captured ? t("common.captured") : t("common.pending")}</span>
+        <button onClick={() => void onRemove(p)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${p}`}><X size={11} />{t("common.remove")}</button>
+      </div>
+      <FilePreviewPane preview={preview} />
+    </div>
+  );
+}
+
+function CandidateDotfileRow({ c, isAdded, isChecked, onToggleCheck, onAdd, onRemove, t }: {
+  c: Candidate; isAdded: boolean; isChecked: boolean;
+  onToggleCheck: (id: string) => void; onAdd: (c: Candidate) => void; onRemove: (id: string) => void; t: (k: string) => string;
+}) {
+  const { preview, toggle } = useFilePreview(c.path, true);
+  return (
+    <div role="row" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", fontSize: 14 }}>
+        <input type="checkbox" aria-label={`select ${c.path}`} checked={isChecked} onChange={() => onToggleCheck(c.id)} />
+        <CategoryIcon category={categorize(c.path)} />
+        <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }} onClick={() => void toggle()}>
+          <PreviewCaret open={preview.open} />{c.path}
+        </span>
+        {isAdded ? (
+          <>
+            <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} added`}><CheckCircle size={11} weight="fill" />{t("common.added")}</span>
+            <button onClick={() => void onRemove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
+          </>
+        ) : (
+          <button onClick={() => void onAdd(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />{t("common.add")}</button>
+        )}
+      </div>
+      <FilePreviewPane preview={preview} />
+    </div>
+  );
 }
 
 export function Dotfiles({ showHud }: DotfilesProps) {
@@ -209,18 +254,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
             <EmptyState icon={<File size={24} />} title={selected.size > 0 ? t("dotfiles.emptyMatchTitle") : t("dotfiles.emptyTitle")} subtitle={selected.size > 0 ? t("dotfiles.emptyMatchSubtitle") : t("dotfiles.emptySubtitle")} />
           ) : (
             <div style={card}>
-              {selectedList.map((p) => {
-                const cat = categorize(p);
-                const captured = (managed ?? []).some((m) => p.endsWith(m) || m.endsWith(p));
-                return (
-                  <div key={p} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
-                    <CategoryIcon category={cat} />
-                    <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                    <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 12.5 }}>{captured ? t("common.captured") : t("common.pending")}</span>
-                    <button onClick={() => void remove(p)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${p}`}><X size={11} />{t("common.remove")}</button>
-                  </div>
-                );
-              })}
+              {selectedList.map((p) => <SelectedDotfileRow key={p} p={p} captured={(managed ?? []).some((m) => p.endsWith(m) || m.endsWith(p))} onRemove={remove} t={t} />)}
             </div>
           )}
         </>
@@ -255,24 +289,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
               </div>
             )}
             <div style={card}>
-              {newCands.map((c) => {
-                const isAdded = selected.has(c.id);
-                return (
-                  <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
-                    <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
-                    <CategoryIcon category={categorize(c.path)} />
-                    <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
-                    {isAdded ? (
-                      <>
-                        <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} added`}><CheckCircle size={11} weight="fill" />{t("common.added")}</span>
-                        <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
-                      </>
-                    ) : (
-                      <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />{t("common.add")}</button>
-                    )}
-                  </div>
-                );
-              })}
+              {newCands.map((c) => <CandidateDotfileRow key={c.id} c={c} isAdded={selected.has(c.id)} isChecked={checked.has(c.id)} onToggleCheck={toggleCheck} onAdd={add} onRemove={remove} t={t} />)}
             </div>
           </div>
         )

@@ -12,6 +12,7 @@ vi.mock("./api", () => ({
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: ["~/.vimrc"] } }),
   removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: [] } }),
   getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: ["~/.zshrc", "~/.gitconfig"] } }),
+  getFilePreview: vi.fn().mockResolvedValue({ ok: true, content: "ZSHRC BODY" }),
 }));
 
 describe("Dotfiles", () => {
@@ -47,5 +48,12 @@ describe("Dotfiles", () => {
 
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /add ~\/\.vimrc/i })); });
     expect(api.addSelection).toHaveBeenCalledWith("dotfiles", "~/.vimrc");
+  });
+
+  it("clicking a selected dotfile path shows an inline preview", async () => {
+    await act(async () => { render(<Dotfiles showHud={vi.fn()} />); });
+    const row = await screen.findByText("~/.zshrc");
+    fireEvent.click(row);
+    expect(await screen.findByText("ZSHRC BODY")).toBeInTheDocument();
   });
 });
