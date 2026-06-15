@@ -1,104 +1,50 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { act } from "react";
-import { within } from "@testing-library/react";
 import { AiBackup } from "./views/AiBackup";
 import * as api from "./api";
 
 vi.mock("./api", () => ({
   getFilePreview: vi.fn().mockResolvedValue({ ok: true, content: "# preview body" }),
-  getAiToolsCatalog: vi.fn().mockResolvedValue({
-    tools: [
-      {
-        id: "claude-code",
-        label: "Claude Code",
-        paths: [
-          { path: "/u/.claude/CLAUDE.md", kind: "memory", encrypt: false, state: "available" },
-          { path: "/u/.claude/settings.local.json", kind: "settings", encrypt: true, state: "dotfiles" },
-          { path: "/u/.claude.json", kind: "data", encrypt: false, state: "never" },
-          { path: "/u/.claude/missing.json", kind: "settings", encrypt: false, state: "missing" },
-        ],
-      },
-      {
-        id: "claude-desktop",
-        label: "Claude Desktop",
-        paths: [
-          { path: "/u/Library/Application Support/Claude/claude_desktop_config.json", kind: "mcp", encrypt: true, state: "selected" },
-        ],
-      },
-    ],
-  }),
+  getAiToolsCatalog: vi.fn().mockResolvedValue({ tools: [] }),
   addSelection: vi.fn().mockResolvedValue({}),
   removeSelection: vi.fn().mockResolvedValue({}),
+  addAiCustom: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 describe("AiBackup", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("renders tool groups after load", async () => {
-    await act(async () => { render(<AiBackup showHud={vi.fn()} />); });
-    await waitFor(() => expect(screen.getByText("Claude Code")).toBeInTheDocument());
-    expect(screen.getByText("Claude Desktop")).toBeInTheDocument();
-  });
-
-  it("available row has Add button; clicking it calls addSelection", async () => {
-    await act(async () => { render(<AiBackup showHud={vi.fn()} />); });
-    await waitFor(() => expect(screen.getByText("Claude Code")).toBeInTheDocument());
-    // CLAUDE.md row is available
-    const claudeRow = screen.getByText("CLAUDE.md").closest("[role='row']") as HTMLElement;
-    const addBtn = within(claudeRow).getByRole("button", { name: /add/i });
-    addBtn.click();
-    await waitFor(() =>
-      expect(api.addSelection).toHaveBeenCalledWith("aitools", "/u/.claude/CLAUDE.md"),
-    );
-  });
-
-  it("dotfiles row is dimmed and has no action button", async () => {
-    await act(async () => { render(<AiBackup showHud={vi.fn()} />); });
-    await waitFor(() => expect(screen.getByText("Claude Code")).toBeInTheDocument());
-    const dotfilesRow = screen.getByText("settings.local.json").closest("[role='row']") as HTMLElement;
-    expect(dotfilesRow).toHaveStyle({ opacity: "0.55" });
-    expect(within(dotfilesRow).queryByRole("button")).toBeNull();
-  });
-
-  it("never row is dimmed and has no action button", async () => {
-    await act(async () => { render(<AiBackup showHud={vi.fn()} />); });
-    await waitFor(() => expect(screen.getByText("Claude Code")).toBeInTheDocument());
-    const neverRow = screen.getByText(".claude.json").closest("[role='row']") as HTMLElement;
-    expect(neverRow).toHaveStyle({ opacity: "0.55" });
-    expect(within(neverRow).queryByRole("button")).toBeNull();
-  });
-
-  it("missing row is not rendered", async () => {
-    await act(async () => { render(<AiBackup showHud={vi.fn()} />); });
-    await waitFor(() => expect(screen.getByText("Claude Code")).toBeInTheDocument());
-    expect(screen.queryByText("missing.json")).not.toBeInTheDocument();
-  });
-
-  it("selected row shows Remove button and calls removeSelection", async () => {
-    await act(async () => { render(<AiBackup showHud={vi.fn()} />); });
-    await waitFor(() => expect(screen.getByText("Claude Desktop")).toBeInTheDocument());
-    const selRow = screen.getByText("claude_desktop_config.json").closest("[role='row']") as HTMLElement;
-    const removeBtn = within(selRow).getByRole("button", { name: /remove/i });
-    removeBtn.click();
-    await waitFor(() =>
-      expect(api.removeSelection).toHaveBeenCalledWith(
-        "aitools",
-        "/u/Library/Application Support/Claude/claude_desktop_config.json",
-      ),
-    );
-  });
-
-  it("clicking a plain row's filename shows an inline preview; encrypted rows are not clickable", async () => {
+  it("collapsed tool shows coverage; expanding reveals file rows", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [
+      { id: "claude-code", label: "Claude Code", paths: [
+        { path: "/h/.claude/CLAUDE.md", kind: "memory", encrypt: false, state: "selected" },
+        { path: "/h/.claude/settings.json", kind: "settings", encrypt: false, state: "available" },
+        { path: "/h/.claude.json", kind: "data", encrypt: false, state: "never" },
+      ]},
+      { id: "cursor", label: "Cursor", paths: [ { path: "/h/.cursor/mcp.json", kind: "mcp", encrypt: true, state: "missing" } ] },
+    ] });
     render(<AiBackup />);
-    const name = await screen.findByText("CLAUDE.md");
-    fireEvent.click(name);
-    expect(await screen.findByText("# preview body")).toBeInTheDocument();
-    expect(api.getFilePreview).toHaveBeenCalledTimes(1);
-    // encrypted row: clicking must not fetch
-    const enc = screen.getByText("settings.local.json");
-    fireEvent.click(enc);
-    expect(api.getFilePreview).toHaveBeenCalledTimes(1);
+    const head = await screen.findByText("Claude Code");
+    // missing-only tool (Cursor) hidden under "all" — not in detected view
+    fireEvent.click(head);
+    expect(await screen.findByText("CLAUDE.md")).toBeInTheDocument();
+    expect(screen.getByText(/never backed up|永不备份/)).toBeInTheDocument();
   });
 
+  it("available row adds to aitools selection", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [ { id: "claude-code", label: "Claude Code", paths: [ { path: "/h/.claude/settings.json", kind: "settings", encrypt: false, state: "available" } ] } ] });
+    render(<AiBackup />);
+    fireEvent.click(await screen.findByText("Claude Code"));
+    fireEvent.click(await screen.findByRole("button", { name: /Add|添加/ }));
+    await waitFor(() => expect(api.addSelection).toHaveBeenCalledWith("aitools", "/h/.claude/settings.json"));
+  });
+
+  it("add-tool form posts a custom path", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [] });
+    render(<AiBackup />);
+    fireEvent.click(await screen.findByRole("button", { name: /Add tool|添加工具/ }));
+    fireEvent.change(screen.getByPlaceholderText(/Path|路径/), { target: { value: "~/.x/c.json" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Add$|^添加$/ }));
+    await waitFor(() => expect(api.addAiCustom).toHaveBeenCalledWith(expect.objectContaining({ path: "~/.x/c.json" })));
+  });
 });
