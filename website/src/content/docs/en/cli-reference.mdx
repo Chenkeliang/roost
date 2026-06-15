@@ -151,6 +151,25 @@ roost diff
 
 **Outputs:** a unified diff per module that has drifted.
 
+### `history`
+
+Show a managed file's snapshot history.
+
+```sh
+roost history ~/.zshrc
+```
+
+**Outputs:** the commits that touched this file (short sha, date, changelog subject).
+
+### `restore`
+
+Restore a managed file's **repo** version to a past snapshot. Repo-side only — your
+machine file is untouched; apply it through [Sync Review](/sync-review/) (or `roost load`).
+
+```sh
+roost restore ~/.zshrc <sha>
+```
+
 ### `audit`
 
 Audit the config repo for plaintext secrets. Exits non-zero if it finds any.

@@ -54,6 +54,7 @@ export default defineConfig({
           items: [
             { label: "Core Concepts", slug: "core-concepts" },
             { label: "Modules", slug: "modules" },
+            { label: "AI Tools", slug: "ai-tools", translations: { "zh-CN": "AI 工具" } },
             { label: "Skills", slug: "skills", translations: { "zh-CN": "Skills 技能" } },
             { label: "Projects", slug: "projects" },
             { label: "Aliases & Env", slug: "aliases-and-env" },
@@ -66,7 +67,8 @@ export default defineConfig({
           items: [
             { label: "Dashboard", slug: "dashboard" },
             { label: "Sync Review", slug: "sync-review", translations: { "zh-CN": "同步复核" } },
-            { label: "Drift & Snapshots", slug: "drift-and-snapshots" },
+            { label: "History & Restore", slug: "drift-and-snapshots", translations: { "zh-CN": "历史与恢复" } },
+            { label: "Backup Automation", slug: "backup-automation", translations: { "zh-CN": "备份自动化" } },
             { label: "Safety & FAQ", slug: "safety-and-faq" },
           ],
         },

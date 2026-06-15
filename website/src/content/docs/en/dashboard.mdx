@@ -28,27 +28,28 @@ server, no account, and no telemetry — nothing is sent anywhere.
 
 ## Navigation
 
-The dashboard uses a **left grouped sidebar** rather than top tabs. It is divided
-into three sections:
+The dashboard uses a **left sidebar** (thin dividers, no group headers):
 
-**Top-level**
-- **Overview** — primary and follower status cards, a drift summary, quick
-  Capture / Load actions, and per-module health dots.
+**State & actions**
+- **Overview** — primary and follower status cards, a Backup Health row, quick
+  Capture / Review actions, and [freshness banners](/backup-automation/).
+- **Sync Review** — resolve drift per item, or switch to the **Raw diff** view
+  for a unified per-module diff. See [Sync Review](/sync-review/).
+- **Timeline** — readable changelog, per-file history, and one-click restore.
+  See [History & Restore](/drift-and-snapshots/).
 
-**Modules group** — one dedicated page per SyncModule:
-- **Dotfiles** — managed dotfiles with filter + scan-to-add.
-- **Packages** — your Brewfile (Formulae / Casks / App Store), with
-  an Import from this Mac action.
-- **Projects** — managed git repos + on-demand scan grouped by remote host.
+**Content** — one page per area:
+- **AI Tools** — [AI tool configs](/ai-tools/) (Config backup) plus the
+  [Skills](/skills/) tab.
+- **Dotfiles** — managed dotfiles with filter, scan-to-add, and inline file preview.
+- **Aliases & Env** — search-first panel for aliases, env vars, PATH, functions.
+- **Packages** — your Brewfile (Formulae / Casks / App Store), with Import.
 - **App Config** — managed `defaults` domains + scan-to-add.
-- **Aliases & Env** — search-first panel for aliases, env vars, PATH entries,
-  and functions.
+- **Projects** — managed git repos + on-demand scan grouped by remote host.
 
-**System items** (below the divider):
-- **Drift** — side-by-side diff of primary vs. follower state.
-- **Timeline** — snapshot history with preview and rollback.
-- **Settings** — repo path, age key, registered modules, Git remote & sync,
-  privacy summary, and documentation links.
+**Settings** (below the divider) — an embedded [Environment Check](/environment-setup/),
+repo path, age key, auto-backup & update settings, Git remote & sync, privacy
+summary, and docs links.
 
 At the bottom of the sidebar there is a **Docs** link and an **EN / 中** language
 switcher that toggles the UI between English and Simplified Chinese.

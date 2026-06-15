@@ -1,0 +1,62 @@
+---
+title: AI 工具
+description: 把 AI 编码工具赖以运行的配置——记忆文件、设置、MCP——加密、带版本地备进你自己的仓库。
+---
+
+**AI 工具**模块备份你的 AI 编码工具所依赖的配置:记忆文件(`CLAUDE.md`、`GEMINI.md`、`AGENTS.md`)、设置、快捷键、MCP server 配置等等 —— 覆盖 **Claude Code**、**Claude Desktop**、**Codex CLI**、**Gemini CLI**。敏感项以 age 加密;凭据绝不触碰。
+
+> [cc-switch](https://github.com/farion1231/cc-switch) 这类运行时管理器决定「你此刻在用哪个供应商」。Roost 是它们下面那一层:确保这一切都能挺过换新 Mac —— 加密、带版本地存在你自己的仓库里。
+
+## 在哪里
+
+桌面应用的 **AI 工具**页有两个标签:
+
+- **配置备份** —— 下面这份 catalog 驱动的清单。
+- **Skills** —— 原样嵌入的 [Skills](/zh-cn/skills/) 模块(它负责把 agent skills 分发到各 IDE,是另一码事)。
+
+## 工作原理
+
+Roost 内置一份**策展 catalog**,记录每个 AI 工具会存哪些文件、以及它们有多敏感。页面按工具分组列出发现的文件;每个文件由你决定是否备份。机制与 [dotfiles 模块](/zh-cn/modules/)一致 —— 捕获经 chezmoi 与[密钥扫描器](/zh-cn/secrets/)。
+
+每行都有状态,让你随时知道一个文件处在哪个阶段:
+
+| 状态 | 含义 |
+|---|---|
+| **添加** | 本机已发现、尚未选中 —— 点击即开始备份 |
+| **待捕获** | 已选中,但还没捕获进仓库 —— 去点**捕获**(或等[自动备份](/zh-cn/backup-automation/)) |
+| **已备份** | 已选中且已在仓库中 |
+| **已在 dotfiles 管理** | 已被 [dotfiles 模块](/zh-cn/modules/)覆盖 —— 灰显,避免你困惑「为什么找不到」 |
+| **🔒 加密** | catalog 标记此文件敏感 —— 以 `encrypted_*.age` 形式捕获 |
+
+## 凭据永不备份
+
+OAuth / 会话文件 —— `~/.claude.json`、`~/.codex/auth.json`、`~/.gemini/.env` —— **永不**备份,即使你手动添加也会被拒,灰显并注明「凭据文件 —— 永不备份」。原因:这些是短时效会话令牌,备份既无价值又徒增风险。换机后重新登录即可;凭据**周围**的一切(设置、记忆、MCP)都会正常恢复。
+
+## catalog 可由你扩展
+
+默认 catalog 是一份数据文件(零个人路径)。要新增工具或改某工具的路径,在你的配置仓库放一个 `roost/ai-tools-catalog.yaml`,它按工具 id 覆盖默认值:
+
+```yaml
+tools:
+  - id: aider
+    label: aider
+    paths:
+      - { path: .aider.conf.yml, kind: settings, encrypt: true }
+```
+
+`kind` 取 `memory | settings | mcp | data`(用于分组显示);`encrypt: true` 表示以加密 `.age` 形式捕获。
+
+## 与 cc-switch 等运行时管理器共处
+
+Roost 与运行时管理器共存,而非竞争:
+
+- **加密备份它们的数据。** cc-switch 的存储(`~/.cc-switch/`)作为 catalog 条目以加密数据捕获。换台 Mac 恢复后,cc-switch 照常工作。
+- **识别它们的产物,而非争抢。** 如果某个 skill 挂载由别的工具管理(例如软链指向 `~/.cc-switch/`),[Skills](/zh-cn/skills/) 页会标为「外部管理」—— 中性徽章,不是冲突。Roost 绝不覆盖别的管理器的文件。
+
+## 在新 Mac 上恢复
+
+`roost clone` 并导入你的 [age 私钥](/zh-cn/secrets/)后,AI 工具配置会走正常恢复路径回来 —— [同步复核](/zh-cn/sync-review/)把它们显示为「仓库较新」,你逐项应用。唯一需要你重新登录获得的,是那些(永不备份的)凭据。
+
+## 预览文件
+
+点文件名即可内联预览内容。加密项、凭据文件、以及任何被密钥扫描器命中的文件**绝不**显示 —— 预览只读,且拒绝在界面里暴露密钥。
