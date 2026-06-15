@@ -36,6 +36,7 @@
 
 | 模块 | 备份内容 |
 |---|---|
+| **AI 工具** | AI 工具配置 —— Claude Code / Claude Desktop / Codex / Gemini CLI 的记忆文件、设置、MCP 配置(敏感项 age 加密;OAuth / 会话令牌**永不**备份) |
 | **dotfiles** | 跟踪的配置文件(经 chezmoi;密钥加密) |
 | **packages** | 你的 Homebrew Brewfile |
 | **appconfig** | 选中的 macOS 应用偏好(`defaults`) |
@@ -46,6 +47,10 @@
 ### 亮点
 
 - **同步复核** —— git 式呈现本机与仓库的差异(*已同步 / 仓库较新 / 本地较新 / 冲突*)。安全变更自动处理,只有真冲突才问你。逐项两栏对比、批量应用、每次覆盖都先备份。
+- **历史与回滚** —— 每次备份都是一条可读的变更日志提交(`capture: dotfiles(2) packages(1)`,正文含逐文件清单)。在时间线里查看任意文件的历史(或 `roost history <路径>`),一键把某个旧版本恢复到仓库(`roost restore <路径> <sha>`)—— 恢复只改**仓库**副本,本机文件原封不动,直到你在同步复核里应用。
+- **文件预览** —— 在 AI 工具页与 Dotfiles 页,点文件名即可内联预览内容(加密项、凭据、含密钥的文件不显形)。
+- **与运行时管理器共处** —— [cc-switch](https://github.com/farion1231/cc-switch) 这类工具管理「你此刻在用哪个供应商」;Roost 是它们下面那层加密、带版本的资产层:把它们的数据库整体加密备份(cc-switch 的库以 age 加密入库),把它们管理的 skill 挂载标为「外部管理」而非争抢,绝不动别的管理器的文件。
+- **自动备份与保鲜** —— 可选的每日 / 每周自动捕获;总览横幅在「有新版本 / 另一台机推送了 / 本地未推送 / 超 7 天未备份」时提醒;大文件先拦后问,绝不让仓库膨胀。
 - **第二台机引导** —— `roost clone`、doctor 预检硬门,以及一个**环境检查**页:缺的工具用 Homebrew 一键安装。
 - **Skills 管理** —— 按工具覆盖度一目了然;从**本地文件夹 / .zip / git 地址**纳入已有 skill(过密钥/体积门);可自定义分发目标目录。
 
@@ -124,7 +129,9 @@ pnpm --dir website dev
 - **Second-machine onboarding** — `roost clone`, a doctor pre-flight gate, and an **Environment check** page that one-click-installs missing tools via Homebrew.
 - **Skills management** — coverage per tool at a glance; adopt existing skills from a **local folder / .zip / git URL** (secret/size gated); add custom distribution-target directories.
 - **History & rollback** — every capture is a readable changelog commit (`capture: dotfiles(2) packages(1)` with a per-file body). Browse any file's history in the Timeline (or `roost history <path>`) and restore a past version with one click (`roost restore <path> <sha>`) — the restore rewrites only the **repo** copy; your machine file is untouched until you apply it through Sync Review.
+- **File preview** — on the AI Tools and Dotfiles pages, click a file name to preview its contents inline (encrypted entries, credentials, and secret-bearing files are never shown).
 - **Plays nice with runtime managers** — tools like [cc-switch](https://github.com/farion1231/cc-switch) manage *which provider you're using right now*; Roost is the encrypted, versioned layer underneath: it backs up their data stores (cc-switch's database ships age-encrypted), labels their skill mounts as externally managed instead of fighting for them, and never touches another manager's files.
+- **Auto-backup & freshness** — optional daily/weekly auto-capture; Overview banners nudge you when a new version is out, another machine pushed, local work is unpushed, or it's been 7+ days; large files are gated before they can bloat the repo.
 
 ### Install the desktop app
 
