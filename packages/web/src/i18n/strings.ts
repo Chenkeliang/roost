@@ -508,6 +508,8 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "ai.preview.tooLarge": { en: "file too large to preview", zh: "文件过大,不预览" },
   "ai.preview.failed": { en: "preview unavailable", zh: "无法预览" },
   "ai.preview.loading": { en: "Loading…", zh: "加载中…" },
+  "ai.preview.secret": { en: "file may contain secrets — preview disabled", zh: "文件可能含有密钥,不提供预览" },
+  "ai.preview.directory": { en: "path is a directory — no preview", zh: "路径为目录,无预览" },
   "skills.targets.add": { en: "Add", zh: "添加" },
   "skills.targets.save": { en: "Save", zh: "保存" },
   "skills.targets.removeNote": { en: "Removes the target from Roost. Roost-managed links into it are cleaned up on the next apply; the directory itself is never deleted.", zh: "仅从 Roost 移除该目标。其下 Roost 自建的链接在下次应用时清理;目录本身不会被删除。" },
