@@ -24,8 +24,15 @@ export function useFilePreview(filePath: string, previewable: boolean) {
   return { preview, toggle };
 }
 
-export function PreviewCaret({ open }: { open: boolean }) {
-  return <CaretRight size={10} style={{ marginRight: 5, transform: open ? "rotate(90deg)" : "none", transition: "transform .12s", flexShrink: 0 }} />;
+// Inline caret before a file name. verticalAlign keeps the SVG centered on the
+// text line (default baseline alignment sits it too low next to row icons).
+// `placeholder` reserves the same width on non-previewable rows so file names
+// stay column-aligned with previewable ones.
+export function PreviewCaret({ open, placeholder }: { open: boolean; placeholder?: boolean }) {
+  if (placeholder) return <span style={{ display: "inline-block", width: 15, flexShrink: 0 }} />;
+  // display:inline-block overrides the global `svg { display: block }` reset, which
+  // otherwise drops the caret onto its own line above the file name.
+  return <CaretRight size={10} style={{ display: "inline-block", marginRight: 5, verticalAlign: "middle", transform: open ? "rotate(90deg)" : "none", transition: "transform .12s", flexShrink: 0 }} />;
 }
 
 export function FilePreviewPane({ preview }: { preview: PreviewState }) {
