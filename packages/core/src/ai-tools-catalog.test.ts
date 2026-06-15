@@ -66,9 +66,6 @@ describe("ai catalog policy (ADR-0023)", () => {
     expect(m.get("/h/.claude/settings.local.json")).toBe("encrypt");
     expect(m.get("/h/.claude/CLAUDE.md")).toBe("plain");
   });
-  it("override yaml back-compat: encrypt:true ⇒ encrypt", () => {
-    // covered by loader test below; see existing override test pattern
-  });
 });
 
 describe("external-managers", () => {
