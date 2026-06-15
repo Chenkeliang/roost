@@ -12,7 +12,11 @@
     "@roost/core": "workspace:*",
     "@roost/shared": "workspace:*",
     "commander": "^15.0.0",
-    "fastify": "^5.8.5"
+    "fastify": "^5.8.5",
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9"
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm",
