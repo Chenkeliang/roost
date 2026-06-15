@@ -67,6 +67,7 @@ import {
   NEVER_BACKUP,
   loadExternalManagers,
   commitRepo,
+  scanPathForSecrets,
 } from "@roost/core";
 import type { SkillTarget, SkillsConfig, SkillLink, RoostSettings, AutoBackupFreq, ExternalManager } from "@roost/core";
 import { createTtlCache } from "./cache.js";
@@ -1349,8 +1350,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   // ── GET /api/file-preview ─────────────────────────────────────────────────────
-  // Read-only text preview of a LOCAL file. Hard limits (I6): credential files
-  // and catalog encrypt-marked entries are refused — secrets never show in UI.
+  // Read-only text preview of a LOCAL file. Hard limits (I6): credential files,
+  // catalog encrypt-marked entries, dotfiles-encrypt-marked paths, and files
+  // detected to contain plaintext secrets are all refused — secrets never show
+  // in the UI. The secret-scan is defense in depth for unmarked files.
   server.get<{ Querystring: { path?: string } }>("/api/file-preview", async (req, reply) => {
     const p = req.query.path?.trim();
     if (!p) return reply.status(400).send({ error: "path is required" });
@@ -1363,13 +1366,22 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       t.paths.some((e) => e.encrypt === true && path.join(home, e.path) === abs),
     );
     if (encryptMarked) return reply.send({ ok: false, reason: "encrypted" });
+    // A dotfile the user marked for encryption (it has secrets) — its LOCAL copy
+    // is plaintext, so previewing it would leak secrets (I6). Refuse.
+    const dotEncrypt = loadSelection(repoDir).modules["dotfiles-encrypt"] ?? [];
+    if (dotEncrypt.includes(abs)) return reply.send({ ok: false, reason: "encrypted" });
     let st: fs.Stats;
     try { st = fs.lstatSync(abs); } catch { return reply.send({ ok: false, reason: "failed" }); }
+    if (st.isDirectory()) return reply.send({ ok: false, reason: "directory" });
     if (!st.isFile()) return reply.send({ ok: false, reason: "failed" });
     if (st.size > 256 * 1024) return reply.send({ ok: false, reason: "too-large" });
     let buf: Buffer;
     try { buf = fs.readFileSync(abs); } catch { return reply.send({ ok: false, reason: "failed" }); }
     if (buf.subarray(0, 8192).includes(0)) return reply.send({ ok: false, reason: "binary" });
+    // Defense in depth: even unmarked files must not expose secrets in the UI (I6).
+    if (scanPathForSecrets(abs, { maxBytes: 256 * 1024 }).secretFiles.length > 0) {
+      return reply.send({ ok: false, reason: "secret" });
+    }
     return reply.send({ ok: true, content: buf.toString("utf8") });
   });
 

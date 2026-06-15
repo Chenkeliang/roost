@@ -2232,6 +2232,84 @@ describe("backup status + settings passthrough", () => {
     }
   });
 
+  it("GET /api/file-preview → dotfiles-encrypt-marked path refused (reason: encrypted)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-prev-enc-"));
+    try {
+      const secretFile = path.join(home, ".env.secret");
+      fs.writeFileSync(secretFile, "MY_API_KEY=plaintext");
+      const sel = emptySelection();
+      sel.modules["dotfiles-encrypt"] = [secretFile];
+      saveSelection(tmpDir, sel);
+      const ctx = (dryRun: boolean): ModuleContext => ({
+        repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
+      });
+      const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
+      const res = await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(secretFile)}` });
+      expect((res.json() as { ok: boolean; reason: string }).reason).toBe("encrypted");
+      await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/file-preview → file with plaintext AWS secret refused (reason: secret)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-prev-sec-"));
+    try {
+      const secretFile = path.join(home, ".aws-creds");
+      // Contains an AWS access key ID — matched by the aws-access-key scanner rule.
+      fs.writeFileSync(secretFile, "export AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE1234567890ABCDEFGHIJ\n");
+      const ctx = (dryRun: boolean): ModuleContext => ({
+        repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
+      });
+      const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
+      const res = await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(secretFile)}` });
+      expect((res.json() as { ok: boolean; reason: string }).reason).toBe("secret");
+      await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/file-preview → directory path refused (reason: directory)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-prev-dir-"));
+    try {
+      const dirPath = path.join(home, "some-dir");
+      fs.mkdirSync(dirPath, { recursive: true });
+      const ctx = (dryRun: boolean): ModuleContext => ({
+        repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
+      });
+      const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
+      const res = await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(dirPath)}` });
+      expect((res.json() as { ok: boolean; reason: string }).reason).toBe("directory");
+      await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/file-preview → clean text file returns ok:true (regression)", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-prev-clean-"));
+    try {
+      const cleanFile = path.join(home, "notes.md");
+      fs.writeFileSync(cleanFile, "# Notes\n\nSome harmless content.\n");
+      const ctx = (dryRun: boolean): ModuleContext => ({
+        repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
+      });
+      const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
+      const res = await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(cleanFile)}` });
+      const body = res.json() as { ok: boolean; content?: string };
+      expect(body.ok).toBe(true);
+      expect(body.content).toBe("# Notes\n\nSome harmless content.\n");
+      await server.close();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it("GET /api/aitools/catalog → available, dotfiles, never states", async () => {
     // Build a controlled temp home so the endpoint's state derivation is fully exercised.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aicat-home-"));
