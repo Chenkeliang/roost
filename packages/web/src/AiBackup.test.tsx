@@ -49,6 +49,21 @@ describe("AiBackup", () => {
     await waitFor(() => expect(api.addAiCustom).toHaveBeenCalledWith(expect.objectContaining({ path: "~/.x/c.json" })));
   });
 
+  it("'All supported' toggle reveals undetected tools as not-installed rows", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [
+      { id: "claude-code", label: "Claude Code", paths: [ { path: "/h/.claude/CLAUDE.md", kind: "memory", encrypt: false, state: "selected" } ] },
+      { id: "cursor", label: "Cursor", paths: [ { path: "/h/.cursor/mcp.json", kind: "mcp", encrypt: false, state: "missing" } ] },
+    ] });
+    render(<AiBackup />);
+    // "Cursor" is undetected — must be absent in Detected view
+    await screen.findByText("Claude Code");
+    expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
+    // Switch to "All supported" — Cursor must now appear
+    fireEvent.click(screen.getByRole("button", { name: /All supported|全部支持/ }));
+    expect(await screen.findByText("Cursor")).toBeInTheDocument();
+    expect(screen.getByText(/not installed|未安装/)).toBeInTheDocument();
+  });
+
   it("add-tool button visible when catalog has detected tools (populated case)", async () => {
     vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [
       { id: "claude-code", label: "Claude Code", paths: [

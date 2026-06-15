@@ -35,7 +35,20 @@ function ToolCard({ tool, onAdd, onRemove }: { tool: AiCatalogTool; onAdd: (p: s
   const done = backable.filter((p) => p.state === "selected").length;
   const total = backable.length;
   const [open, setOpen] = useState(false);
-  if (visible.length === 0) return null;
+
+  // All paths missing → tool not installed; render a dimmed, non-interactive row
+  // so the "All supported" toggle actually reveals undetected catalog entries.
+  if (visible.length === 0) {
+    return (
+      <div style={{ borderBottom: "1px solid var(--border-soft)", opacity: 0.45 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 2px" }}>
+          <CaretRight size={13} style={{ color: "var(--muted)" }} />
+          <span style={{ fontSize: 13, fontWeight: 500 }}>{tool.label}</span>
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)" }}>{t("ai.notInstalled")}</span>
+        </div>
+      </div>
+    );
+  }
 
   const stateEl = (p: AiCatalogPath) => {
     if (p.state === "selected") return <span style={{ color: "var(--green)", fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4 }}><CheckCircle size={13} />{t("ai.state.backedUp")}</span>;

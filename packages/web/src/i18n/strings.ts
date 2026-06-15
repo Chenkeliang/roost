@@ -673,4 +673,5 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "ai.custom.pathPh": { en: "Path, e.g. ~/.mytool/config.json", zh: "路径,如 ~/.mytool/config.json" },
   "ai.custom.labelPh": { en: "Tool name (optional)", zh: "工具名(可选)" },
   "ai.custom.save": { en: "Add", zh: "添加" },
+  "ai.notInstalled": { en: "not installed", zh: "未安装" },
 };
