@@ -1,0 +1,47 @@
+---
+title: Backup Automation
+description: Auto-backup, freshness banners, update checks, and large-file protection — so your repo stays current without bloating.
+---
+
+Roost can keep your backup current on its own and nudge you when something needs attention — while making sure the repo never bloats.
+
+## Auto-backup
+
+In **Settings**, set how often Roost captures changes while it's running:
+
+- **Off** — capture only when you click **Capture**.
+- **Daily** (default) / **Weekly** — Roost captures automatically in the background.
+
+**Auto-push** is a separate, off-by-default toggle: when on, a successful auto-capture also pushes to your remote. Pushes are single-flight — the API and the scheduler share one lock, so two pushes never race.
+
+A capture with no real changes produces **no commit** (and no repo growth) — it just refreshes the "last backup" timestamp.
+
+## Freshness banners
+
+The **Overview** shows a banner only when there's something to do, by priority:
+
+| Banner | When | Action |
+|---|---|---|
+| **Update available** | a newer Roost version was published | open the release |
+| **Repo is newer** | another machine pushed since you last synced | pull |
+| **Unpushed changes** | local commits aren't on the remote yet | push |
+| **Backup is stale** | no backup in 7+ days | capture |
+
+"Last backup" is the last time a capture *ran* (even a no-op); the **Timeline** shows when content actually changed. They answer different questions — "how long since I checked?" vs. "how long since anything changed?".
+
+## Update check
+
+On launch, Roost can check GitHub for a newer release (opt-in, toggle in Settings). This is the app's only outbound request — it sends nothing about you, and there's no telemetry. You can also check manually from Settings.
+
+## Large-file protection
+
+Backing up a large file into git makes every future change re-store the whole thing, bloating the repo. Roost guards against this — **without ever touching your local files**:
+
+- **New files over 10 MB are gated.** Capture blocks them and asks: **Back up anyway** (adds it to an allow-list) or **Stop backing up** (removes it from the repo and excludes it — your local file stays put).
+- **Existing large files are surfaced.** The Overview lists large files already in your backup; each offers **Keep backing up** (don't remind again) or **Stop backing up (keeps local file)**.
+
+Every remediation is repo-side only: *"Stop backing up"* forgets the file from the source repo via chezmoi; your machine copy is never modified or deleted.
+
+## No re-encryption churn
+
+age encryption is non-deterministic — naively re-encrypting an unchanged file would produce a brand-new blob every capture and grow the repo forever. Roost records a hash of each encrypted file's plaintext and **skips re-encryption when the content hasn't changed**, so repeated captures of an unchanged setup add nothing to the repo.

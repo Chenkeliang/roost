@@ -1,0 +1,62 @@
+---
+title: AI Tools
+description: Back up the configs your AI coding tools live on — memory files, settings, and MCP — encrypted and versioned into your own repo.
+---
+
+The **AI Tools** module backs up the configuration your AI coding tools depend on: memory files (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`), settings, keybindings, MCP server config, and more — for **Claude Code**, **Claude Desktop**, **Codex CLI**, and **Gemini CLI**. Sensitive entries are age-encrypted; credentials are never touched.
+
+> Runtime managers like [cc-switch](https://github.com/farion1231/cc-switch) decide *which provider you're using right now*. Roost is the layer underneath: it makes sure all of this survives a new Mac — encrypted and versioned in your own repo.
+
+## Where to find it
+
+The desktop app's **AI Tools** page has two tabs:
+
+- **Config backup** — the catalog-driven list below.
+- **Skills** — the [Skills](/skills/) module, embedded unchanged (it manages distribution of agent skills, a separate concern).
+
+## How it works
+
+Roost ships a **curated catalog** of the files each AI tool stores and how sensitive they are. The page groups discovered files by tool; for each file you decide whether to back it up. Mechanics mirror the [dotfiles module](/modules/) — capture goes through chezmoi and the [Secret Scanner](/secrets/).
+
+Each row shows a state so you always know where a file stands:
+
+| State | Meaning |
+|---|---|
+| **Add** | found on this machine, not yet selected — click to start backing it up |
+| **pending capture** | selected, but not captured into the repo yet — run **Capture** (or wait for [auto-backup](/backup-automation/)) |
+| **backed up** | selected and present in your repo |
+| **managed under Dotfiles** | already covered by the [dotfiles module](/modules/) — shown greyed so you're never confused about why it's "missing" |
+| **🔒 encrypted** | the catalog marks this file sensitive — it's captured as `encrypted_*.age` |
+
+## Credentials are never backed up
+
+OAuth/session files — `~/.claude.json`, `~/.codex/auth.json`, `~/.gemini/.env` — are **never** backed up, even if you try to add them by hand. They appear greyed with *"credential file — never backed up"*. The reasoning: these hold short-lived session tokens, so a backup is worthless and only adds risk. Re-authenticate on the new machine instead; everything *around* the credential (settings, memory, MCP) restores normally.
+
+## The catalog is yours to extend
+
+The default catalog is a data file (zero personal paths). To add a tool or change a tool's paths, drop a `roost/ai-tools-catalog.yaml` into your config repo — it merges over the defaults by tool id:
+
+```yaml
+tools:
+  - id: aider
+    label: aider
+    paths:
+      - { path: .aider.conf.yml, kind: settings, encrypt: true }
+```
+
+`kind` is one of `memory | settings | mcp | data` (display grouping); `encrypt: true` captures the file as an encrypted `.age`.
+
+## Working with cc-switch and other runtime managers
+
+Roost coexists with runtime managers rather than competing with them:
+
+- **It backs up their data, encrypted.** cc-switch's store (`~/.cc-switch/`) is a catalog entry captured as encrypted data. Restore it on a new Mac and cc-switch keeps working.
+- **It recognizes their footprints instead of fighting them.** If a skill mount is managed by another tool (e.g. a symlink into `~/.cc-switch/`), the [Skills](/skills/) page labels it *externally managed* — a neutral badge, not a conflict. Roost never overwrites another manager's files.
+
+## Restoring on a new Mac
+
+After `roost clone` and importing your [age key](/secrets/), the AI Tools configs come back through the normal restore path — [Sync Review](/sync-review/) shows them as *repo-newer* and you apply per item. Credentials (never backed up) are the one thing you re-create by signing in again.
+
+## Previewing a file
+
+Click a file's name to preview its contents inline. Encrypted entries, credential files, and anything the Secret Scanner flags are **never** shown — preview is read-only and refuses to surface secrets in the UI.

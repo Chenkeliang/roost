@@ -1,62 +1,67 @@
 ---
-title: 漂移与快照
-description: 仪表盘的 Drift 与 Timeline 视图,以及它们在 CLI 端对应的 status 与 diff。
+title: 历史与恢复
+description: 时间线的可读变更日志、文件级历史、一键仓库侧恢复,以及内联文件预览。
 sidebar:
   order: 12
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-一旦你开始管理不止一台 Mac,要问的问题就变成"哪里不同步?"和"改了什么、何时改的?"。
-Roost 同时回答这两点——在[仪表盘](/zh-cn/dashboard/)里可视化呈现,在命令行也能查。
+每次 `capture` 都在你的配置仓库记一条提交,所以仓库的 git 历史**就是**你的快照历史。
+**时间线**把它变成可浏览、可预览、可恢复的变更日志。
 
-## 漂移——哪里不同步
+## 可读的变更日志提交
 
-漂移是配置仓库状态与当前机器之间的差异。一个模块要么 **synced**(已同步),要么
-**drifted**(漂移),要么处于 **conflict**(冲突)。
+捕获不再统一提交「roost: capture」。每条提交的标题说明改了什么,正文逐文件列出:
 
-### 在仪表盘里
+```
+capture: dotfiles(2) aitools(1) packages(1)
 
-**Drift** 视图只列出发生漂移(或冲突)的模块,每个带一个状态点。用 **View diff**
-展开某一行,即可看到该模块按需拉取的、`+`/`-` 着色的统一 diff。当一切同步时,该视图显示
-"No drift detected" 空态。
-
-### 在 CLI 端
-
-```sh
-roost status   # 各模块漂移摘要:synced / drift / conflict
-roost diff     # 每个漂移模块一份统一 diff
-roost list     # 被管条目及其漂移状态
+dotfiles: ~/.zshrc, ~/.npmrc (encrypted)
+aitools: ~/.claude/CLAUDE.md
+packages: Brewfile
 ```
 
-`status` 是摘要;`diff` 是细节。仪表盘的 Drift 视图正是这同样两份数据源的可视化组合。
+恢复操作提交为 `restore: <文件> @ <sha7>`。整段历史读起来就像一份「你究竟做了什么」的日志。
 
-## 时间线——改了什么、何时改的
+## 时间线 —— 什么变了、何时变的
 
-每次 `capture` 都会在你的配置仓库里记录一次提交,所以仓库的 git 历史*就是*你的快照历史。
+**时间线**按时间倒序列出快照 —— 短 SHA、标题、相对时间。点击某行可展开正文(逐文件清单)。
+它读取你配置仓库的提交日志;首次捕获前显示「暂无快照」空状态。
 
-### 在仪表盘里
+## 文件级历史与恢复
 
-**Timeline** 视图按时间倒序列出快照——短 SHA、提交标题,以及相对时间("2h ago")。
-它读取你配置仓库的提交日志;若你还没采集过,它会显示 "No snapshots yet" 空态,引导你去跑
-`roost capture`。
+在时间线顶部输入路径(如 `~/.zshrc`)并点**查看历史**,即可切到该文件的历史。每个旧版本都提供
+**恢复此版本到仓库**;最新一条标为「当前版本」(恢复成自己无意义)。
 
-<Aside type="note" title="回滚">
-要回滚到更早的快照,请在你的配置仓库里检出对应提交,再运行 `roost load`。直接在 Timeline
-视图内预览与一键回滚的功能计划在未来版本中推出。
-</Aside>
+恢复**仅作用于仓库侧** —— 它改写**仓库**副本并提交;本机文件原封不动。成功提示会带一个跳到
+[同步复核](/zh-cn/sync-review/)的入口,在那里该文件显示为「仓库较新」,你经正常闸门应用。
+由于每次恢复本身都是一条新提交,所以无需确认弹窗 —— 历史就是后悔药。
 
-### 在 CLI 端
-
-快照就是普通 git 提交,因此你直接用 git 查看和切换它们:
+命令行:
 
 ```sh
-git -C <config-repo> log --oneline    # 快照历史
-git -C <config-repo> checkout <sha>   # 切到更早的快照
-roost load                            # 预览应用它(dry-run)
+roost history ~/.zshrc          # 列出该文件的快照
+roost restore ~/.zshrc <sha>    # 把仓库副本恢复到该快照
+```
+
+## 内联文件预览
+
+在 [AI 工具](/zh-cn/ai-tools/)页和 [Dotfiles](/zh-cn/modules/)页,点文件名即可内联预览内容
+(只读、文本最多 256 KB)。加密项、凭据文件、以及任何被[密钥扫描器](/zh-cn/secrets/)命中的文件**绝不**显示。
+
+## 漂移 —— 哪里不同步
+
+漂移是仓库与本机此刻的差异,归入[同步复核](/zh-cn/sync-review/):**逐项**视图按条目处置,
+**原始 diff** 视图按模块给出 `+`/`-` 着色的统一 diff。命令行:
+
+```sh
+roost status   # 各模块漂移概况:已同步 / 漂移 / 冲突
+roost diff     # 每个漂移模块一份统一 diff
+roost list     # 已管理项及其漂移状态
 ```
 
 <Aside type="tip">
-Drift 比较的是*此刻的仓库 vs 机器*;Timeline 是*仓库随时间的历史*。两者合起来回答"这台 Mac
-同步了吗?"与"仓库是怎么变成现在这样的?"。
+同步复核比较的是*此刻仓库 vs 本机*;时间线是*仓库随时间的历史*。两者合起来回答「这台 Mac 同步了吗?」
+与「仓库是怎么变成现在这样的?」。
 </Aside>

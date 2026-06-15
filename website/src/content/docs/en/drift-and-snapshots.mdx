@@ -1,29 +1,69 @@
 ---
-title: Drift & Snapshots
-description: The dashboard's Drift and Timeline views, and their CLI equivalents status and diff.
+title: History & Restore
+description: The Timeline's readable changelog, per-file history, one-click repo-side restore, and inline file preview.
 sidebar:
   order: 12
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Once you're managing more than one Mac, the questions become "what's out of
-sync?" and "what changed, and when?". Roost answers both — visually in the
-[Dashboard](/dashboard/), and on the command line.
+Every `capture` records a commit in your config repo, so the repo's git history
+*is* your snapshot history. The **Timeline** turns that into a readable changelog
+you can browse, preview, and restore from.
+
+## Readable changelog commits
+
+Captures no longer commit a uniform "roost: capture". Each commit's subject names
+what changed and the body lists every file:
+
+```
+capture: dotfiles(2) aitools(1) packages(1)
+
+dotfiles: ~/.zshrc, ~/.npmrc (encrypted)
+aitools: ~/.claude/CLAUDE.md
+packages: Brewfile
+```
+
+A restore commits as `restore: <file> @ <sha7>`. The whole history reads like a
+log of what you actually did.
+
+## Timeline — what changed, and when
+
+The **Timeline** lists snapshots newest-first — short SHA, subject, relative time.
+Click a row to expand its body (the per-file list). It reads your config repo's
+commit log; before your first capture it shows a "No snapshots yet" empty state.
+
+## Per-file history & restore
+
+Type a path at the top of the Timeline (e.g. `~/.zshrc`) and **Show history** to
+switch to that file's history. Each past version offers **Restore this version to
+the repo**; the newest one is marked *current* (restoring to itself is a no-op).
+
+Restore is **repo-side only** — it rewrites the *repo* copy and commits it; your
+machine file is untouched. A success notice links you to [Sync Review](/sync-review/),
+where the file now shows as *repo-newer* and you apply it through the normal gates.
+Because every restore is itself a new commit, there's no confirmation dialog —
+history is the undo.
+
+On the CLI:
+
+```sh
+roost history ~/.zshrc          # list this file's snapshots
+roost restore ~/.zshrc <sha>    # restore the repo copy to that snapshot
+```
+
+## Inline file preview
+
+On the [AI Tools](/ai-tools/) and [Dotfiles](/modules/) pages, click a file's
+name to preview its contents inline (read-only, text up to 256 KB). Encrypted
+entries, credential files, and anything the [Secret Scanner](/secrets/) flags are
+**never** shown.
 
 ## Drift — what's out of sync
 
-Drift is the difference between your config repo's state and the current
-machine. A module is **synced**, **drifted**, or in **conflict**.
-
-### In the dashboard
-
-The **Drift** view lists only the modules that have drifted (or conflict),
-each with a status dot. Expand a row with **View diff** to see a unified,
-`+`/`-`-colored diff for that module, fetched on demand. When everything is in
-sync, the view shows a "No drift detected" empty state.
-
-### On the CLI
+Drift is the difference between the repo and the machine right now. It lives in
+[Sync Review](/sync-review/): the **Items** view resolves per entry, and the
+**Raw diff** view shows a unified, `+`/`-`-colored diff per module. On the CLI:
 
 ```sh
 roost status   # per-module drift summary: synced / drift / conflict
@@ -31,40 +71,8 @@ roost diff     # unified diff per drifted module
 roost list     # managed items plus their drift state
 ```
 
-`status` is the summary; `diff` is the detail. The dashboard's Drift view is the
-visual composition of the same two data sources.
-
-## Timeline — what changed, and when
-
-Each `capture` records a commit in your config repo, so the repo's git history
-*is* your snapshot history.
-
-### In the dashboard
-
-The **Timeline** view lists snapshots newest-first — short SHA, commit subject,
-and a relative time ("2h ago"). It reads your config repo's commit log; if you
-haven't captured yet, it shows a "No snapshots yet" empty state pointing you to
-`roost capture`.
-
-<Aside type="note" title="Rollback">
-To roll back to an earlier snapshot, check out that commit in your config repo
-and run `roost load`. Preview and one-click rollback directly from the Timeline
-view are planned for a future release.
-</Aside>
-
-### On the CLI
-
-Snapshots are ordinary git commits, so you inspect and move between them with
-git directly:
-
-```sh
-git -C <config-repo> log --oneline    # the snapshot history
-git -C <config-repo> checkout <sha>   # move to an earlier snapshot
-roost load                            # preview applying it (dry-run)
-```
-
 <Aside type="tip">
-Drift compares *repo vs. machine right now*; Timeline is *the repo's history over
-time*. Together they answer "is this Mac in sync?" and "how did the repo get
-here?".
+Sync Review compares *repo vs. machine right now*; the Timeline is *the repo's
+history over time*. Together they answer "is this Mac in sync?" and "how did the
+repo get here?".
 </Aside>

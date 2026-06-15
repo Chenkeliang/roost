@@ -26,3 +26,18 @@ Imports go through the same **safety gate** as capture: a Secret Scanner and a s
 ## Conflicts
 
 If an IDE's skills folder already holds your own (non-Roost) directory, Roost won't overwrite it. **Back up & take over** moves your folder into `~/.roost-backups/` and links Roost's copy in its place.
+
+## Skills managed by another tool
+
+If a skill mount is a symlink whose target lives outside Roost's source dir — for
+example a runtime manager like [cc-switch](https://github.com/farion1231/cc-switch)
+distributing skills from `~/.cc-switch/` — Roost labels it **externally managed**
+(a neutral badge, never a conflict) and leaves it alone. Detection is generic: any
+non-Roost symlink mount is recognized, and a small built-in registry just supplies
+a friendly name (extend it via `roost/external-managers.yaml`).
+
+When a mount Roost *was* managing gets taken over by another tool, the row offers
+two explicit choices — **Take over again** (back up the other tool's mount and
+re-link Roost's copy) or **Leave it to &lt;tool&gt;** (Roost stops distributing to that
+target; its content is still backed up). Roost never auto-overwrites another
+manager's files — you decide.
