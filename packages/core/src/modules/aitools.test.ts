@@ -69,27 +69,30 @@ describe("aitools module", () => {
     expect(memo.note).toContain("Claude Code");
   });
 
-  it("capture encrypts catalog-encrypt paths and blocks never-backup ids", async () => {
+  it("capture encrypts catalog-encrypt paths; .claude.json with no mcpServers is silently skipped (ADR-0024 extract)", async () => {
     const home = tmpDir;
     const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
     fs.mkdirSync(path.join(home, "Library/Application Support/Claude"), { recursive: true });
     const mcp = path.join(home, "Library/Application Support/Claude/claude_desktop_config.json");
     fs.writeFileSync(mcp, "{}", "utf8");
     const cred = path.join(home, ".claude.json");
+    // .claude.json has no mcpServers → extract branch picks nothing → silently skipped
     fs.writeFileSync(cred, "{}", "utf8");
     // Create age key so ensureChezmoiAgeConfig returns ready:true
     fs.mkdirSync(path.join(home, ".config", "sops", "age"), { recursive: true });
     fs.writeFileSync(path.join(home, ".config", "sops", "age", "keys.txt"), "AGE-SECRET-KEY-X");
     let sel = emptySelection();
     sel = addItem(sel, "aitools", mcp);
-    sel = addItem(sel, "aitools", cred); // hand-added credential — must be refused
+    sel = addItem(sel, "aitools", cred);
     const { exec, calls } = makeFakeExec(Array.from({ length: 10 }, () => ({ code: 0, stdout: "age1recipientkey", stderr: "" })));
     const ctx = makeCtx({ exec, home, repoDir });
     const cs = await aitoolsModule.capture(ctx, sel);
     const add = calls.find((c) => c.cmd === "chezmoi" && c.args.includes("add") && c.args.includes(mcp));
     expect(add).toBeDefined();
     expect(add!.args).toContain("--encrypt"); // catalog says encrypt for the MCP file
-    expect(cs.blockedDetail?.some((b) => b.id === cred && b.reason === "managed")).toBe(true);
+    // .claude.json silently skipped (no extractable fields) — not in blocked, not in encrypted
+    expect(cs.blocked).not.toContain(cred);
+    expect(cs.encrypted).not.toContain(cred);
     expect(calls.some((c) => c.args.includes(cred) && c.args.includes("add"))).toBe(false);
     expect(fs.existsSync(cred)).toBe(true); // local file untouched
   });
@@ -106,13 +109,15 @@ describe("aitools policy capture (ADR-0023)", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("skip-policy path is blocked (managed) and not captured; local file untouched", async () => {
+  it(".claude.json routes to extract branch (ADR-0024); no mcpServers → silently skipped, not blocked-managed", async () => {
     const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
+    // No mcpServers → nothing extractable → silent skip (not blocked-managed as in v1.1)
     const cred = path.join(home, ".claude.json"); fs.writeFileSync(cred, "{}", "utf8");
     let sel = emptySelection(); sel = addItem(sel, "aitools", cred);
     const { exec, calls } = makeFakeExec([]);
     const cs = await aitoolsModule.capture(makeCtx({ exec, home, repoDir }), sel);
-    expect(cs.blockedDetail?.some((b) => b.id === cred && b.reason === "managed")).toBe(true);
+    // In v1.2 the extract branch handles .claude.json; with no fields to pick, it silently continues
+    expect(cs.blocked).not.toContain(cred);
     expect(calls.some((c) => c.cmd === "chezmoi" && c.args.includes("add") && c.args.includes(cred))).toBe(false);
     expect(fs.existsSync(cred)).toBe(true);
   });
@@ -133,5 +138,65 @@ describe("aitools policy capture (ADR-0023)", () => {
     expect(encAdd!.args).toContain("--encrypt");
     expect(cs.written).toContain(mem);     // plain
     expect(cs.encrypted).toContain(mcp);   // encrypt
+  });
+});
+
+describe("aitools field extraction (ADR-0024)", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aitools-ext-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("capture extracts only mcpServers; the token never enters the artifact JSON", async () => {
+    const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
+    const f = path.join(home, ".claude.json");
+    fs.writeFileSync(f, JSON.stringify({ mcpServers: { x: { command: "y" } }, oauthAccount: "TOKEN", projects: {} }), "utf8");
+    // age key present so recipientFromKey works
+    fs.mkdirSync(path.join(home, ".config/sops/age"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".config/sops/age/keys.txt"), "AGE-SECRET-KEY-1");
+    let sel = emptySelection(); sel = addItem(sel, "aitools", f);
+    let captured = "";
+    const exec: Exec = { async run(cmd, args) {
+      if (cmd === "age-keygen") return { code: 0, stdout: "age1recipient", stderr: "" };
+      if (cmd === "age" && args.includes("-r")) { const last = args[args.length - 1]; if (last) captured = fs.readFileSync(last, "utf8"); return { code: 0, stdout: "", stderr: "" }; }
+      return { code: 0, stdout: "", stderr: "" };
+    }};
+    const cs = await aitoolsModule.capture(makeCtx({ exec, home, repoDir }), sel);
+    expect(cs.encrypted).toContain(f);
+    expect(captured).toContain("mcpServers");
+    expect(captured).not.toContain("TOKEN");   // token never extracted
+  });
+
+  it("apply merges mcpServers back, preserves token, backs up first, dryRun no-write", async () => {
+    const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
+    const f = path.join(home, ".claude.json");
+    fs.writeFileSync(f, JSON.stringify({ mcpServers: { old: 1 }, oauthAccount: "KEEPTOKEN" }), "utf8");
+    // age key so decryptEnvSecret existsSync checks pass
+    fs.mkdirSync(path.join(home, ".config/sops/age"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".config/sops/age/keys.txt"), "k");
+    // artifact file must exist so decryptEnvSecret skips the existsSync guard
+    const artifactDir = path.join(repoDir, "aitools-extract");
+    fs.mkdirSync(artifactDir, { recursive: true });
+    const artifactPath = path.join(artifactDir, "claude-code__.claude.json.json.age");
+    fs.writeFileSync(artifactPath, "ciphertext-placeholder", "utf8");
+    const exec: Exec = { async run(cmd, args) {
+      if (cmd === "age" && args.includes("-d")) return { code: 0, stdout: JSON.stringify({ mcpServers: { new: 2 } }), stderr: "" };
+      return { code: 0, stdout: "", stderr: "" };
+    }};
+    const plan = { module: "aitools", actions: [{ id: f, kind: "update" as const, target: f }] };
+    // dry-run: no write
+    await aitoolsModule.apply({ ...makeCtx({ exec, home, repoDir }), dryRun: true }, plan);
+    expect(JSON.parse(fs.readFileSync(f, "utf8")).mcpServers).toEqual({ old: 1 });
+    // real: merge
+    await aitoolsModule.apply(makeCtx({ exec, home, repoDir }), plan);
+    const after = JSON.parse(fs.readFileSync(f, "utf8"));
+    expect(after.mcpServers).toEqual({ new: 2 });
+    expect(after.oauthAccount).toBe("KEEPTOKEN");   // token preserved
+    expect(fs.existsSync(path.join(home, ".roost-backups", "aitools"))).toBe(true); // backed up
   });
 });
