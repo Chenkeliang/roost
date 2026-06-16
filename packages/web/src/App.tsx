@@ -279,7 +279,7 @@ export function App() {
           {activeTab === "dotfiles" && <Dotfiles showHud={showHud} />}
           {activeTab === "appconfig" && <AppConfig showHud={showHud} />}
           {activeTab === "aitools" && <AiTools showHud={showHud} />}
-          {activeTab === "env" && <AliasesEnv showHud={showHud} />}
+          {activeTab === "env" && <AliasesEnv showHud={showHud} onOpenSettings={() => setActiveTab("settings")} />}
           {activeTab === "sync" && <SyncState onOpenSettings={() => setActiveTab("settings")} />}
           {activeTab === "timeline" && <Timeline showHud={showHud} onOpenSync={() => setActiveTab("sync")} />}
           {activeTab === "settings" && <Settings />}

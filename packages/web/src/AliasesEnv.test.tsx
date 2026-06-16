@@ -28,9 +28,12 @@ vi.mock("./api", () => ({
   getEnv: vi.fn(),
   putEnv: vi.fn(),
   getDiscover: vi.fn(),
+  applyEnv: vi.fn(),
+  getHealth: vi.fn().mockRejectedValue(new Error("not mocked")),
+  getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
 }));
 
-import { getEnv, putEnv, getDiscover } from "./api";
+import { getEnv, putEnv, getDiscover, getHealth } from "./api";
 
 function mockEnv(data: EnvData = BASE_ENV) {
   vi.mocked(getEnv).mockResolvedValue(structuredClone(data));
@@ -339,5 +342,42 @@ describe("AliasesEnv", () => {
     expect((screen.getByRole("button", { name: /^Save$/i }) as HTMLButtonElement).disabled).toBe(
       false,
     );
+  });
+});
+
+// ── Task 2: age-key awareness ─────────────────────────────────────────────────
+
+const ageSecretEnv = {
+  schemaVersion: 1, aliases: [], path: [], functions: [],
+  // value non-empty so it is treated as a new (not yet encrypted) secret → isStoredSecret=false
+  env: [{ kind: "env", name: "TOKEN", value: "sk-test", secret: true, source: { kind: "age" }, enabled: true }],
+};
+
+async function renderEnv() {
+  await act(async () => { render(<AliasesEnv onOpenSettings={() => {}} />); });
+  // Wait for the load to settle (skeleton → content) before interacting.
+  await waitFor(() => screen.getByRole("button", { name: "edit env TOKEN" }));
+  // open the TOKEN row so its editor (and hint) mounts
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "edit env TOKEN" })); });
+}
+
+describe("AliasesEnv — no age key guidance", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the dual-option note for an age secret when no key exists", async () => {
+    (getEnv as ReturnType<typeof vi.fn>).mockResolvedValue(ageSecretEnv);
+    (getHealth as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, name: "r", ageKey: false });
+    await renderEnv();
+    await waitFor(() => expect(screen.getByText(/No age key on this Mac/)).toBeInTheDocument());
+    expect(screen.getByText(/switch the source to a 1Password \/ rbw reference/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "generate or import one in Settings" })).toBeInTheDocument();
+  });
+
+  it("hides the note when an age key exists", async () => {
+    (getEnv as ReturnType<typeof vi.fn>).mockResolvedValue(ageSecretEnv);
+    (getHealth as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, name: "r", ageKey: true });
+    await renderEnv();
+    await waitFor(() => expect(screen.getByLabelText("env name TOKEN")).toBeInTheDocument());
+    expect(screen.queryByText(/No age key on this Mac/)).toBeNull();
   });
 });

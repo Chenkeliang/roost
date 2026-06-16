@@ -24,10 +24,11 @@ import type {
 import type { HudMessage } from "../components/Hud";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getEnv, putEnv, getDiscover, applyEnv } from "../api";
+import { getEnv, putEnv, getDiscover, applyEnv, getHealth } from "../api";
 
 interface AliasesEnvProps {
   showHud?: (msg: HudMessage) => void;
+  onOpenSettings?: () => void;
 }
 
 type ItemKind = "alias" | "env" | "path" | "function";
@@ -241,10 +242,14 @@ function EnvEditor({
   item,
   onChange,
   t,
+  ageKey,
+  onOpenSettings,
 }: {
   item: EnvVarItem;
   onChange: (next: Partial<EnvVarItem>) => void;
   t: (key: string) => string;
+  ageKey: boolean;
+  onOpenSettings?: () => void;
 }) {
   const sel = sourceSel(item);
   const isRef = item.secret && sel !== "age";
@@ -343,9 +348,34 @@ function EnvEditor({
         )}
       </div>
       {item.secret && (
-        <p style={hintStyle}>
-          {isRef ? t("env.secret.hint.ref") : t("env.secret.hint.age")}
-        </p>
+        <div style={hintStyle}>
+          {isRef ? (
+            t("env.secret.hint.ref")
+          ) : !ageKey ? (
+            isStoredSecret ? (
+              <>
+                {t("env.key.storedNoKeyPrefix")}{" "}
+                {onOpenSettings && (
+                  <button type="button" onClick={onOpenSettings} style={linkBtnStyle}>
+                    {t("env.key.storedNoKeySettings")}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                {t("env.key.missingNotePrefix")}
+                {onOpenSettings && (
+                  <button type="button" onClick={onOpenSettings} style={linkBtnStyle}>
+                    {t("env.key.missingNoteSettings")}
+                  </button>
+                )}
+                {t("env.key.missingNoteSuffix")}
+              </>
+            )
+          ) : (
+            t("env.secret.hint.age")
+          )}
+        </div>
       )}
     </div>
   );
@@ -466,6 +496,11 @@ const hintStyle: React.CSSProperties = {
   color: "var(--faint)",
   fontSize: 12.5,
   margin: "8px 0 0",
+};
+
+const linkBtnStyle: React.CSSProperties = {
+  appearance: "none", background: "none", border: "none", padding: 0,
+  color: "var(--accent)", cursor: "pointer", font: "inherit", textDecoration: "underline",
 };
 
 const lockBadgeStyle: React.CSSProperties = {
@@ -615,10 +650,11 @@ function ImportPicker({
 
 // ── AliasesEnv (root) ─────────────────────────────────────────────────────────
 
-export function AliasesEnv({ showHud }: AliasesEnvProps) {
+export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
   const { t } = useT();
   const [data, setData] = useState<EnvData | null>(null);
   const [serverData, setServerData] = useState<EnvData | null>(null);
+  const [ageKey, setAgeKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -634,9 +670,10 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
     setLoading(true);
     setError(null);
     try {
-      const env = await getEnv();
+      const [env, h] = await Promise.all([getEnv(), getHealth().catch(() => null)]);
       setData(env);
       setServerData(env);
+      setAgeKey(h?.ageKey ?? false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1322,6 +1359,8 @@ export function AliasesEnv({ showHud }: AliasesEnvProps) {
                         item={item as EnvVarItem}
                         onChange={(next) => patchEnv(ref.idx, next)}
                         t={t}
+                        ageKey={ageKey}
+                        onOpenSettings={onOpenSettings}
                       />
                     )}
                     {ref.kind === "path" && (
