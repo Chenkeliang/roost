@@ -5,10 +5,14 @@ import * as yaml from "js-yaml";
 // ADR-0023: per-entry policy replaces NEVER_BACKUP blacklist.
 export type AiPolicy = "plain" | "encrypt" | "skip";
 
+// ADR-0024: field-extraction rule; format default "json" (only supported value in v1.2).
+export interface AiExtract { fields: string[]; format?: "json" }
+
 export interface AiToolPath {
   path: string; // home-relative
   kind: "memory" | "settings" | "mcp" | "data";
   policy?: AiPolicy; // default "plain"; "skip" = never backed up (credential/session/large)
+  extract?: AiExtract; // present ⇒ field-extraction handling, NOT whole-file chezmoi
 }
 export interface AiTool { id: string; label: string; paths: AiToolPath[] }
 
@@ -22,7 +26,7 @@ export const DEFAULT_AI_TOOLS_CATALOG: AiTool[] = [
     { path: ".claude/keybindings.json", kind: "settings" },
     { path: ".claude/agents", kind: "settings" },
     { path: ".claude/commands", kind: "settings" },
-    { path: ".claude.json", kind: "data", policy: "skip" },
+    { path: ".claude.json", kind: "mcp", policy: "encrypt", extract: { fields: ["mcpServers"] } },
   ]},
   { id: "claude-desktop", label: "Claude Desktop", paths: [
     { path: "Library/Application Support/Claude/claude_desktop_config.json", kind: "mcp", policy: "encrypt" },
@@ -88,6 +92,12 @@ function parseOverride(raw: unknown): AiTool[] {
       const pol = po["policy"];
       if (pol === "plain" || pol === "encrypt" || pol === "skip") entry.policy = pol;
       else if (po["encrypt"] === true) entry.policy = "encrypt";
+      const ex = po["extract"];
+      if (ex && typeof ex === "object" && Array.isArray((ex as { fields?: unknown }).fields)) {
+        entry.extract = {
+          fields: ((ex as { fields: unknown[] }).fields).filter((f): f is string => typeof f === "string"),
+        };
+      }
       paths.push(entry);
     }
     if (paths.length === 0) continue;
@@ -122,5 +132,13 @@ export function aiPathPolicies(repoDir: string, home: string): Map<string, AiPol
   for (const tool of loadAiToolsCatalog(repoDir)) {
     for (const p of tool.paths) m.set(path.join(home, p.path), effectivePolicy(p));
   }
+  return m;
+}
+
+// All extract entries, keyed by absolute path. Used by the aitools module.
+export function aiExtractEntries(repoDir: string, home: string): Map<string, AiExtract> {
+  const m = new Map<string, AiExtract>();
+  for (const tool of loadAiToolsCatalog(repoDir))
+    for (const p of tool.paths) if (p.extract) m.set(path.join(home, p.path), p.extract);
   return m;
 }
