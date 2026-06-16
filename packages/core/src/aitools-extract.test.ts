@@ -20,8 +20,15 @@ describe("aitools-extract primitives", () => {
     const live = { mcpServers: { old: 1 }, t: "k" };
     expect(mergeFields(live, {}, ["mcpServers"])).toEqual({ mcpServers: { old: 1 }, t: "k" });
   });
-  it("artifact path is repo-scoped and slugged", () => {
-    const p = extractArtifactPath("/repo", "/Users/x/.claude.json");
-    expect(p).toMatch(/\/repo\/aitools-extract\/.+\.json\.age$/);
+  it("artifact path includes toolId discriminator and basename", () => {
+    const p = extractArtifactPath("/repo", "claude-code", "/Users/x/.claude.json");
+    expect(p).toBe("/repo/aitools-extract/claude-code__.claude.json.json.age");
+  });
+  it("artifact path collision-avoidance: two tools with same basename get distinct paths", () => {
+    const p1 = extractArtifactPath("/repo", "cursor", "/Users/x/.cursor/mcp.json");
+    const p2 = extractArtifactPath("/repo", "windsurf", "/Users/x/.codeium/windsurf/mcp_config.json");
+    expect(p1).not.toBe(p2);
+    expect(p1).toContain("cursor__");
+    expect(p2).toContain("windsurf__");
   });
 });

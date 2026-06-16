@@ -29,23 +29,24 @@ export function mergeFields(
   return out;
 }
 
-// Artifact path is home-independent: uses only the basename of the source file,
-// so the artifact survives a move to a new Mac with a different username/homedir.
-// Format: repo/aitools-extract/<basename>.json.age
-export function extractArtifactPath(repoDir: string, absPath: string): string {
-  return path.join(repoDir, "aitools-extract", `${path.basename(absPath)}.json.age`);
+// Artifact path is home-independent: uses <toolId>__<basename> as the key, so the
+// artifact survives a move to a new Mac with a different username/homedir, while the
+// toolId discriminator prevents basename collisions (e.g. two tools' mcp.json or
+// mcp_config.json mapping to the same artifact). Format: repo/aitools-extract/<toolId>__<basename>.json.age
+export function extractArtifactPath(repoDir: string, toolId: string, absPath: string): string {
+  return path.join(repoDir, "aitools-extract", `${toolId}__${path.basename(absPath)}.json.age`);
 }
 
 // age-encrypt the extracted JSON to the artifact path, delegating to encryptEnvSecret.
 // Plaintext only in tmpdir (handled by encryptEnvSecret).
 export async function writeExtractArtifact(
   exec: Exec,
-  opts: { repoDir: string; absPath: string; home: string; json: Record<string, unknown> },
+  opts: { repoDir: string; toolId: string; absPath: string; home: string; json: Record<string, unknown> },
 ): Promise<void> {
   const recipient = await recipientFromKey(exec, defaultAgeKeyPath(opts.home));
   if (!recipient) throw new Error("no age key");
-  const dest = extractArtifactPath(opts.repoDir, opts.absPath);
-  const name = `aitools-extract-${path.basename(opts.absPath)}`;
+  const dest = extractArtifactPath(opts.repoDir, opts.toolId, opts.absPath);
+  const name = `aitools-extract-${opts.toolId}__${path.basename(opts.absPath)}`;
   await encryptEnvSecret(exec, {
     repoDir: opts.repoDir,
     name,
@@ -59,11 +60,11 @@ export async function writeExtractArtifact(
 // Delegates to decryptEnvSecret.
 export async function readExtractArtifact(
   exec: Exec,
-  opts: { repoDir: string; absPath: string; home: string },
+  opts: { repoDir: string; toolId: string; absPath: string; home: string },
 ): Promise<Record<string, unknown> | null> {
-  const src = extractArtifactPath(opts.repoDir, opts.absPath);
+  const src = extractArtifactPath(opts.repoDir, opts.toolId, opts.absPath);
   const keyPath = defaultAgeKeyPath(opts.home);
-  const name = `aitools-extract-${path.basename(opts.absPath)}`;
+  const name = `aitools-extract-${opts.toolId}__${path.basename(opts.absPath)}`;
   const plaintext = await decryptEnvSecret(exec, {
     repoDir: opts.repoDir,
     name,
