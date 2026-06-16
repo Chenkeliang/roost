@@ -699,7 +699,11 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
       setServerData(saved);
       showHud?.({ text: t("env.hud.saved"), type: "success" });
     } catch (e) {
-      showHud?.({ text: e instanceof Error ? e.message : t("env.hud.saveFailed"), type: "error" });
+      const msg = e instanceof Error ? e.message : "";
+      const text = /no age key/i.test(msg)
+        ? t("env.key.missingNotePrefix") + t("env.key.missingNoteSettings") + t("env.key.missingNoteSuffix")
+        : (msg || t("env.hud.saveFailed"));
+      showHud?.({ text, type: "error" });
     } finally {
       setSaving(false);
     }

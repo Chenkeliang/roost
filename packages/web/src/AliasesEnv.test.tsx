@@ -381,3 +381,32 @@ describe("AliasesEnv — no age key guidance", () => {
     expect(screen.queryByText(/No age key on this Mac/)).toBeNull();
   });
 });
+
+describe("AliasesEnv — save with no age key", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("translates a 'no age key' 400 into the dual-option HUD message", async () => {
+    const dirtyEnv = {
+      schemaVersion: 1, aliases: [], path: [], functions: [],
+      env: [{ kind: "env", name: "TOKEN", value: "", secret: true, source: { kind: "age" }, enabled: true }],
+    };
+    (getEnv as ReturnType<typeof vi.fn>).mockResolvedValue(dirtyEnv);
+    (getHealth as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, name: "r", ageKey: false });
+    (putEnv as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('cannot encrypt secret "TOKEN": no age key available'),
+    );
+    const showHud = vi.fn();
+    await act(async () => { render(<AliasesEnv showHud={showHud} onOpenSettings={() => {}} />); });
+    // type a value so the page is dirty + the secret carries plaintext
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "edit env TOKEN" })); });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("env value TOKEN"), { target: { value: "sk-123" } });
+    });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Save/ })); });
+    await waitFor(() =>
+      expect(showHud).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "error", text: expect.stringContaining("No age key on this Mac") }),
+      ),
+    );
+  });
+});
