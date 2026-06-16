@@ -351,8 +351,8 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     zh: "密钥值从不存入仓库或在此显示 —— 已用你的 age 密钥加密。",
   },
   "env.secret.hint.ref": {
-    en: "Secret value is never stored in the repo or shown here — resolved from your password manager on apply.",
-    zh: "密钥值从不存入仓库或在此显示 —— 应用时从你的密码管理器解析。",
+    en: "References an item you've already created in your password manager (1Password/Bitwarden) — Roost won't create it. Resolved via op/rbw on apply; never stored in the repo.",
+    zh: "引用你密码管理器里已存在的条目(1Password/Bitwarden)—— 需先自己建好,Roost 不会替你创建。应用时经 op/rbw 取值,值不入库、不在此显示。",
   },
 
   // PathEditor: position options + hint

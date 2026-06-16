@@ -434,6 +434,22 @@ describe("AliasesEnv — ref backend availability", () => {
   });
 });
 
+describe("AliasesEnv — reference points to a pre-existing item", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("clarifies that a ref references an item you already created (Roost won't create it)", async () => {
+    const refEnv = {
+      schemaVersion: 1, aliases: [], path: [], functions: [],
+      env: [{ kind: "env", name: "TOKEN", value: "", secret: true, source: { kind: "ref", backend: "rbw", ref: "my-entry" }, enabled: true }],
+    };
+    (getEnv as ReturnType<typeof vi.fn>).mockResolvedValue(refEnv);
+    (getHealth as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, name: "r", ageKey: true });
+    await act(async () => { render(<AliasesEnv onOpenSettings={() => {}} />); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "edit env TOKEN" })); });
+    await waitFor(() => expect(screen.getByText(/already created in your password manager/i)).toBeInTheDocument());
+  });
+});
+
 describe("AliasesEnv — secret-source discoverability", () => {
   beforeEach(() => vi.clearAllMocks());
 
