@@ -19,6 +19,7 @@ import {
   addSelection,
   removeSelection,
   excludeDotfile,
+  generateKey,
   type HealthResponse,
   type MachinesResponse,
   type StatusResponse,
@@ -26,12 +27,24 @@ import {
   type GitStatus,
   type BackupStatus,
 } from "../api";
+import { KeyBackupConfirm } from "../components/KeyBackupConfirm";
 import { FreshnessBanners } from "../components/FreshnessBanners";
 import { LargeFilesAdvisory } from "../components/LargeFilesAdvisory";
 import { checkForUpdate } from "../updateCheck";
 import type { UpdateInfo } from "../updateCheck";
 import { Onboarding } from "./onboarding/Onboarding";
 import { RemoteWarningBanner } from "../components/RemoteWarningBanner";
+
+const blockedActionBtn: React.CSSProperties = {
+  appearance: "none", border: "1px solid var(--border)", background: "var(--raise)",
+  color: "var(--accent)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 9px",
+  borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
+};
+const blockedLinkBtn: React.CSSProperties = {
+  appearance: "none", border: "none", background: "none", padding: 0,
+  color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, cursor: "pointer",
+  textDecoration: "underline",
+};
 
 interface OverviewProps {
   showHud: (msg: HudMessage) => void;
@@ -124,6 +137,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [keygen, setKeygen] = useState<{ recipient: string | null; keyPath: string } | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoadingData(true);
@@ -232,6 +246,37 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
       await fetchData();
     } catch (e) {
       showHud({ text: e instanceof Error ? e.message : "Remove failed", type: "error" });
+    }
+  };
+
+  const isNoKey = (b: { reason: string; detail?: string }) =>
+    b.reason === "error" && b.detail === "no age key";
+
+  // Generate the age key, then require an explicit backup acknowledgement
+  // (KeyBackupConfirm) before re-capturing. age-binary presence is checked at
+  // the call site so this only runs when generation can succeed.
+  const handleGenerateKey = async () => {
+    setRetrying(true);
+    try {
+      const gen = await generateKey();
+      setKeygen({ recipient: gen.recipient, keyPath: gen.keyPath });
+    } catch (e) {
+      showHud({ text: e instanceof Error ? e.message : "Generate key failed", type: "error" });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  // "Skip for now": stop tracking this item in its module so capture won't
+  // attempt it. Respects the user's choice not to back it up.
+  const handleSkipBlocked = async (b: { id: string; module: string }) => {
+    try {
+      await removeSelection(b.module, b.id);
+      setBlockedDetail((prev) => prev.filter((x) => x.id !== b.id));
+      setBlocked((prev) => prev.filter((p) => p !== b.id));
+      await fetchData();
+    } catch (e) {
+      showHud({ text: e instanceof Error ? e.message : "Skip failed", type: "error" });
     }
   };
 
@@ -479,14 +524,18 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
               : item.reason === "too-large" ? t("overview.blocked.tooLarge")
               : item.reason === "managed" ? t("overview.blocked.managed")
               : item.reason === "large" ? t("overview.blocked.large")
+              : isNoKey(item) ? t("overview.blocked.noKey")
               : t("overview.blocked.error");
             return (
               <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border-soft)", fontSize: 13.5 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{item.id}</div>
                   <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                    {reasonLabel}{item.detail ? ` · ${item.detail}` : ""}
-                    {item.reason === "too-large" ? ` · ${t("overview.blocked.raiseLimit")}` : ""}
+                    {isNoKey(item) ? (
+                      <><span>{reasonLabel}</span>{" · "}<span>{t("overview.blocked.noKeyHint")}</span></>
+                    ) : (
+                      <>{reasonLabel}{item.detail ? ` · ${item.detail}` : ""}{item.reason === "too-large" ? ` · ${t("overview.blocked.raiseLimit")}` : ""}</>
+                    )}
                   </div>
                 </div>
                 {item.reason === "secret" && (
@@ -532,6 +581,25 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
                     </button>
                   </span>
                 )}
+                {isNoKey(item) && (
+                  <span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                    {missingDeps.includes("age") ? (
+                      <button onClick={() => onOpenSetup?.()} style={blockedLinkBtn}>
+                        {t("overview.key.needAgeBinary")}
+                      </button>
+                    ) : (
+                      <button onClick={() => void handleGenerateKey()} disabled={retrying} style={blockedActionBtn}>
+                        <Lock size={11} />{t("overview.blocked.generateRetry")}
+                      </button>
+                    )}
+                    <button onClick={() => onOpenSetup?.()} style={blockedLinkBtn}>
+                      {t("overview.blocked.importInSettings")}
+                    </button>
+                    <button onClick={() => void handleSkipBlocked(item)} style={blockedLinkBtn}>
+                      {t("overview.blocked.skipForNow")}
+                    </button>
+                  </span>
+                )}
               </div>
             );
           })}
@@ -567,6 +635,15 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           ))}
         </section>
       ) : null}
+
+      {keygen && (
+        <KeyBackupConfirm
+          recipient={keygen.recipient}
+          keyPath={keygen.keyPath}
+          t={t}
+          onConfirm={() => { setKeygen(null); void handleCapture(); }}
+        />
+      )}
 
       {/* Module Health */}
       <section

@@ -199,3 +199,33 @@ describe("Overview — blocked card labelling", () => {
     await waitFor(() => expect(screen.getByText("items blocked — potential secrets")).toBeInTheDocument());
   });
 });
+
+// ── Task 5: Overview — no-key remedy cluster ──────────────────────────────────
+
+import { generateKey } from "./api";
+
+describe("Overview — no-key remedy cluster", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders the no-key label, hint, and Generate key & retry button", async () => {
+    await captureWith([{ id: "/h/.aws/credentials", reason: "error", detail: "no age key" }]);
+    await waitFor(() => expect(screen.getByText("age key required")).toBeInTheDocument());
+    expect(screen.getByText("Sensitive files can only be backed up age-encrypted.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate key & retry" })).toBeInTheDocument();
+    // raw "no age key" string must NOT be shown
+    expect(screen.queryByText(/· no age key/)).toBeNull();
+  });
+
+  it("Generate key & retry calls generateKey then shows the backup-confirm modal", async () => {
+    (generateKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+      created: true, source: "generated", recipient: "age1xyz", keyPath: "/h/.config/sops/age/keys.txt",
+    });
+    await captureWith([{ id: "/h/.aws/credentials", reason: "error", detail: "no age key" }]);
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Generate key & retry" }));
+    });
+    await waitFor(() => expect(generateKey).toHaveBeenCalledOnce());
+    // KeyBackupConfirm shows the key path + a disabled Continue until ack
+    expect(screen.getByText("/h/.config/sops/age/keys.txt")).toBeInTheDocument();
+  });
+});
