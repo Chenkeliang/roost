@@ -1,8 +1,11 @@
-import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import type { Exec } from "@roost/shared";
-import { defaultAgeKeyPath, recipientFromKey } from "./env-crypto.js";
+import {
+  defaultAgeKeyPath,
+  recipientFromKey,
+  encryptEnvSecret,
+  decryptEnvSecret,
+} from "./env-crypto.js";
 
 // Shallow allowlist: keep only the named top-level fields of a parsed object.
 export function pickFields(obj: unknown, fields: string[]): Record<string, unknown> {
@@ -26,15 +29,15 @@ export function mergeFields(
   return out;
 }
 
-function slug(absPath: string): string {
-  return absPath.replace(/^\/+/, "").replace(/[^a-zA-Z0-9._-]+/g, "_");
-}
-
+// Artifact path is home-independent: uses only the basename of the source file,
+// so the artifact survives a move to a new Mac with a different username/homedir.
+// Format: repo/aitools-extract/<basename>.json.age
 export function extractArtifactPath(repoDir: string, absPath: string): string {
-  return path.join(repoDir, "aitools-extract", `${slug(absPath)}.json.age`);
+  return path.join(repoDir, "aitools-extract", `${path.basename(absPath)}.json.age`);
 }
 
-// age-encrypt the extracted JSON to the artifact path. Plaintext only in tmpdir.
+// age-encrypt the extracted JSON to the artifact path, delegating to encryptEnvSecret.
+// Plaintext only in tmpdir (handled by encryptEnvSecret).
 export async function writeExtractArtifact(
   exec: Exec,
   opts: { repoDir: string; absPath: string; home: string; json: Record<string, unknown> },
@@ -42,36 +45,34 @@ export async function writeExtractArtifact(
   const recipient = await recipientFromKey(exec, defaultAgeKeyPath(opts.home));
   if (!recipient) throw new Error("no age key");
   const dest = extractArtifactPath(opts.repoDir, opts.absPath);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  const tmpIn = path.join(
-    os.tmpdir(),
-    `roost-extract-${process.pid}-${slug(opts.absPath)}.tmp`,
-  );
-  try {
-    fs.writeFileSync(tmpIn, JSON.stringify(opts.json, null, 2), { encoding: "utf8", mode: 0o600 });
-    const r = await exec.run("age", ["-r", recipient, "-o", dest, tmpIn]);
-    if (r.code !== 0) throw new Error(r.stderr || `age -r exited ${r.code}`);
-  } finally {
-    try {
-      fs.unlinkSync(tmpIn);
-    } catch {
-      // already gone — fine
-    }
-  }
+  const name = `aitools-extract-${path.basename(opts.absPath)}`;
+  await encryptEnvSecret(exec, {
+    repoDir: opts.repoDir,
+    name,
+    plaintext: JSON.stringify(opts.json, null, 2),
+    recipient,
+    dest,
+  });
 }
 
 // Decrypt the artifact to a parsed object; null if missing / no key / parse fail.
+// Delegates to decryptEnvSecret.
 export async function readExtractArtifact(
   exec: Exec,
   opts: { repoDir: string; absPath: string; home: string },
 ): Promise<Record<string, unknown> | null> {
   const src = extractArtifactPath(opts.repoDir, opts.absPath);
   const keyPath = defaultAgeKeyPath(opts.home);
-  if (!fs.existsSync(src) || !fs.existsSync(keyPath)) return null;
-  const r = await exec.run("age", ["-d", "-i", keyPath, src]);
-  if (r.code !== 0) return null;
+  const name = `aitools-extract-${path.basename(opts.absPath)}`;
+  const plaintext = await decryptEnvSecret(exec, {
+    repoDir: opts.repoDir,
+    name,
+    keyPath,
+    src,
+  });
+  if (plaintext === null) return null;
   try {
-    return JSON.parse(r.stdout) as Record<string, unknown>;
+    return JSON.parse(plaintext) as Record<string, unknown>;
   } catch {
     return null;
   }
