@@ -80,13 +80,25 @@ function globShallow(home: string, patterns: string[]): string[] {
         // e.g. ".config/*/config.json" or ".config/*/*.json"
         const [base, , leaf] = parts;
         if (!base || !leaf) continue;
+        const hasLeafWild = leaf.includes("*");
         const baseDir = path.join(home, base);
         let dirs: fs.Dirent[];
         try { dirs = fs.readdirSync(baseDir, { withFileTypes: true }); } catch { continue; }
         for (const d of dirs) {
           if (!d.isDirectory()) continue;
-          const abs = path.join(baseDir, d.name, leaf);
-          if (abs.endsWith(".json") && fs.existsSync(abs)) out.push(abs);
+          if (hasLeafWild) {
+            const leafSuffix = leaf.replace(/^\*/, "");
+            let children: fs.Dirent[];
+            try { children = fs.readdirSync(path.join(baseDir, d.name), { withFileTypes: true }); } catch { continue; }
+            for (const c of children) {
+              if (!c.isFile()) continue;
+              const abs = path.join(baseDir, d.name, c.name);
+              if (c.name.endsWith(leafSuffix) && abs.endsWith(".json")) out.push(abs);
+            }
+          } else {
+            const abs = path.join(baseDir, d.name, leaf);
+            if (abs.endsWith(".json") && fs.existsSync(abs)) out.push(abs);
+          }
         }
       }
     } catch { /* ignore */ }
@@ -141,7 +153,9 @@ export const aitoolsModule: SyncModule = {
       ...globShallow(ctx.home, [".config/*/config.json", ".config/*/*.json", ".*rc.json", ".*/*.json"]),
     ];
     for (const abs of new Set(candidates)) {
-      if (seen.has(abs) || extracts.has(abs)) continue;       // already handled or already an extract rule
+      if (seen.has(abs) || extracts.has(abs)) continue;              // already handled or already an extract rule
+      if (policies.get(abs) === "skip") continue;                    // I6: credential/session files — never backup
+      if (dotfilesSel.has(abs)) continue;                            // single owner: already under dotfiles
       if (!abs.endsWith(".json") || !fs.existsSync(abs)) continue;
       let parsed: unknown;
       try { parsed = JSON.parse(fs.readFileSync(abs, "utf8")); } catch { continue; }
