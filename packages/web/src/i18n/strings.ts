@@ -678,4 +678,22 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "ai.suggest.group": { en: "Detected MCP you can extract", zh: "检测到可提取的 MCP" },
   "ai.suggest.adopt": { en: "Back up just the MCP", zh: "按提取方式纳管" },
   "ai.suggest.note": { en: "Backs up only mcpServers; your token/secrets stay out of the repo.", zh: "只备份 mcpServers;令牌/密钥不入库。" },
+
+  // ── Secret-protection guidance (age vs ref) — env page ───────────────────
+  "env.key.missingNotePrefix": { en: "No age key on this Mac — ", zh: "本机没有 age 私钥 —— " },
+  "env.key.missingNoteSettings": { en: "generate or import one in Settings", zh: "去设置生成或导入" },
+  "env.key.missingNoteSuffix": { en: ", or switch the source to a 1Password / rbw reference (no key needed).", zh: ",或把来源改为 1Password / rbw 引用(无需私钥)。" },
+  "env.key.storedNoKeyPrefix": { en: "Encrypted, but this Mac has no key — it can't be decrypted on apply. ", zh: "已加密保存,但本机无私钥,apply 时无法解密。" },
+  "env.key.storedNoKeySettings": { en: "Import the key in Settings", zh: "去设置导入私钥" },
+  "env.ref.backendMissing": { en: " is not installed — this reference can't be resolved on apply.", zh: " 未安装 —— apply 时无法解析此引用。" },
+  // ── Overview capture-blocked card ────────────────────────────────────────
+  "overview.blockedTitleNeutral": { en: "items need attention", zh: "项待处理" },
+  "overview.blocked.noKey": { en: "age key required", zh: "缺 age 私钥" },
+  "overview.blocked.noKeyHint": { en: "Sensitive files can only be backed up age-encrypted.", zh: "敏感文件只能用 age 加密备份。" },
+  "overview.blocked.generateRetry": { en: "Generate key & retry", zh: "生成密钥并重试" },
+  "overview.blocked.importInSettings": { en: "Import in Settings", zh: "去设置导入" },
+  "overview.blocked.skipForNow": { en: "Skip for now", zh: "暂不备份" },
+  "overview.key.needAgeBinary": { en: "Install age first (Setup), then generate a key.", zh: "请先安装 age(设置检查),再生成密钥。" },
+  // ── Onboarding capture ───────────────────────────────────────────────────
+  "onboard.capture.refHint": { en: "Secrets will be age-encrypted; you can switch any to a 1Password / rbw reference later on the Env page.", zh: "密钥项将用 age 加密;之后可在 env 页把任意一项改为 1Password / rbw 引用。" },
 };
