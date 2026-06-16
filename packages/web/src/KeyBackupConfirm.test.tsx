@@ -21,4 +21,10 @@ describe("KeyBackupConfirm", () => {
     expect(screen.getByText("age1xyz")).toBeInTheDocument();
     expect(screen.getByText("/k/keys.txt")).toBeInTheDocument();
   });
+
+  it("wraps a long recipient instead of overflowing the dialog", () => {
+    const longRecipient = "age1907uq7gpfzsdafpf0p90dtmypkemcyt4qf8guf757xc07enal3lqap02e8";
+    render(<KeyBackupConfirm recipient={longRecipient} keyPath="/k/keys.txt" t={t} onConfirm={() => {}} />);
+    expect(screen.getByText(longRecipient)).toHaveStyle({ wordBreak: "break-all" });
+  });
 });

@@ -20,7 +20,7 @@ export function KeyBackupConfirm({ recipient, keyPath, t, onConfirm }: {
         <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5, margin: "0 0 10px" }}>{t("onboard.key.body")}</p>
         <div style={{ fontSize: 12.5, marginBottom: 4 }}>
           <span style={{ color: "var(--muted)" }}>{t("onboard.key.recipient")} </span>
-          <span className="mono" style={{ color: "var(--text)" }}>{recipient ?? "—"}</span>
+          <span className="mono" style={{ color: "var(--text)", wordBreak: "break-all" }}>{recipient ?? "—"}</span>
         </div>
         <div style={{ fontSize: 12.5, marginBottom: 12 }}>
           <span style={{ color: "var(--muted)" }}>{t("onboard.key.path")} </span>
