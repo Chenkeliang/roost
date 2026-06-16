@@ -32,6 +32,7 @@ export interface Candidate {
   recommendation: Recommendation; note?: string;
   remote?: string; host?: string; protocol?: "ssh" | "https" | "other";
   origin?: CandidateOrigin;
+  suggestExtract?: string[];
 }
 
 export interface ModuleIndex {

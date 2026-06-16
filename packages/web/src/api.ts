@@ -163,8 +163,9 @@ export interface AiCatalogPath {
   kind: "memory" | "settings" | "mcp" | "data";
   encrypt: boolean;
   state: "selected" | "pending" | "available" | "dotfiles" | "never" | "missing";
+  extract?: boolean;
 }
-export interface AiCatalogTool { id: string; label: string; paths: AiCatalogPath[] }
+export interface AiCatalogTool { id: string; label: string; paths: AiCatalogPath[]; suggest?: boolean }
 export function getFilePreview(p: string): Promise<{ ok: boolean; content?: string; reason?: "encrypted" | "secret" | "binary" | "too-large" | "directory" | "failed" }> {
   return apiFetch(`/api/file-preview?path=${encodeURIComponent(p)}`);
 }
@@ -173,7 +174,7 @@ export function getAiToolsCatalog(): Promise<{ tools: AiCatalogTool[] }> {
   return apiFetch("/api/aitools/catalog");
 }
 
-export function addAiCustom(body: { path: string; label?: string; kind?: string; policy?: string }): Promise<{ ok: boolean }> {
+export function addAiCustom(body: { path: string; label?: string; kind?: string; policy?: string; extract?: { fields: string[] } }): Promise<{ ok: boolean }> {
   return apiFetch("/api/aitools/custom", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 }
 

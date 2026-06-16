@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { loadAiToolsCatalog, DEFAULT_AI_TOOLS_CATALOG, effectivePolicy, aiPathPolicies } from "./ai-tools-catalog.js";
+import { loadAiToolsCatalog, DEFAULT_AI_TOOLS_CATALOG, effectivePolicy, aiPathPolicies, aiExtractEntries } from "./ai-tools-catalog.js";
 import { loadExternalManagers, DEFAULT_EXTERNAL_MANAGERS } from "./external-managers.js";
 
 let tmpDir: string;
@@ -50,7 +50,10 @@ describe("ai catalog policy (ADR-0023)", () => {
   });
   it("credentials are skip entries in the catalog, not a separate list", () => {
     const cc = DEFAULT_AI_TOOLS_CATALOG.find((t) => t.id === "claude-code")!;
-    expect(cc.paths.find((p) => p.path === ".claude.json")!.policy).toBe("skip");
+    // ADR-0024: .claude.json is now an extract entry (policy:"encrypt") not a skip entry
+    const claudeJson = cc.paths.find((p) => p.path === ".claude.json")!;
+    expect(claudeJson.policy).toBe("encrypt");
+    expect(claudeJson.extract?.fields).toEqual(["mcpServers"]);
     const gem = DEFAULT_AI_TOOLS_CATALOG.find((t) => t.id === "gemini")!;
     expect(gem.paths.some((p) => p.path === ".gemini/oauth_creds.json" && p.policy === "skip")).toBe(true);
     expect(gem.paths.some((p) => p.path === ".gemini/google_accounts.json" && p.policy === "skip")).toBe(true);
@@ -62,9 +65,15 @@ describe("ai catalog policy (ADR-0023)", () => {
   it("aiPathPolicies maps abs paths to policy", () => {
     const home = "/h";
     const m = aiPathPolicies("/repo-nonexistent", home);
-    expect(m.get("/h/.claude.json")).toBe("skip");
+    // ADR-0024: .claude.json is now policy:"encrypt" (extract entry)
+    expect(m.get("/h/.claude.json")).toBe("encrypt");
     expect(m.get("/h/.claude/settings.local.json")).toBe("encrypt");
     expect(m.get("/h/.claude/CLAUDE.md")).toBe("plain");
+  });
+  it("aiExtractEntries returns extract spec for .claude.json", () => {
+    const home = "/h";
+    const m = aiExtractEntries("/repo-nonexistent", home);
+    expect(m.get("/h/.claude.json")).toEqual({ fields: ["mcpServers"] });
   });
 });
 

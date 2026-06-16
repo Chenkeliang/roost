@@ -674,4 +674,8 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "ai.custom.labelPh": { en: "Tool name (optional)", zh: "工具名(可选)" },
   "ai.custom.save": { en: "Add", zh: "添加" },
   "ai.notInstalled": { en: "not installed", zh: "未安装" },
+  "ai.extractTag": { en: "field", zh: "提取" },
+  "ai.suggest.group": { en: "Detected MCP you can extract", zh: "检测到可提取的 MCP" },
+  "ai.suggest.adopt": { en: "Back up just the MCP", zh: "按提取方式纳管" },
+  "ai.suggest.note": { en: "Backs up only mcpServers; your token/secrets stay out of the repo.", zh: "只备份 mcpServers;令牌/密钥不入库。" },
 };

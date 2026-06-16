@@ -31,16 +31,19 @@ export async function recipientFromKey(exec: Exec, keyPath: string): Promise<str
 }
 
 /**
- * Encrypt `plaintext` to `roost/env-secrets/<name>.age` using the given recipient.
+ * Encrypt `plaintext` to an age-encrypted file using the given recipient.
  * Writes via a temp file in os.tmpdir() so plaintext never lands next to the repo.
  * Returns the ciphertext path. Throws with a clear message on failure.
+ *
+ * `dest` defaults to `roost/env-secrets/<name>.age`; callers that need a different
+ * storage path (e.g. aitools-extract artifacts) may supply an explicit dest.
  */
 export async function encryptEnvSecret(
   exec: Exec,
-  opts: { repoDir: string; name: string; plaintext: string; recipient: string },
+  opts: { repoDir: string; name: string; plaintext: string; recipient: string; dest?: string },
 ): Promise<string> {
-  const { repoDir, name, plaintext, recipient } = opts;
-  const dest = envSecretPath(repoDir, name);
+  const { name, plaintext, recipient } = opts;
+  const dest = opts.dest ?? envSecretPath(opts.repoDir, name);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
 
   // Plaintext lives only in os.tmpdir(), short-lived, removed in finally.
@@ -62,16 +65,19 @@ export async function encryptEnvSecret(
 }
 
 /**
- * Decrypt `roost/env-secrets/<name>.age` to plaintext using the age identity at keyPath.
+ * Decrypt an age-encrypted file to plaintext using the age identity at keyPath.
  * Returns null if the ciphertext is missing or decryption fails. Plaintext is returned to
  * the caller and never written to disk here.
+ *
+ * `src` defaults to `roost/env-secrets/<name>.age`; callers that need a different
+ * storage path (e.g. aitools-extract artifacts) may supply an explicit src.
  */
 export async function decryptEnvSecret(
   exec: Exec,
-  opts: { repoDir: string; name: string; keyPath: string },
+  opts: { repoDir: string; name: string; keyPath: string; src?: string },
 ): Promise<string | null> {
-  const { repoDir, name, keyPath } = opts;
-  const src = envSecretPath(repoDir, name);
+  const { name, keyPath } = opts;
+  const src = opts.src ?? envSecretPath(opts.repoDir, name);
   if (!fs.existsSync(src) || !fs.existsSync(keyPath)) return null;
   const r = await exec.run("age", ["-d", "-i", keyPath, src]);
   if (r.code !== 0) return null;
