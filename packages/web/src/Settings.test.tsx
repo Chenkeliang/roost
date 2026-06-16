@@ -102,6 +102,28 @@ describe("Settings", () => {
     });
   });
 
+  it("gates rotate behind an in-app confirm dialog (not window.confirm)", async () => {
+    const { rotateKey } = await import("./api");
+    await act(async () => { render(<Settings />); });
+    const trigger = await screen.findByText("Rotate / replace key");
+    await act(async () => { fireEvent.click(trigger); });
+    // dialog shown; rotate not performed until confirmed
+    expect(rotateKey).not.toHaveBeenCalled();
+    const confirmBtn = await screen.findByRole("button", { name: "Rotate now" });
+    await act(async () => { fireEvent.click(confirmBtn); });
+    await waitFor(() => expect(rotateKey).toHaveBeenCalledOnce());
+  });
+
+  it("rotate success message guides commit/push and other-Mac key import", async () => {
+    await act(async () => { render(<Settings />); });
+    await act(async () => { fireEvent.click(await screen.findByText("Rotate / replace key")); });
+    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Rotate now" })); });
+    await waitFor(() => {
+      expect(screen.getByText(/Commit & push/i)).toBeInTheDocument();
+      expect(screen.getByText(/import the NEW key on your other Macs/i)).toBeInTheDocument();
+    });
+  });
+
   it("shows the max capture size field", async () => {
     await act(async () => { render(<Settings />); });
     await waitFor(() => {

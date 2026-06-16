@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { Skeleton } from "../components/Skeleton";
 import { KeyBackupConfirm } from "../components/KeyBackupConfirm";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useT } from "../i18n";
 import { getHealth, getModules, getGitStatus, gitPush, gitPull, getKey, generateKey, rotateKey, getSettings, saveSettings, type ModulesResponse, type GitStatus,
   type GitOpResult, type KeyStatus } from "../api";
@@ -29,6 +30,7 @@ export function Settings() {
   const [keyBusy, setKeyBusy] = useState<"generate" | "rotate" | null>(null);
   const [keyResult, setKeyResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [keyBackup, setKeyBackup] = useState<{ recipient: string | null; keyPath: string } | null>(null);
+  const [confirmRotate, setConfirmRotate] = useState(false);
   const [maxCaptureMB, setMaxCaptureMB] = useState(100);
   const [appSettings, setAppSettings] = useState<{ autoBackup: "off" | "daily" | "weekly"; autoPush: boolean; checkUpdates: boolean }>({ autoBackup: "daily", autoPush: false, checkUpdates: true });
   const [updateResult, setUpdateResult] = useState<"checking" | "latest" | "failed" | { version: string; url: string } | null>(null);
@@ -91,14 +93,13 @@ export function Settings() {
   }
 
   async function handleRotateKey() {
-    if (!window.confirm(t("settings.key.rotateConfirm"))) return;
     setKeyBusy("rotate");
     setKeyResult(null);
     try {
       const r = await rotateKey();
       setKeyResult(
         r.swapped
-          ? { ok: true, text: `Rotated ${r.rotated.length} file(s). New recipient: ${r.recipient}. Old key backed up — RE-BACK UP the new key.` }
+          ? { ok: true, text: `Rotated ${r.rotated.length} file(s). New recipient: ${r.recipient}. Old key backed up${r.backupPath ? ` at ${r.backupPath}` : ""}. Commit & push to propagate the re-encrypted files; import the NEW key on your other Macs, then RE-BACK UP the new key.` }
           : { ok: false, text: `Aborted — ${r.failed.length} file(s) failed to re-encrypt; the key was left unchanged.` },
       );
       if (r.swapped) setKeyBackup({ recipient: r.recipient, keyPath: keyStatus?.keyPath ?? "" });
@@ -417,7 +418,7 @@ export function Settings() {
             </button>
           ) : (
             <button
-              onClick={() => { void handleRotateKey(); }}
+              onClick={() => setConfirmRotate(true)}
               disabled={keyBusy !== null}
               style={{ padding: "7px 16px", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rr)", fontSize: 14, cursor: keyBusy ? "default" : "pointer", opacity: keyBusy ? 0.6 : 1 }}
             >
@@ -559,6 +560,18 @@ export function Settings() {
           </a>
         ))}
       </div>
+
+      {confirmRotate && (
+        <ConfirmDialog
+          title={t("settings.key.rotateConfirmTitle")}
+          body={t("settings.key.rotateConfirm")}
+          confirmLabel={t("settings.key.rotateConfirmYes")}
+          cancelLabel={t("settings.key.rotateConfirmCancel")}
+          danger
+          onConfirm={() => { setConfirmRotate(false); void handleRotateKey(); }}
+          onCancel={() => setConfirmRotate(false)}
+        />
+      )}
 
       {keyBackup && (
         <KeyBackupConfirm
