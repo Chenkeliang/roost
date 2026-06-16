@@ -44,6 +44,9 @@ export function StepCapture({ t, showHud, onDone }: { t: (k: string) => string; 
   };
 
   const summary = modules ? Object.entries(modules).filter(([, ids]) => ids.length > 0) : [];
+  const hasSecretModule = modules
+    ? Object.entries(modules).some(([m, ids]) => SECRET_MODULES.has(m) && ids.length > 0)
+    : false;
 
   return (
     <div>
@@ -63,6 +66,11 @@ export function StepCapture({ t, showHud, onDone }: { t: (k: string) => string; 
         </div>
       )}
       {err && <div style={{ color: "var(--accent)", fontSize: 12.5, marginBottom: 8 }}>{err}</div>}
+      {hasSecretModule && (
+        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 10px" }}>
+          {t("onboard.capture.refHint")}
+        </p>
+      )}
       <button onClick={() => void onCaptureClick()} disabled={busy || summary.length === 0} style={{ appearance: "none", border: "1px solid var(--accent)", background: "var(--accent)", color: "#0b0b0d", fontFamily: "var(--font)", fontWeight: 600, fontSize: 13, padding: "7px 14px", borderRadius: 8, cursor: busy ? "default" : "pointer", opacity: summary.length === 0 ? 0.6 : 1 }}>{busy ? "…" : t("onboard.capture.btn")}</button>
 
       {keygen && (

@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import { act } from "react";
 import { StepCapture } from "./views/onboarding/StepCapture";
 import * as api from "./api";
 
 vi.mock("./api", () => ({
   getSelection: vi.fn(),
-  getKey: vi.fn(),
+  getKey: vi.fn().mockResolvedValue({ exists: true, recipient: "age1", keyPath: "/k", encryptedFiles: 0 }),
   generateKey: vi.fn(),
   postCapture: vi.fn().mockResolvedValue({ changes: [] }),
 }));
@@ -39,5 +40,22 @@ describe("StepCapture", () => {
     screen.getByRole("button", { name: "onboard.key.continue" }).click();
     await waitFor(() => expect(api.postCapture).toHaveBeenCalled());
     await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+});
+
+// Task 8: ref-hint line
+describe("StepCapture — ref-hint line", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the ref-hint when a secret module (env) is selected", async () => {
+    vi.mocked(api.getSelection).mockResolvedValue({ schemaVersion: 1, modules: { env: ["TOKEN"] } });
+    await act(async () => { render(<StepCapture t={t} onDone={() => {}} />); });
+    await waitFor(() => expect(screen.getByText("onboard.capture.refHint")).toBeInTheDocument());
+  });
+
+  it("omits the ref-hint when no secret module is selected", async () => {
+    vi.mocked(api.getSelection).mockResolvedValue({ schemaVersion: 1, modules: { dotfiles: ["~/.zshrc"] } });
+    await act(async () => { render(<StepCapture t={t} onDone={() => {}} />); });
+    await waitFor(() => expect(screen.queryByText("onboard.capture.refHint")).toBeNull());
   });
 });
