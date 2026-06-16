@@ -172,6 +172,16 @@ describe("aitools field extraction (ADR-0024)", () => {
     expect(captured).not.toContain("TOKEN");   // token never extracted
   });
 
+  it("discover emits extract-entry candidate with · 提取 note", async () => {
+    const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
+    // .claude.json exists and has mcpServers (extract entry is a candidate only when the field exists)
+    fs.writeFileSync(path.join(home, ".claude.json"), JSON.stringify({ mcpServers: { a: {} } }), "utf8");
+    const cands = await aitoolsModule.discover(makeCtx({ exec: makeFakeExec([]).exec, home, repoDir }));
+    const c = cands.find((c) => c.path.endsWith(".claude.json"));
+    expect(c).toBeDefined();
+    expect(c!.note).toContain("提取");
+  });
+
   it("apply merges mcpServers back, preserves token, backs up first, dryRun no-write", async () => {
     const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
     const f = path.join(home, ".claude.json");
@@ -198,5 +208,36 @@ describe("aitools field extraction (ADR-0024)", () => {
     expect(after.mcpServers).toEqual({ new: 2 });
     expect(after.oauthAccount).toBe("KEEPTOKEN");   // token preserved
     expect(fs.existsSync(path.join(home, ".roost-backups", "aitools"))).toBe(true); // backed up
+  });
+});
+
+describe("aitools MCP auto-detect (ADR-0024)", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aitools-autodetect-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("suggests extraction for a JSON file with top-level mcpServers + a secret", async () => {
+    const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
+    fs.mkdirSync(path.join(home, ".weirdtool"), { recursive: true });
+    const f = path.join(home, ".weirdtool", "config.json");
+    fs.writeFileSync(f, JSON.stringify({ mcpServers: { a: { command: "x" } }, apiKey: "AKIAIOSFODNN7EXAMPLE1234567890AB" }), "utf8");
+    const cands = await aitoolsModule.discover(makeCtx({ exec: makeFakeExec([]).exec, home, repoDir }));
+    const s = cands.find((c) => c.path === f);
+    expect(s?.suggestExtract).toEqual(["mcpServers"]);
+  });
+  it("does NOT suggest when there is no secret, or no mcpServers", async () => {
+    const home = tmpDir; const repoDir = path.join(tmpDir, "repo"); fs.mkdirSync(repoDir, { recursive: true });
+    fs.mkdirSync(path.join(home, ".cleantool"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".cleantool", "config.json"), JSON.stringify({ mcpServers: { a: {} } }), "utf8"); // no secret
+    fs.mkdirSync(path.join(home, ".other"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".other", "config.json"), JSON.stringify({ apiKey: "AKIAIOSFODNN7EXAMPLE1234567890AB" }), "utf8"); // no mcpServers
+    const cands = await aitoolsModule.discover(makeCtx({ exec: makeFakeExec([]).exec, home, repoDir }));
+    expect(cands.some((c) => c.suggestExtract)).toBe(false);
   });
 });

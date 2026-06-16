@@ -17,12 +17,82 @@ import type {
   BlockedItem,
 } from "@roost/shared";
 import { createChezmoi } from "../adapters/chezmoi.js";
-import { loadAiToolsCatalog, aiPathPolicies, type AiExtract } from "../ai-tools-catalog.js";
+import { loadAiToolsCatalog, aiPathPolicies, aiExtractEntries, type AiExtract } from "../ai-tools-catalog.js";
 import { loadSelection } from "../selection.js";
 import { ensureChezmoiAgeConfig } from "../chezmoi-config.js";
 import { scanPathForSecrets } from "./dotfiles.js";
 import { pickFields, mergeFields, writeExtractArtifact, readExtractArtifact } from "../aitools-extract.js";
 import { backupFiles } from "../apply.js";
+
+// Shallow glob helper (no external dep). Resolves a single `*` wildcard by
+// reading one `fs.readdirSync` level. Returns existing JSON file matches only.
+// Bounded to ≤2 levels; errors yield [].
+function globShallow(home: string, patterns: string[]): string[] {
+  const out: string[] = [];
+  for (const pat of patterns) {
+    const parts = pat.split("/");
+    try {
+      if (parts.length === 1) {
+        // e.g. ".*rc.json" — file directly in home, may contain *
+        const [seg] = parts;
+        if (!seg) continue;
+        if (!seg.includes("*")) {
+          const abs = path.join(home, seg);
+          if (abs.endsWith(".json") && fs.existsSync(abs)) out.push(abs);
+        } else {
+          const suffix = seg.replace(/^\*/, "");
+          let entries: fs.Dirent[];
+          try { entries = fs.readdirSync(home, { withFileTypes: true }); } catch { continue; }
+          for (const e of entries) {
+            if (!e.isFile()) continue;
+            const abs = path.join(home, e.name);
+            if (e.name.endsWith(suffix) && abs.endsWith(".json")) out.push(abs);
+          }
+        }
+      } else if (parts.length === 2) {
+        // e.g. ".*/*.json" — dotdir under home / any json file
+        const [dirSeg, fileSeg] = parts;
+        if (!dirSeg || !fileSeg) continue;
+        const dirPrefix = dirSeg.replace(/^\.\*/, "."); // ".*" → starts-with-dot
+        const hasDirWild = dirSeg.includes("*");
+        const hasFileWild = fileSeg.includes("*");
+        let entries: fs.Dirent[];
+        try { entries = fs.readdirSync(home, { withFileTypes: true }); } catch { continue; }
+        for (const e of entries) {
+          if (!e.isDirectory()) continue;
+          if (hasDirWild && !e.name.startsWith(dirPrefix)) continue;
+          if (!hasDirWild && e.name !== dirSeg) continue;
+          if (hasFileWild) {
+            const fileSuffix = fileSeg.replace(/^\*/, "");
+            let children: fs.Dirent[];
+            try { children = fs.readdirSync(path.join(home, e.name), { withFileTypes: true }); } catch { continue; }
+            for (const c of children) {
+              if (!c.isFile()) continue;
+              const abs = path.join(home, e.name, c.name);
+              if (c.name.endsWith(fileSuffix) && abs.endsWith(".json")) out.push(abs);
+            }
+          } else {
+            const abs = path.join(home, e.name, fileSeg);
+            if (abs.endsWith(".json") && fs.existsSync(abs)) out.push(abs);
+          }
+        }
+      } else if (parts.length === 3) {
+        // e.g. ".config/*/config.json" or ".config/*/*.json"
+        const [base, , leaf] = parts;
+        if (!base || !leaf) continue;
+        const baseDir = path.join(home, base);
+        let dirs: fs.Dirent[];
+        try { dirs = fs.readdirSync(baseDir, { withFileTypes: true }); } catch { continue; }
+        for (const d of dirs) {
+          if (!d.isDirectory()) continue;
+          const abs = path.join(baseDir, d.name, leaf);
+          if (abs.endsWith(".json") && fs.existsSync(abs)) out.push(abs);
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  return out;
+}
 
 // Build a map from absolute path to { extract spec, toolId } from the catalog.
 // Used by capture/status/apply to route extract entries away from chezmoi.
@@ -40,6 +110,7 @@ export const aitoolsModule: SyncModule = {
   async discover(ctx: ModuleContext): Promise<Candidate[]> {
     const cat = loadAiToolsCatalog(ctx.repoDir);
     const policies = aiPathPolicies(ctx.repoDir, ctx.home);
+    const extracts = aiExtractEntries(ctx.repoDir, ctx.home);
     const dotfilesSel = new Set(loadSelection(ctx.repoDir).modules["dotfiles"] ?? []);
     const out: Candidate[] = [];
     for (const tool of cat) {
@@ -48,10 +119,37 @@ export const aitoolsModule: SyncModule = {
         if (policies.get(abs) === "skip") continue;
         if (!fs.existsSync(abs)) continue;
         if (dotfilesSel.has(abs)) continue; // single owner: already under dotfiles
+        // ADR-0024: extract entries must have at least one listed field present in the file.
+        if (p.extract) {
+          let parsed: unknown;
+          try { parsed = JSON.parse(fs.readFileSync(abs, "utf8")); } catch { continue; }
+          if (!parsed || typeof parsed !== "object") continue;
+          const hasField = p.extract.fields.some((f) => f in (parsed as object));
+          if (!hasField) continue;
+        }
         const enc = policies.get(abs) === "encrypt";
-        out.push({ id: abs, path: abs, category: p.kind, recommendation: enc ? "encrypt" : "track", note: `${tool.label} · ${p.kind}${enc ? " · encrypted" : ""}` });
+        const extractTag = p.extract ? " · 提取" : "";
+        out.push({ id: abs, path: abs, category: p.kind, recommendation: enc ? "encrypt" : "track", note: `${tool.label} · ${p.kind}${enc ? " · encrypted" : ""}${extractTag}` });
       }
     }
+
+    // MCP auto-detect (ADR-0024): JSON files with a top-level mcpServers block that
+    // also carry a secret → suggest extraction. Suggest-only; bounded candidate set.
+    const seen = new Set(out.map((c) => c.path));
+    const candidates = [
+      ...cat.flatMap((tl) => tl.paths.map((p) => path.join(ctx.home, p.path))),  // catalog paths
+      ...globShallow(ctx.home, [".config/*/config.json", ".config/*/*.json", ".*rc.json", ".*/*.json"]),
+    ];
+    for (const abs of new Set(candidates)) {
+      if (seen.has(abs) || extracts.has(abs)) continue;       // already handled or already an extract rule
+      if (!abs.endsWith(".json") || !fs.existsSync(abs)) continue;
+      let parsed: unknown;
+      try { parsed = JSON.parse(fs.readFileSync(abs, "utf8")); } catch { continue; }
+      if (!parsed || typeof parsed !== "object" || !("mcpServers" in (parsed as object))) continue;
+      if (scanPathForSecrets(abs, { maxBytes: 2 * 1024 * 1024 }).secretFiles.length === 0) continue; // not mixed
+      out.push({ id: abs, path: abs, category: "mcp", recommendation: "encrypt", note: `${path.basename(path.dirname(abs))} · MCP (建议提取)`, suggestExtract: ["mcpServers"] });
+    }
+
     return out;
   },
 
