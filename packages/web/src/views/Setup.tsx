@@ -136,6 +136,8 @@ export function Setup({ onOpenSettings, embedded, onReady }: { onOpenSettings?: 
                     <CopyButton text={BREW_INSTALL_CMD} />
                     <a href="https://brew.sh" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 12.5 }}>brew.sh</a>
                   </span>
+                ) : c.id === "op" || c.id === "rbw" ? (
+                  <span style={{ fontSize: 12.5, color: "#f0b352" }}>{t("setup.check.refBackendHint")}</span>
                 ) : (
                   <span style={{ fontSize: 12.5, color: c.required ? "#ff8c8c" : "#f0b352" }}>{t("setup.needBrewFirst")}</span>
                 )}

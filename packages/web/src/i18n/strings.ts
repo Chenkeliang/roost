@@ -55,6 +55,9 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "setup.check.age": { en: "age (encryption)", zh: "age(加密)" },
   "setup.check.mise": { en: "mise (project tools)", zh: "mise(项目工具)" },
   "setup.check.age-key": { en: "age key", zh: "age 私钥" },
+  "setup.check.op": { en: "1Password CLI (op)", zh: "1Password CLI(op)" },
+  "setup.check.rbw": { en: "rbw (Bitwarden)", zh: "rbw(Bitwarden)" },
+  "setup.check.refBackendHint": { en: "Not installed — optional, for op:// / rbw secret references", zh: "未安装 —— 可选,用于 op:// / rbw 密钥引用" },
   "setup.check.repo": { en: "Config repo", zh: "配置仓库" },
 
   // ── Sync Review (sync-state) ─────────────────────────────────────────────

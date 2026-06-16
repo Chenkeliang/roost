@@ -22,4 +22,22 @@ describe("Setup onReady", () => {
     render(<Setup embedded onReady={onReady} />);
     await waitFor(() => expect(onReady).toHaveBeenCalledWith(false));
   });
+
+  it("labels op/rbw and shows a ref-backend hint, not a Homebrew prompt", async () => {
+    const checks: EnvCheck[] = [
+      { id: "brew", ok: true, required: true },
+      { id: "op", ok: false, required: false },
+      { id: "rbw", ok: true, required: false },
+    ];
+    vi.mocked(api.getEnvironment).mockResolvedValue({ checks });
+    const { queryByText, getByText } = render(<Setup embedded />);
+    await waitFor(() => expect(getByText("1Password CLI (op)")).toBeInTheDocument());
+    expect(getByText("rbw (Bitwarden)")).toBeInTheDocument();
+    // no raw i18n keys leak through
+    expect(queryByText("setup.check.op")).toBeNull();
+    expect(queryByText("setup.check.rbw")).toBeNull();
+    // op (optional, no brew formula) must NOT show the misleading Homebrew hint
+    expect(queryByText("Install Homebrew first, then re-check.")).toBeNull();
+    expect(getByText(/optional, for op/i)).toBeInTheDocument();
+  });
 });
