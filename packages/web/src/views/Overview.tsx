@@ -119,7 +119,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
   const [missingDeps, setMissingDeps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
-  const [blockedDetail, setBlockedDetail] = useState<BlockedItem[]>([]);
+  const [blockedDetail, setBlockedDetail] = useState<(BlockedItem & { module: string })[]>([]);
   const [retrying, setRetrying] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
@@ -172,12 +172,18 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
     try {
       const result = await postCapture();
       const blockedPaths = result.changes.flatMap((c) => c.blocked ?? []);
+      const details = result.changes.flatMap((c) =>
+        (c.blockedDetail ?? []).map((b) => ({ ...b, module: c.module })),
+      );
       setBlocked(blockedPaths);
-      setBlockedDetail(result.changes.flatMap((c) => c.blockedDetail ?? []));
+      setBlockedDetail(details);
       const written = result.changes.reduce((n, c) => n + c.written.length + c.encrypted.length, 0);
+      const hasSecret = details.some((b) => b.reason === "secret");
       showHud({
         text: blockedPaths.length > 0
-          ? `Captured ${written} · ${blockedPaths.length} blocked (potential secrets)`
+          ? (hasSecret
+              ? `Captured ${written} · ${blockedPaths.length} blocked (potential secrets)`
+              : `Captured ${written} · ${blockedPaths.length} need attention`)
           : `Captured ${written} item${written === 1 ? "" : "s"}`,
         type: blockedPaths.length > 0 ? "error" : "success",
       });
@@ -198,7 +204,9 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
       const result = await postCapture();
       const stillBlocked = result.changes.flatMap((c) => c.blocked ?? []);
       setBlocked(stillBlocked);
-      setBlockedDetail(result.changes.flatMap((c) => c.blockedDetail ?? []));
+      setBlockedDetail(result.changes.flatMap((c) =>
+        (c.blockedDetail ?? []).map((b) => ({ ...b, module: c.module })),
+      ));
       const enc = result.changes.reduce((n, c) => n + c.encrypted.length, 0);
       showHud({
         text: stillBlocked.length > 0
@@ -447,7 +455,12 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <Lock size={14} style={{ color: "var(--amber)" }} />
             <span style={{ fontSize: 14, fontWeight: 540, color: "var(--text)" }}>
-              {blockedDetail.length} {t("overview.blockedTitle")}
+              {blockedDetail.length}{" "}
+              <span>
+                {blockedDetail.some((b) => b.reason === "secret")
+                  ? t("overview.blockedTitle")
+                  : t("overview.blockedTitleNeutral")}
+              </span>
             </span>
             {blockedDetail.some((b) => b.reason === "secret") && (
               <button

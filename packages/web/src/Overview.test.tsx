@@ -3,10 +3,11 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { Overview } from "./views/Overview";
 import * as api from "./api";
+import { postCapture } from "./api";
 
 // Mock with realistic server shapes matching server.ts actual responses
 vi.mock("./api", () => ({
-  getHealth: vi.fn().mockResolvedValue({ ok: true, name: "roost" }),
+  getHealth: vi.fn().mockResolvedValue({ ok: true, name: "roost", ageKey: false }),
   getEnvironment: vi.fn().mockResolvedValue({ checks: [] }),
   getMachines: vi.fn().mockResolvedValue({ hosts: ["macbook.local"], states: {} }),
   getGitStatus: vi.fn().mockResolvedValue({ isRepo: true, remote: "git@x:y.git", branch: "main", ahead: 0, behind: 0, clean: true }),
@@ -39,6 +40,8 @@ vi.mock("./api", () => ({
   excludeDotfile: vi.fn().mockResolvedValue({ ok: true }),
   gitPull: vi.fn().mockResolvedValue({ ok: true, output: "" }),
   gitPush: vi.fn().mockResolvedValue({ ok: true, output: "" }),
+  getSettings: vi.fn().mockResolvedValue({ checkUpdates: false }),
+  generateKey: vi.fn(),
 }));
 
 describe("Overview", () => {
@@ -162,5 +165,37 @@ describe("Overview", () => {
     const exclude = screen.getByRole("button", { name: /Stop backing up|移出管理/ });
     await act(async () => { fireEvent.click(exclude); });
     await waitFor(() => expect(api.excludeDotfile).toHaveBeenCalledWith("/u/.x/huge.bin"));
+  });
+});
+
+// ── Task 4: Overview — module tracking + de-mislabel title/HUD ───────────────
+
+function captureResult(blockedDetail: { id: string; reason: string; detail?: string }[]) {
+  return { changes: [{ module: "dotfiles", written: [], encrypted: [], blocked: blockedDetail.map((b) => b.id), blockedDetail }] };
+}
+
+async function captureWith(detail: { id: string; reason: string; detail?: string }[]) {
+  (postCapture as ReturnType<typeof vi.fn>).mockResolvedValueOnce(captureResult(detail));
+  const showHud = vi.fn();
+  await act(async () => { render(<Overview showHud={showHud} onOpenSetup={() => {}} />); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Capture/i })); });
+  return showHud;
+}
+
+describe("Overview — blocked card labelling", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("uses the neutral title + non-secret HUD when no item is a secret", async () => {
+    const showHud = await captureWith([{ id: "/h/.aws/credentials", reason: "error", detail: "no age key" }]);
+    await waitFor(() => expect(screen.getByText("items need attention")).toBeInTheDocument());
+    expect(showHud).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining("need attention") }),
+    );
+    expect(screen.queryByText("items blocked — potential secrets")).toBeNull();
+  });
+
+  it("keeps the potential-secrets title when a secret item is present", async () => {
+    await captureWith([{ id: "/h/.npmrc", reason: "secret", detail: "1 file(s)" }]);
+    await waitFor(() => expect(screen.getByText("items blocked — potential secrets")).toBeInTheDocument());
   });
 });
