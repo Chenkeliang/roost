@@ -433,3 +433,15 @@ describe("AliasesEnv — ref backend availability", () => {
     );
   });
 });
+
+describe("AliasesEnv — secret-source discoverability", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("advertises the three secret sources on the page so they're findable", async () => {
+    (getEnv as ReturnType<typeof vi.fn>).mockResolvedValue({ schemaVersion: 1, aliases: [], env: [], path: [], functions: [] });
+    (getHealth as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, name: "r", ageKey: true });
+    await act(async () => { render(<AliasesEnv onOpenSettings={() => {}} />); });
+    await waitFor(() => expect(screen.getByText(/age \(encrypted into the repo\)/i)).toBeInTheDocument());
+    expect(screen.getByText(/Bitwarden/i)).toBeInTheDocument();
+  });
+});

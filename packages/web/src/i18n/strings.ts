@@ -265,6 +265,10 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
     en: "Portable aliases & environment Roost manages for you and carries across Macs — your existing dotfiles stay untouched.",
     zh: "Roost 为你管理并跨 Mac 携带的可移植别名与环境变量 —— 你现有的 dotfiles 不受影响。",
   },
+  "env.secretSourcesHint": {
+    en: "Secret values support three sources — age (encrypted into the repo), 1Password, or rbw/Bitwarden reference — set per variable below.",
+    zh: "密钥值支持三种来源:age(加密入库)、1Password、或 rbw/Bitwarden 引用 —— 在下方每条变量上单独设置。",
+  },
   "env.save": { en: "Save", zh: "保存" },
   "env.saving": { en: "Saving…", zh: "保存中…" },
   "env.importFromShell": { en: "Import from your shell", zh: "从你的 shell 导入" },

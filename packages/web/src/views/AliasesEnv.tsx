@@ -981,6 +981,22 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
       >
         {t("env.explainer")}
       </p>
+      {/* secret-source discoverability: advertise the per-variable age/op/rbw choice */}
+      <p
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          color: "var(--faint)",
+          fontSize: 12.5,
+          lineHeight: 1.5,
+          margin: "0 0 14px",
+          maxWidth: 720,
+        }}
+      >
+        <LockKey size={13} weight="fill" style={{ flexShrink: 0 }} />
+        {t("env.secretSourcesHint")}
+      </p>
 
       {/* search input (filters across all kinds) */}
       <div style={{ position: "relative", marginBottom: 13 }}>
