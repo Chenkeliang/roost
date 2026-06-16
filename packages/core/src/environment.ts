@@ -5,7 +5,7 @@ import type { Exec } from "@roost/shared";
 import { defaultAgeKeyPath } from "./env-crypto.js";
 
 export interface EnvCheck {
-  id: string; // brew | git | chezmoi | age | mise | age-key | repo
+  id: string; // brew | git | chezmoi | age | mise | op | rbw | age-key | repo
   ok: boolean;
   required: boolean;
   brewFormula?: string; // present ⇒ installable via `brew install <formula>`
@@ -31,6 +31,12 @@ export async function checkEnvironment(
   const checks: EnvCheck[] = [];
   for (const t of TOOLS) {
     checks.push({ id: t.id, ok: await hasTool(exec, t.cmd), required: t.required, brewFormula: t.brew });
+  }
+  // Password-manager CLIs for `ref` secrets (ADR-0004). Non-required, not
+  // brew-installable (op is a cask, rbw is cargo) — surfaced so the Env page
+  // can warn when a chosen ref backend is unavailable.
+  for (const cli of ["op", "rbw"] as const) {
+    checks.push({ id: cli, ok: await hasTool(exec, cli), required: false });
   }
   checks.push({ id: "age-key", ok: fs.existsSync(defaultAgeKeyPath(opts.home)), required: false });
   let repoOk = false;

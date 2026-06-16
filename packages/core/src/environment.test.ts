@@ -48,6 +48,17 @@ describe("checkEnvironment", () => {
     expect(by["age-key"]!.ok).toBe(true);
     expect(by["repo"]!.ok).toBe(true);
   });
+
+  it("includes op and rbw as non-required, non-brew checks", async () => {
+    const exec = execWith(new Set(["brew", "git", "chezmoi", "age", "rbw"])); // op missing, rbw present
+    const checks = await checkEnvironment(exec, { home: tmp, repoDir: tmp });
+    const by = Object.fromEntries(checks.map((c) => [c.id, c]));
+    expect(by["op"]!.ok).toBe(false);
+    expect(by["op"]!.required).toBe(false);
+    expect(by["op"]!.brewFormula).toBeUndefined();
+    expect(by["rbw"]!.ok).toBe(true);
+    expect(by["rbw"]!.required).toBe(false);
+  });
 });
 
 describe("brewInstall", () => {
