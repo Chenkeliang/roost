@@ -410,3 +410,26 @@ describe("AliasesEnv — save with no age key", () => {
     );
   });
 });
+
+import { getEnvironment } from "./api";
+
+describe("AliasesEnv — ref backend availability", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("warns when an rbw-referenced secret has rbw uninstalled", async () => {
+    const rbwEnv = {
+      schemaVersion: 1, aliases: [], path: [], functions: [],
+      env: [{ kind: "env", name: "TOKEN", value: "", secret: true, source: { kind: "ref", backend: "rbw", ref: "my-entry" }, enabled: true }],
+    };
+    (getEnv as ReturnType<typeof vi.fn>).mockResolvedValue(rbwEnv);
+    (getHealth as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, name: "r", ageKey: true });
+    (getEnvironment as ReturnType<typeof vi.fn>).mockResolvedValue({
+      checks: [{ id: "rbw", ok: false, required: false }, { id: "op", ok: true, required: false }],
+    });
+    await act(async () => { render(<AliasesEnv onOpenSettings={() => {}} />); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "edit env TOKEN" })); });
+    await waitFor(() =>
+      expect(screen.getByText(/is not installed — this reference can't be resolved on apply/)).toBeInTheDocument(),
+    );
+  });
+});

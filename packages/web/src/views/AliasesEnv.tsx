@@ -24,7 +24,7 @@ import type {
 import type { HudMessage } from "../components/Hud";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
-import { getEnv, putEnv, getDiscover, applyEnv, getHealth } from "../api";
+import { getEnv, putEnv, getDiscover, applyEnv, getHealth, getEnvironment } from "../api";
 
 interface AliasesEnvProps {
   showHud?: (msg: HudMessage) => void;
@@ -244,12 +244,16 @@ function EnvEditor({
   t,
   ageKey,
   onOpenSettings,
+  opAvailable,
+  rbwAvailable,
 }: {
   item: EnvVarItem;
   onChange: (next: Partial<EnvVarItem>) => void;
   t: (key: string) => string;
   ageKey: boolean;
   onOpenSettings?: () => void;
+  opAvailable: boolean;
+  rbwAvailable: boolean;
 }) {
   const sel = sourceSel(item);
   const isRef = item.secret && sel !== "age";
@@ -317,6 +321,11 @@ function EnvEditor({
                 style={inputStyle}
               />
             </div>
+            {((sel === "ref:op" && !opAvailable) || (sel === "ref:rbw" && !rbwAvailable)) && (
+              <p style={{ ...hintStyle, color: "var(--amber)" }}>
+                {sel === "ref:op" ? "1Password CLI (op)" : "rbw"}{t("env.ref.backendMissing")}
+              </p>
+            )}
           </Field>
         ) : isStoredSecret ? (
           <Field label={t("env.field.value")} flex>
@@ -655,6 +664,8 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
   const [data, setData] = useState<EnvData | null>(null);
   const [serverData, setServerData] = useState<EnvData | null>(null);
   const [ageKey, setAgeKey] = useState(false);
+  const [opAvailable, setOpAvailable] = useState(true);
+  const [rbwAvailable, setRbwAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -670,10 +681,17 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
     setLoading(true);
     setError(null);
     try {
-      const [env, h] = await Promise.all([getEnv(), getHealth().catch(() => null)]);
+      const [env, h, envck] = await Promise.all([
+        getEnv(),
+        getHealth().catch(() => null),
+        getEnvironment().catch(() => null),
+      ]);
       setData(env);
       setServerData(env);
       setAgeKey(h?.ageKey ?? false);
+      const checks = envck?.checks ?? [];
+      setOpAvailable(checks.find((c) => c.id === "op")?.ok ?? true);
+      setRbwAvailable(checks.find((c) => c.id === "rbw")?.ok ?? true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1365,6 +1383,8 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
                         t={t}
                         ageKey={ageKey}
                         onOpenSettings={onOpenSettings}
+                        opAvailable={opAvailable}
+                        rbwAvailable={rbwAvailable}
                       />
                     )}
                     {ref.kind === "path" && (
