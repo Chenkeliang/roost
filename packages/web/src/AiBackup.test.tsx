@@ -75,4 +75,35 @@ describe("AiBackup", () => {
     // Button must be present even though the catalog is populated (non-empty list)
     expect(await screen.findByRole("button", { name: /Add tool|添加工具/ })).toBeInTheDocument();
   });
+
+  it("path with extract:true renders a 提取 tag after the filename", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [
+      { id: "claude-code", label: "Claude Code", paths: [
+        { path: "/h/.claude.json", kind: "mcp", encrypt: true, state: "selected", extract: true },
+      ]},
+    ] });
+    render(<AiBackup />);
+    fireEvent.click(await screen.findByText("Claude Code"));
+    // The extract tag must appear next to the filename row
+    expect(await screen.findByText(/提取|field/)).toBeInTheDocument();
+  });
+
+  it("tool with suggest:true renders in suggestion group with adopt button that calls addAiCustom with extract", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [
+      { id: "myapp", label: "MyApp", paths: [ { path: "/h/.myapp/config.json", kind: "mcp", encrypt: false, state: "available" } ], suggest: true },
+    ] });
+    render(<AiBackup />);
+    // Suggestion group heading
+    expect(await screen.findByText(/检测到可提取的 MCP|Detected MCP you can extract/)).toBeInTheDocument();
+    // Adopt button
+    const adoptBtn = screen.getByRole("button", { name: /按提取方式纳管|Back up just the MCP/ });
+    expect(adoptBtn).toBeInTheDocument();
+    fireEvent.click(adoptBtn);
+    await waitFor(() => expect(api.addAiCustom).toHaveBeenCalledWith({
+      path: "/h/.myapp/config.json",
+      label: "MyApp",
+      kind: "mcp",
+      extract: { fields: ["mcpServers"] },
+    }));
+  });
 });

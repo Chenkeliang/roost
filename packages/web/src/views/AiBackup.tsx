@@ -73,6 +73,7 @@ function ToolCard({ tool, onAdd, onRemove }: { tool: AiCatalogTool; onAdd: (p: s
             <div key={p.path} role="row" style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px 9px 18px", borderTop: "1px solid var(--border-soft)", fontSize: 12.5, opacity: p.state === "never" || p.state === "dotfiles" ? 0.5 : 1 }}>
               <KindIcon kind={p.kind} state={p.state} />
               <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 400, color: "var(--text)" }}>{p.path.split("/").pop()}</span>
+              {p.extract && <span style={{ fontSize: 10, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>{t("ai.extractTag")}</span>}
               {p.encrypt && <Lock size={12} style={{ color: "var(--amber)", flexShrink: 0 }} />}
               {p.state === "selected" || p.state === "pending"
                 ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{stateEl(p)}<button onClick={() => onRemove(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--muted)", fontSize: 11.5, cursor: "pointer" }}>{t("common.remove")}</button></span>
@@ -111,10 +112,18 @@ export function AiBackup({ showHud }: AiBackupProps) {
     setAdding(false); setCustomPath(""); setCustomLabel(""); void load();
   }, [customPath, customLabel, load]);
 
+  const onAdoptSuggestion = useCallback(async (tl: AiCatalogTool) => {
+    const path = tl.paths[0]?.path ?? "";
+    await addAiCustom({ path, label: tl.label, kind: "mcp", extract: { fields: ["mcpServers"] } });
+    void load();
+  }, [load]);
+
   if (tools === null) return <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}><Skeleton height={48} /><Skeleton height={48} /></div>;
 
-  const detected = tools.filter((tl) => tl.paths.some((p) => p.state !== "missing"));
-  const undetected = tools.filter((tl) => tl.paths.every((p) => p.state === "missing"));
+  const suggestions = tools.filter((tl) => tl.suggest);
+  const nonSuggest = tools.filter((tl) => !tl.suggest);
+  const detected = nonSuggest.filter((tl) => tl.paths.some((p) => p.state !== "missing"));
+  const undetected = nonSuggest.filter((tl) => tl.paths.every((p) => p.state === "missing"));
   const list = showAll ? [...detected, ...undetected] : detected;
 
   return (
@@ -123,7 +132,7 @@ export function AiBackup({ showHud }: AiBackupProps) {
         <span style={{ fontSize: 12, color: "var(--muted)", flex: 1 }}>{t("ai.tagline")}</span>
         <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden" }}>
           <button onClick={() => setShowAll(false)} style={{ appearance: "none", border: "none", fontSize: 11, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font)", background: !showAll ? "var(--raise)" : "transparent", color: !showAll ? "var(--text)" : "var(--muted)" }}>{t("ai.detected")} {detected.length}</button>
-          <button onClick={() => setShowAll(true)} style={{ appearance: "none", border: "none", fontSize: 11, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font)", background: showAll ? "var(--raise)" : "transparent", color: showAll ? "var(--text)" : "var(--muted)" }}>{t("ai.all")} {tools.length}</button>
+          <button onClick={() => setShowAll(true)} style={{ appearance: "none", border: "none", fontSize: 11, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font)", background: showAll ? "var(--raise)" : "transparent", color: showAll ? "var(--text)" : "var(--muted)" }}>{t("ai.all")} {nonSuggest.length}</button>
         </div>
         <button onClick={() => setAdding(!adding)} style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontSize: 11.5, padding: "4px 10px", borderRadius: 7, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font)" }}><Plus size={13} />{t("ai.addTool")}</button>
       </div>
@@ -135,9 +144,22 @@ export function AiBackup({ showHud }: AiBackupProps) {
         </div>
       )}
       <div>
-        {list.length === 0 && <p style={{ color: "var(--muted)", fontSize: 13.5 }}>{t("ai.empty")}</p>}
+        {list.length === 0 && suggestions.length === 0 && <p style={{ color: "var(--muted)", fontSize: 13.5 }}>{t("ai.empty")}</p>}
         {list.map((tl) => <ToolCard key={tl.id} tool={tl} onAdd={onAdd} onRemove={onRemove} />)}
       </div>
+      {suggestions.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>{t("ai.suggest.group")}</div>
+          {suggestions.map((tl) => (
+            <div key={tl.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderTop: "1px solid var(--border-soft)" }}>
+              <Plugs size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
+              <span className="mono" style={{ fontSize: 12.5, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{tl.paths[0]?.path ?? tl.label}</span>
+              <span style={{ fontSize: 11, color: "var(--muted)", flexShrink: 0 }}>{t("ai.suggest.note")}</span>
+              <button onClick={() => void onAdoptSuggestion(tl)} style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontSize: 11.5, padding: "4px 10px", borderRadius: 7, cursor: "pointer", flexShrink: 0, fontFamily: "var(--font)" }}>{t("ai.suggest.adopt")}</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
