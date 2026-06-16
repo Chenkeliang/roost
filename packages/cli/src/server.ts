@@ -43,6 +43,7 @@ import {
   encryptEnvSecret,
   ensureAgeKey,
   rotateToNewKey,
+  ensureChezmoiAgeConfig,
   indexAll,
   testRemote,
   parseBrewfile,
@@ -1074,6 +1075,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         newKeyTmpPath: path.join(os.tmpdir(), `roost-newkey-${stamp}`),
         backupPath: `${keyPath}.bak-${stamp}`,
       });
+      // After a successful swap the chezmoi recipient is stale (still the old key).
+      // Refresh it so the NEXT `chezmoi add --encrypt` targets the new key, not the
+      // rotated-out one. Existing repo .age files were already re-encrypted above.
+      if (result.swapped) {
+        await ensureChezmoiAgeConfig(ctx.exec, { home: ctx.home, repoDir });
+      }
       return reply.send(result);
     } catch (err) {
       return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });

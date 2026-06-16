@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { execFileSync } from "node:child_process";
 import type {
   Exec,
   ExecResult,
@@ -2558,5 +2559,67 @@ describe("file history + restore (ADR-0022 §5)", () => {
     expect(pathArg).not.toContain("~");
     expect(pathArg).toBe(path.join(os.homedir(), ".zshrc"));
     await server.close();
+  });
+});
+
+function hasAgeBinaries(): boolean {
+  try {
+    execFileSync("age", ["--version"], { stdio: "ignore" });
+    execFileSync("age-keygen", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+const HAS_AGE = hasAgeBinaries();
+
+describe("POST /api/key/rotate", () => {
+  // Real-age integration (gated like the rbw backend tests): generate a real key,
+  // encrypt a real .age file to it, rotate via the server, and assert the chezmoi
+  // recipient config is refreshed to the NEW key so post-rotate encrypts stay readable.
+  it.skipIf(!HAS_AGE)("re-encrypts repo .age files and refreshes chezmoi recipient to the new key", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-rot-home-"));
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "roost-rot-repo-"));
+    try {
+      const keyPath = path.join(home, ".config", "sops", "age", "keys.txt");
+      fs.mkdirSync(path.dirname(keyPath), { recursive: true });
+      execFileSync("age-keygen", ["-o", keyPath], { stdio: "ignore" });
+      const oldRecipient = execFileSync("age-keygen", ["-y", keyPath]).toString().trim();
+
+      // an .age artifact encrypted to the old key (mimics roost/env-secrets/*.age)
+      const secretDir = path.join(repo, "roost", "env-secrets");
+      fs.mkdirSync(secretDir, { recursive: true });
+      const plain = path.join(home, "plain.txt");
+      fs.writeFileSync(plain, "hello");
+      execFileSync("age", ["-r", oldRecipient, "-o", path.join(secretDir, "X.age"), plain]);
+
+      const makeCtx = (dryRun: boolean): ModuleContext => ({
+        repoDir: repo,
+        home,
+        profile: "base",
+        dryRun,
+        exec: createExec(),
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+        t: (k: string) => k,
+      });
+      const server = buildServer({ repoDir: repo, registry: new ModuleRegistry(), makeCtx });
+      const res = await server.inject({ method: "POST", url: "/api/key/rotate" });
+      await server.close();
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { swapped: boolean; recipient: string };
+      expect(body.swapped).toBe(true);
+
+      const newRecipient = execFileSync("age-keygen", ["-y", keyPath]).toString().trim();
+      expect(newRecipient).not.toBe(oldRecipient);
+
+      // chezmoi runtime config must now carry the NEW recipient (not the stale old one)
+      const chezmoiToml = fs.readFileSync(path.join(home, ".config", "chezmoi", "chezmoi.toml"), "utf8");
+      expect(chezmoiToml).toContain(newRecipient);
+      expect(chezmoiToml).not.toContain(oldRecipient);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
