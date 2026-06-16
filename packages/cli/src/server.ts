@@ -66,6 +66,7 @@ import {
   summarizeCapture,
   loadAiToolsCatalog,
   aiPathPolicies,
+  aiExtractEntries,
   loadExternalManagers,
   commitRepo,
   scanPathForSecrets,
@@ -1403,6 +1404,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       managedAbs = null;
     }
     const policies = aiPathPolicies(repoDir, home);
+    const extracts = aiExtractEntries(repoDir, home);
     const tools = cat.map((t) => ({
       id: t.id, label: t.label,
       paths: t.paths.map((p) => {
@@ -1415,28 +1417,49 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
           : selected.has(abs) ? (managedAbs === null || managedAbs.has(abs) ? "selected" : "pending")
           : dotfilesSel.has(abs) ? "dotfiles"
           : "available";
-        return { path: abs, kind: p.kind, encrypt: policy === "encrypt", state };
+        return { path: abs, kind: p.kind, encrypt: policy === "encrypt", state, extract: extracts.has(abs) };
       }),
     }));
-    return reply.send({ tools });
+    // Surface MCP-suggest candidates from aitools discover (try/catch → [] for safety).
+    let suggestions: { id: string; label: string; suggest: true; paths: { path: string; kind: string; encrypt: boolean; state: "available"; extract: boolean; suggest: true }[] }[] = [];
+    try {
+      const aitoolsMod = registry.get("aitools");
+      if (aitoolsMod) {
+        const candidates = await aitoolsMod.discover(makeCtx(true));
+        suggestions = candidates
+          .filter((c) => Array.isArray(c.suggestExtract) && (c.suggestExtract as string[]).length > 0)
+          .map((c) => ({
+            id: c.id,
+            label: c.note ?? path.basename(c.path),
+            suggest: true as const,
+            paths: [{ path: c.path, kind: c.category, encrypt: true, state: "available" as const, extract: false, suggest: true as const }],
+          }));
+      }
+    } catch { /* ignore */ }
+    return reply.send({ tools: [...tools, ...suggestions] });
   });
 
   // ── POST /api/aitools/custom ─────────────────────────────────────────────────
   // Self-serve: add a tool/path to roost/ai-tools-catalog.yaml (override file). I8.
-  server.post<{ Body: { label?: string; path?: string; kind?: string; policy?: string } }>("/api/aitools/custom", async (req, reply) => {
+  server.post<{ Body: { label?: string; path?: string; kind?: string; policy?: string; extract?: { fields?: unknown } } }>("/api/aitools/custom", async (req, reply) => {
     const raw = req.body?.path?.trim();
     if (!raw) return reply.status(400).send({ error: "path is required" });
     const rel = raw.replace(/^~\//, "").replace(/^\/+/, "").replace(/\/+$/, "");
     const kind = ["memory", "settings", "mcp", "data"].includes(req.body?.kind ?? "") ? req.body!.kind! : "settings";
     const policy = ["plain", "encrypt", "skip"].includes(req.body?.policy ?? "") ? req.body!.policy : undefined;
     const label = req.body?.label?.trim() || "自定义";
+    const extractFields = req.body?.extract && Array.isArray(req.body.extract.fields) ? (req.body.extract.fields as unknown[]).filter((f): f is string => typeof f === "string") : undefined;
     const id = "custom-" + rel.replace(/[^a-zA-Z0-9]+/g, "-").replace(/(^-|-$)/g, "").toLowerCase();
     const file = path.join(repoDir, "roost", "ai-tools-catalog.yaml");
-    let doc: { tools: { id: string; label: string; paths: { path: string; kind: string; policy?: string }[] }[] } = { tools: [] };
+    let doc: { tools: { id: string; label: string; paths: { path: string; kind: string; policy?: string; extract?: { fields: string[] } }[] }[] } = { tools: [] };
     try { if (fs.existsSync(file)) { const parsed = yaml.load(fs.readFileSync(file, "utf8")); if (parsed && typeof parsed === "object" && Array.isArray((parsed as { tools?: unknown }).tools)) doc = parsed as typeof doc; } } catch { doc = { tools: [] }; }
     let tool = doc.tools.find((tt) => tt.id === id);
     if (!tool) { tool = { id, label, paths: [] }; doc.tools.push(tool); }
-    if (!tool.paths.some((pp) => pp.path === rel)) tool.paths.push({ path: rel, kind, ...(policy ? { policy } : {}) });
+    if (!tool.paths.some((pp) => pp.path === rel)) {
+      const entry: { path: string; kind: string; policy?: string; extract?: { fields: string[] } } = { path: rel, kind, ...(policy ? { policy } : {}) };
+      if (extractFields && extractFields.length > 0) entry.extract = { fields: extractFields };
+      tool.paths.push(entry);
+    }
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, yaml.dump(doc), "utf8");
     cache.invalidateAll();

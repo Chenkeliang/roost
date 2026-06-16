@@ -2322,7 +2322,7 @@ describe("backup status + settings passthrough", () => {
       const sel = emptySelection();
       sel.modules["dotfiles"] = [path.join(home, ".claude", "settings.json")];
       saveSelection(tmpDir, sel);
-      // .claude.json exists → always state "never" (credential file in NEVER_BACKUP)
+      // .claude.json exists + policy:encrypt (extract rule) → state "available"
       fs.writeFileSync(path.join(home, ".claude.json"), "{}");
 
       const reg = new ModuleRegistry();
@@ -2356,10 +2356,10 @@ describe("backup status + settings passthrough", () => {
       expect(settings).toBeDefined();
       expect(settings!.state).toBe("dotfiles");
 
-      // .claude.json — credential in NEVER_BACKUP → "never"
+      // .claude.json — policy:encrypt (extract entry) → "available"
       const claudeJson = byPath(".claude.json");
       expect(claudeJson).toBeDefined();
-      expect(claudeJson!.state).toBe("never");
+      expect(claudeJson!.state).toBe("available");
 
       // All states are within the valid enum
       const validStates = new Set(["selected", "available", "dotfiles", "never", "missing"]);
@@ -2373,16 +2373,20 @@ describe("backup status + settings passthrough", () => {
     }
   });
 
-  it("catalog endpoint: skip-policy paths report state never; plain/encrypt unaffected", async () => {
+  it("catalog endpoint: skip-policy paths report state never; encrypt unaffected", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-aipol-"));
     try {
       fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
       fs.writeFileSync(path.join(home, ".claude/CLAUDE.md"), "# x");
-      fs.writeFileSync(path.join(home, ".claude.json"), "{}"); // skip entry
+      // .claude.json has policy:encrypt (extract rule) → "available", not "never"
+      fs.writeFileSync(path.join(home, ".claude.json"), "{}");
+      // ollama/models has policy:skip → "never"
+      fs.mkdirSync(path.join(home, ".ollama", "models"), { recursive: true });
       const ctx = (d: boolean): ModuleContext => ({ repoDir: tmpDir, home, profile: "base", dryRun: d, exec: makeFakeExec(), log: { info(){}, warn(){}, error(){} }, t: (k: string) => k });
       const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
       const all = (await (await server.inject({ method: "GET", url: "/api/aitools/catalog" })).json() as { tools: { paths: { path: string; state: string }[] }[] }).tools.flatMap((t) => t.paths);
-      expect(all.find((p) => p.path === path.join(home, ".claude.json"))!.state).toBe("never");
+      expect(all.find((p) => p.path === path.join(home, ".ollama", "models"))!.state).toBe("never");
+      expect(all.find((p) => p.path === path.join(home, ".claude.json"))!.state).toBe("available");
       expect(all.find((p) => p.path === path.join(home, ".claude/CLAUDE.md"))!.state).toBe("available");
       await server.close();
     } finally { fs.rmSync(home, { recursive: true, force: true }); }
@@ -2499,6 +2503,26 @@ describe("file history + restore (ADR-0022 §5)", () => {
     const commit = calls.find((c) => c[0] === "git" && c.includes("commit"));
     expect(commit![commit!.indexOf("-m") + 1]).toBe("restore: machine-zshrc @ abc1234");
     expect(fs.readFileSync(machineFile, "utf8")).toBe("local content"); // never touched
+    await server.close();
+  });
+
+  it("catalog endpoint marks extract entries with extract:true", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-ex-"));
+    try {
+      fs.writeFileSync(path.join(home, ".claude.json"), JSON.stringify({ mcpServers: { a: {} } }));
+      const ctx = (d: boolean): ModuleContext => ({ repoDir: tmpDir, home, profile: "base", dryRun: d, exec: makeFakeExec(), log: {info(){},warn(){},error(){}}, t: (k:string)=>k });
+      const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
+      const all = (await (await server.inject({ method:"GET", url:"/api/aitools/catalog" })).json() as { tools:{paths:{path:string;extract?:boolean}[]}[] }).tools.flatMap(t=>t.paths);
+      expect(all.find(p => p.path === path.join(home, ".claude.json"))!.extract).toBe(true);
+      await server.close();
+    } finally { fs.rmSync(home, { recursive:true, force:true }); }
+  });
+
+  it("custom-add accepts an extract rule", async () => {
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx:(d)=>makeCtx(tmpDir,d) });
+    await server.inject({ method:"POST", url:"/api/aitools/custom", payload:{ label:"W", path:"~/.w/c.json", kind:"mcp", extract:{ fields:["mcpServers"] } }, headers:{"content-type":"application/json"} });
+    const cat = loadAiToolsCatalog(tmpDir);
+    expect(cat.find(t=>t.paths.some(p=>p.path===".w/c.json" && p.extract?.fields?.includes("mcpServers")))).toBeTruthy();
     await server.close();
   });
 
