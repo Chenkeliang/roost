@@ -2208,13 +2208,15 @@ describe("backup status + settings passthrough", () => {
     }
   });
 
-  it("GET /api/file-preview → text ok; encrypted-marked and credentials refused; binary refused", async () => {
+  it("GET /api/file-preview → text ok; encrypt-marked JSON masked; credentials refused; binary refused", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-prev-"));
     try {
       fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+      fs.mkdirSync(path.join(home, ".codex"), { recursive: true });
       fs.writeFileSync(path.join(home, ".claude", "CLAUDE.md"), "# hello");
-      fs.writeFileSync(path.join(home, ".claude", "settings.local.json"), "{\"k\":\"v\"}"); // catalog encrypt:true
-      fs.writeFileSync(path.join(home, ".claude.json"), "{}"); // credential
+      fs.writeFileSync(path.join(home, ".claude", "settings.local.json"), "{\"k\":\"v\"}"); // catalog encrypt → masked
+      fs.writeFileSync(path.join(home, ".claude.json"), "{}"); // catalog encrypt (extract) → masked
+      fs.writeFileSync(path.join(home, ".codex", "auth.json"), "{\"token\":\"x\"}"); // catalog skip → refused
       fs.writeFileSync(path.join(home, "bin.dat"), Buffer.from([1, 0, 2, 0]));
       const ctx = (dryRun: boolean): ModuleContext => ({
         repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
@@ -2222,10 +2224,17 @@ describe("backup status + settings passthrough", () => {
       });
       const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
       const get = async (p: string) =>
-        (await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(p)}` })).json() as { ok: boolean; content?: string; reason?: string };
+        (await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(p)}` })).json() as { ok: boolean; content?: string; masked?: boolean; reason?: string };
+      // plain file: full content
       expect(await get(path.join(home, ".claude", "CLAUDE.md"))).toEqual({ ok: true, content: "# hello" });
-      expect((await get(path.join(home, ".claude", "settings.local.json"))).reason).toBe("encrypted");
-      expect((await get(path.join(home, ".claude.json"))).reason).toBe("encrypted");
+      // encrypt-marked JSON: masked structure (keys kept, values hidden — I6), not refused
+      const sl = await get(path.join(home, ".claude", "settings.local.json"));
+      expect(sl.ok).toBe(true); expect(sl.masked).toBe(true);
+      expect(sl.content).toContain("k"); expect(sl.content).not.toContain("v");
+      const cj = await get(path.join(home, ".claude.json"));
+      expect(cj.ok).toBe(true); expect(cj.masked).toBe(true);
+      // skip credential: refused outright (no structure shown)
+      expect((await get(path.join(home, ".codex", "auth.json"))).reason).toBe("encrypted");
       expect((await get(path.join(home, "bin.dat"))).reason).toBe("binary");
       await server.close();
     } finally {
@@ -2633,5 +2642,25 @@ describe("POST /api/key/rotate", () => {
       fs.rmSync(home, { recursive: true, force: true });
       fs.rmSync(repo, { recursive: true, force: true });
     }
+  });
+});
+
+describe("GET /api/file-preview — masked structural preview (I6)", () => {
+  it("returns masked structure (keys kept, values hidden) for an encrypted JSON file", async () => {
+    const file = path.join(tmpDir, "secret.json");
+    fs.writeFileSync(file, JSON.stringify({ mcpServers: { ctx7: { command: "node", env: { API_KEY: "sk-LEAK" } } } }), "utf8");
+    // mark it as an encryption target so the handler treats it as secret
+    saveSelection(tmpDir, { ...emptySelection(), modules: { "dotfiles-encrypt": [file] } });
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => makeCtx(tmpDir, d) });
+    const res = await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(file)}` });
+    await server.close();
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { ok: boolean; masked?: boolean; content?: string };
+    expect(body.ok).toBe(true);
+    expect(body.masked).toBe(true);
+    expect(body.content).toContain("mcpServers");
+    expect(body.content).toContain("API_KEY");
+    expect(body.content).not.toContain("sk-LEAK");
+    expect(body.content).not.toContain("node");
   });
 });

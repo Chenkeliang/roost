@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { getFilePreview } from "../api";
 import { useT } from "../i18n";
 
-export type PreviewState = { open: boolean; loading: boolean; content?: string; reason?: string };
+export type PreviewState = { open: boolean; loading: boolean; content?: string; reason?: string; masked?: boolean };
 
 // Per-row preview state + lazy fetch (cached after first open). Not previewable
 // rows (encrypted/credential) get a no-op toggle.
@@ -16,7 +16,7 @@ export function useFilePreview(filePath: string, previewable: boolean) {
     setPreview({ open: true, loading: true });
     try {
       const r = await getFilePreview(filePath);
-      setPreview({ open: true, loading: false, content: r.ok ? r.content : undefined, reason: r.ok ? undefined : (r.reason ?? "failed") });
+      setPreview({ open: true, loading: false, content: r.ok ? r.content : undefined, reason: r.ok ? undefined : (r.reason ?? "failed"), masked: r.ok ? r.masked : undefined });
     } catch {
       setPreview({ open: true, loading: false, reason: "failed" });
     }
@@ -45,7 +45,10 @@ export function FilePreviewPane({ preview }: { preview: PreviewState }) {
         ? <span style={{ color: "var(--muted)" }}>{t("preview.loading")}</span>
         : preview.reason
           ? <span style={{ color: "var(--muted)" }}>{t(reasonKey)}</span>
-          : <pre className="mono" style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "var(--text)" }}>{preview.content}</pre>}
+          : <>
+              {preview.masked && <div style={{ color: "var(--amber)", fontSize: 11.5, marginBottom: 6 }}>{t("preview.masked")}</div>}
+              <pre className="mono" style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "var(--text)" }}>{preview.content}</pre>
+            </>}
     </div>
   );
 }

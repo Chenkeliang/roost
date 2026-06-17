@@ -520,6 +520,7 @@ export const STRINGS: Record<string, { en: string; zh: string }> = {
   "preview.tooLarge": { en: "file too large to preview", zh: "文件过大,不预览" },
   "preview.directory": { en: "directory — no preview", zh: "目录,无预览" },
   "preview.failed": { en: "preview unavailable", zh: "无法预览" },
+  "preview.masked": { en: "encrypted file — structure only, values hidden", zh: "加密文件 —— 仅显示结构,值已隐藏" },
   "skills.targets.add": { en: "Add", zh: "添加" },
   "skills.targets.save": { en: "Save", zh: "保存" },
   "skills.targets.removeNote": { en: "Removes the target from Roost. Roost-managed links into it are cleaned up on the next apply; the directory itself is never deleted.", zh: "仅从 Roost 移除该目标。其下 Roost 自建的链接在下次应用时清理;目录本身不会被删除。" },

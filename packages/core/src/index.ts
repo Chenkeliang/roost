@@ -179,4 +179,5 @@ export { DEFAULT_EXTERNAL_MANAGERS, loadExternalManagers } from "./external-mana
 export type { ExternalManager } from "./external-managers.js";
 export type { AiToolPath, AiTool, AiPolicy, AiExtract } from "./ai-tools-catalog.js";
 export { pickFields, mergeFields, extractArtifactPath, writeExtractArtifact, readExtractArtifact } from "./aitools-extract.js";
+export { maskJsonStructure } from "./mask-json.js";
 export type { RoostSettings, AutoBackupFreq } from "./settings.js";

@@ -44,6 +44,7 @@ import {
   ensureAgeKey,
   rotateToNewKey,
   ensureChezmoiAgeConfig,
+  maskJsonStructure,
   indexAll,
   testRemote,
   parseBrewfile,
@@ -1369,13 +1370,25 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const home = makeCtx(true).home;
     const abs = p.startsWith("~/") ? path.join(home, p.slice(2)) : p;
     const previewPolicy = aiPathPolicies(repoDir, home).get(abs);
-    if (previewPolicy === "skip" || previewPolicy === "encrypt") {
+    // Credentials / skip entries: never preview at all.
+    if (previewPolicy === "skip") return reply.send({ ok: false, reason: "encrypted" });
+    // Encrypt-marked entries (catalog policy or a user-marked dotfile): show the
+    // STRUCTURE with every value masked — never the plaintext (I6). If it isn't
+    // JSON (no safe structure to show), fall back to the "encrypted" notice.
+    const dotEncrypt = loadSelection(repoDir).modules["dotfiles-encrypt"] ?? [];
+    if (previewPolicy === "encrypt" || dotEncrypt.includes(abs)) {
+      try {
+        const s = fs.lstatSync(abs);
+        if (s.isFile() && s.size <= 256 * 1024) {
+          const b = fs.readFileSync(abs);
+          if (!b.subarray(0, 8192).includes(0)) {
+            const masked = maskJsonStructure(b.toString("utf8"));
+            if (masked !== null) return reply.send({ ok: true, content: masked, masked: true });
+          }
+        }
+      } catch { /* unreadable → fall through to the notice */ }
       return reply.send({ ok: false, reason: "encrypted" });
     }
-    // A dotfile the user marked for encryption (it has secrets) — its LOCAL copy
-    // is plaintext, so previewing it would leak secrets (I6). Refuse.
-    const dotEncrypt = loadSelection(repoDir).modules["dotfiles-encrypt"] ?? [];
-    if (dotEncrypt.includes(abs)) return reply.send({ ok: false, reason: "encrypted" });
     let st: fs.Stats;
     try { st = fs.lstatSync(abs); } catch { return reply.send({ ok: false, reason: "failed" }); }
     if (st.isDirectory()) {
