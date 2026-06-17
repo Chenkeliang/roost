@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import {
   FolderOpen,
-  Cube,
+  Box,
   ShieldCheck,
-  ArrowSquareOut,
+  ExternalLink,
   Key,
   GitBranch,
-} from "@phosphor-icons/react";
+} from "lucide-react";
 import { Skeleton } from "../components/Skeleton";
 import { KeyBackupConfirm } from "../components/KeyBackupConfirm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -249,7 +249,7 @@ export function Settings() {
                 fontSize: 14,
               }}
             >
-              <Cube size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
+              <Box size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
               <span className="mono" style={{ color: "var(--text)" }}>{m}</span>
             </div>
           ))
@@ -521,7 +521,7 @@ export function Settings() {
       {/* ── Privacy ── */}
       <div style={sectionLabel}>{t("settings.privacy")}</div>
       <div style={{ ...row, gap: 12 }}>
-        <ShieldCheck size={16} weight="fill" style={{ color: "var(--green)", flexShrink: 0 }} />
+        <ShieldCheck size={16} fill="currentColor" style={{ color: "var(--green)", flexShrink: 0 }} />
         <div>
           <div style={{ fontWeight: 540 }}>{t("settings.privacyTitle")}</div>
           <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>
@@ -556,7 +556,7 @@ export function Settings() {
             }}
           >
             <span>{label}</span>
-            <ArrowSquareOut size={13} style={{ color: "var(--muted)" }} />
+            <ExternalLink size={13} style={{ color: "var(--muted)" }} />
           </a>
         ))}
       </div>

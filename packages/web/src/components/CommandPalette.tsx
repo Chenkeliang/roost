@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  FloppyDisk,
-  DownloadSimple,
-  GitDiff,
-  ClockCounterClockwise,
-  GearSix,
+  Save,
+  Download,
+  GitCompare,
+  History,
+  Settings,
   Scan,
-} from "@phosphor-icons/react";
+} from "lucide-react";
 import { Tile } from "./Tile";
 import { Kbd } from "./Kbd";
 
@@ -46,7 +46,7 @@ export function CommandPalette({
     {
       id: "capture",
       label: "Capture",
-      icon: <FloppyDisk size={16} />,
+      icon: <Save size={16} />,
       tileColor: "coral",
       kbd: "⌘S",
       action: onCapture,
@@ -54,7 +54,7 @@ export function CommandPalette({
     {
       id: "load",
       label: "Load (dry-run)",
-      icon: <DownloadSimple size={16} />,
+      icon: <Download size={16} />,
       tileColor: "blue",
       kbd: "⌘L",
       action: onLoad,
@@ -62,21 +62,21 @@ export function CommandPalette({
     {
       id: "sync",
       label: "View diff",
-      icon: <GitDiff size={16} />,
+      icon: <GitCompare size={16} />,
       tileColor: "amber",
       action: onOpenSync,
     },
     {
       id: "timeline",
       label: "Open Timeline",
-      icon: <ClockCounterClockwise size={16} />,
+      icon: <History size={16} />,
       tileColor: "violet",
       action: onOpenTimeline,
     },
     {
       id: "settings",
       label: "Settings",
-      icon: <GearSix size={16} />,
+      icon: <Settings size={16} />,
       tileColor: "slate",
       action: onOpenSettings,
     },

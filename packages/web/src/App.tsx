@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ShieldCheck } from "@phosphor-icons/react";
+import { ShieldCheck } from "lucide-react";
 import { useT } from "./i18n";
 import type { Locale } from "./i18n/strings";
 import { CommandPalette } from "./components/CommandPalette";
@@ -321,7 +321,7 @@ export function App() {
                 fontSize: 12.5,
               }}
             >
-              <ShieldCheck size={13} style={{ color: "var(--green)" }} weight="fill" />
+              <ShieldCheck size={13} style={{ color: "var(--green)" }} fill="currentColor" />
               local
             </span>
             <a

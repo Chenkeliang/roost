@@ -12,11 +12,11 @@
   "dependencies": {
     "@roost/shared": "workspace:^",
     "@tauri-apps/plugin-opener": "^2.5.4",
+    "lucide-react": "^1.20.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
-    "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/cli": "^2.11.2",

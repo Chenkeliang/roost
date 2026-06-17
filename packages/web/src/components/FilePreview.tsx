@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CaretRight } from "@phosphor-icons/react";
+import { ChevronRight } from "lucide-react";
 import { getFilePreview } from "../api";
 import { useT } from "../i18n";
 
@@ -32,7 +32,7 @@ export function PreviewCaret({ open, placeholder }: { open: boolean; placeholder
   if (placeholder) return <span style={{ display: "inline-block", width: 15, flexShrink: 0 }} />;
   // display:inline-block overrides the global `svg { display: block }` reset, which
   // otherwise drops the caret onto its own line above the file name.
-  return <CaretRight size={10} style={{ display: "inline-block", marginRight: 5, verticalAlign: "middle", transform: open ? "rotate(90deg)" : "none", transition: "transform .12s", flexShrink: 0 }} />;
+  return <ChevronRight size={10} style={{ display: "inline-block", marginRight: 5, verticalAlign: "middle", transform: open ? "rotate(90deg)" : "none", transition: "transform .12s", flexShrink: 0 }} />;
 }
 
 export function FilePreviewPane({ preview }: { preview: PreviewState }) {

@@ -1,4 +1,4 @@
-import { Warning } from "@phosphor-icons/react";
+import { TriangleAlert } from "lucide-react";
 
 const card: React.CSSProperties = {
   background: "var(--surface)",
@@ -34,7 +34,7 @@ export function ConfirmDialog({
     >
       <div style={{ ...card, maxWidth: 460, width: "100%", padding: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
-          <Warning size={18} weight="duotone" style={{ color: danger ? "var(--accent)" : "var(--amber)" }} />
+          <TriangleAlert size={18} style={{ color: danger ? "var(--accent)" : "var(--amber)" }} />
           {title}
         </div>
         <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5, margin: "0 0 14px" }}>{body}</p>

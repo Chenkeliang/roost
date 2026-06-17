@@ -8,6 +8,7 @@ vi.mock("./api", () => ({
   addSelection: vi.fn().mockResolvedValue({}),
   removeSelection: vi.fn().mockResolvedValue({}),
   addAiCustom: vi.fn().mockResolvedValue({ ok: true }),
+  getFilePreview: vi.fn().mockResolvedValue({ ok: true, content: "preview content" }),
 }));
 
 describe("AiBackup", () => {
@@ -105,5 +106,45 @@ describe("AiBackup", () => {
       kind: "mcp",
       extract: { fields: ["mcpServers"] },
     }));
+  });
+
+  it("clicking a file row name toggles an inline file preview (file preview regression)", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [
+      { id: "claude-code", label: "Claude Code", paths: [
+        { path: "/h/.claude/CLAUDE.md", kind: "memory", encrypt: false, state: "selected" },
+      ]},
+    ] });
+    (api.getFilePreview as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, content: "# Claude rules" });
+    render(<AiBackup />);
+    // Expand the tool card
+    fireEvent.click(await screen.findByText("Claude Code"));
+    // Find the filename span (it should be clickable and have a PreviewCaret)
+    const fileNameEl = await screen.findByText("CLAUDE.md");
+    expect(fileNameEl.closest("span")).toBeTruthy();
+    // Preview pane should NOT be visible before click
+    expect(screen.queryByText("# Claude rules")).not.toBeInTheDocument();
+    // Click to open preview
+    fireEvent.click(fileNameEl.closest("span")!);
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/h/.claude/CLAUDE.md"));
+    expect(await screen.findByText("# Claude rules")).toBeInTheDocument();
+    // Click again to close
+    fireEvent.click(fileNameEl.closest("span")!);
+    await waitFor(() => expect(screen.queryByText("# Claude rules")).not.toBeInTheDocument());
+  });
+
+  it("encrypted file row shows encrypted reason instead of content (I6 compliance)", async () => {
+    vi.mocked(api.getAiToolsCatalog).mockResolvedValue({ tools: [
+      { id: "claude-code", label: "Claude Code", paths: [
+        { path: "/h/.claude/settings.json", kind: "settings", encrypt: true, state: "selected" },
+      ]},
+    ] });
+    (api.getFilePreview as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, reason: "encrypted" });
+    render(<AiBackup />);
+    fireEvent.click(await screen.findByText("Claude Code"));
+    const fileNameEl = await screen.findByText("settings.json");
+    fireEvent.click(fileNameEl.closest("span")!);
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/h/.claude/settings.json"));
+    // FilePreviewPane renders the encrypted reason text
+    expect(await screen.findByText(/encrypted entry|加密项/)).toBeInTheDocument();
   });
 });

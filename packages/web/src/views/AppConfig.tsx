@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { AppWindow, Sliders, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, X } from "@phosphor-icons/react";
+import { AppWindow, SlidersHorizontal, Search, RefreshCw, Save, CircleCheck, X } from "lucide-react";
 import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
@@ -122,7 +122,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
     return (
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
         <EmptyState
-          icon={<Sliders size={24} />}
+          icon={<SlidersHorizontal size={24} />}
           title={t("appconfig.unavailableTitle")}
           subtitle={t("appconfig.unavailableSubtitle")}
         />
@@ -146,7 +146,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
           ]}
         />
         <div style={{ position: "relative", flex: 1, maxWidth: 260 }}>
-          <MagnifyingGlass size={14} style={{ position: "absolute", left: 9, top: 8, color: "var(--muted)" }} />
+          <Search size={14} style={{ position: "absolute", left: 9, top: 8, color: "var(--muted)" }} />
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -155,7 +155,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
           />
         </div>
         <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
-          {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
+          {scanning ? <RefreshCw size={14} /> : <Search size={14} />}
           {scanning ? t("appconfig.scanning") : t("appconfig.scan")}
         </button>
       </div>
@@ -163,7 +163,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
       {tab === "selected" && (
         selectedList.length === 0 ? (
           <EmptyState
-            icon={<Sliders size={24} />}
+            icon={<SlidersHorizontal size={24} />}
             title={selected.size > 0 ? t("appconfig.emptyMatchTitle") : t("appconfig.emptyTitle")}
             subtitle={selected.size > 0 ? t("appconfig.emptyMatchSubtitle") : t("appconfig.emptySubtitle")}
           />
@@ -187,9 +187,9 @@ export function AppConfig({ showHud }: AppConfigProps) {
 
       {tab === "discovered" && (
         cands === null ? (
-          <EmptyState icon={<Sliders size={24} />} title={t("appconfig.emptyTitle")} subtitle={t("appconfig.emptySubtitle")} />
+          <EmptyState icon={<SlidersHorizontal size={24} />} title={t("appconfig.emptyTitle")} subtitle={t("appconfig.emptySubtitle")} />
         ) : newCands.length === 0 ? (
-          <EmptyState icon={<CheckCircle size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
+          <EmptyState icon={<CircleCheck size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
         ) : (
         <div>
           {checked.size > 0 && (
@@ -205,7 +205,7 @@ export function AppConfig({ showHud }: AppConfigProps) {
               </label>
               <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
-                  <FloppyDisk size={11} />{t("common.addSelected")}
+                  <Save size={11} />{t("common.addSelected")}
                 </button>
                 <button onClick={() => void batch("remove")} disabled={busy} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}>
                   <X size={11} />{t("common.removeSelected")}
@@ -224,11 +224,11 @@ export function AppConfig({ showHud }: AppConfigProps) {
                   <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{domain}</span>
                   {isAdded ? (
                     <>
-                      <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${domain} added`}><CheckCircle size={11} weight="fill" />{t("common.added")}</span>
+                      <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${domain} added`}><CircleCheck size={11} fill="currentColor" />{t("common.added")}</span>
                       <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${domain}`}><X size={11} />{t("common.remove")}</button>
                     </>
                   ) : (
-                    <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${domain}`}><FloppyDisk size={11} />{t("common.add")}</button>
+                    <button onClick={() => void add(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${domain}`}><Save size={11} />{t("common.add")}</button>
                   )}
                 </div>
               );

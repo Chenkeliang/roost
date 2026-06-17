@@ -1,4 +1,4 @@
-import { Laptop, Desktop } from "@phosphor-icons/react";
+import { Laptop, Monitor } from "lucide-react";
 import { Tile } from "./Tile";
 import { StatusDot } from "./StatusDot";
 import { Skeleton } from "./Skeleton";
@@ -40,7 +40,7 @@ export function MachineCard({
     >
       <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
         <Tile color={isPrimary ? "blue" : "slate"} size={30}>
-          {isPrimary ? <Laptop size={16} /> : <Desktop size={16} />}
+          {isPrimary ? <Laptop size={16} /> : <Monitor size={16} />}
         </Tile>
         <div style={{ flex: 1, minWidth: 0 }}>
           {loading ? (

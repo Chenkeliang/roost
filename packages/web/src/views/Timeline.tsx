@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ClockCounterClockwise, GitCommit, CaretDown, CaretUp } from "@phosphor-icons/react";
+import { History, GitCommitHorizontal, ChevronDown, ChevronUp } from "lucide-react";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
@@ -36,7 +36,7 @@ function SnapshotRow({ entry }: { entry: TimelineEntry }) {
         }}
       >
         <span style={{ color: "var(--muted)", flexShrink: 0, marginTop: 2 }}>
-          <GitCommit size={14} />
+          <GitCommitHorizontal size={14} />
         </span>
         <span
           className="mono"
@@ -76,7 +76,7 @@ function SnapshotRow({ entry }: { entry: TimelineEntry }) {
               flexShrink: 0,
             }}
           >
-            {expanded ? <CaretUp size={12} /> : <CaretDown size={12} />}
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
         )}
         <span
@@ -131,7 +131,7 @@ function HistoryRow({ entry, isCurrent, onRestore, restoring }: HistoryRowProps)
       }}
     >
       <span style={{ color: "var(--muted)", flexShrink: 0 }}>
-        <GitCommit size={14} />
+        <GitCommitHorizontal size={14} />
       </span>
       <span
         className="mono"
@@ -358,7 +358,7 @@ export function Timeline({ showHud, onOpenSync }: TimelineProps) {
             </div>
           ) : historyEntries.length === 0 ? (
             <EmptyState
-              icon={<ClockCounterClockwise size={24} weight="duotone" />}
+              icon={<History size={24} />}
               title={t("history.empty")}
               subtitle=""
             />
@@ -442,7 +442,7 @@ export function Timeline({ showHud, onOpenSync }: TimelineProps) {
             </div>
           ) : entries.length === 0 ? (
             <EmptyState
-              icon={<ClockCounterClockwise size={24} weight="duotone" />}
+              icon={<History size={24} />}
               title={t("timeline.emptyTitle")}
               subtitle={t("timeline.emptySubtitle")}
             />

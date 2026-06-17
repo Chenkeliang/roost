@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileCode, Package, SlidersHorizontal, GitBranch, Lock, Scan, CheckCircle } from "@phosphor-icons/react";
+import { FileCode, Package, SlidersHorizontal, GitBranch, Lock, Scan, CircleCheck } from "lucide-react";
 import { Tile } from "./Tile";
 import { StatusDot } from "./StatusDot";
 
@@ -24,7 +24,7 @@ function getModuleIcon(module: string) {
     case "secrets":
       return { icon: <Scan size={13} />, color: "coral" as const };
     default:
-      return { icon: <CheckCircle size={13} />, color: "default" as const };
+      return { icon: <CircleCheck size={13} />, color: "default" as const };
   }
 }
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CaretRight } from "@phosphor-icons/react";
+import { ChevronRight } from "lucide-react";
 import type { DriftItem } from "@roost/shared";
 import { StatusDot } from "./StatusDot";
 import { ItemRow } from "./ItemRow";
@@ -41,7 +41,7 @@ export function ModuleSection({ name, status, items, icon, note }: ModuleSection
           textAlign: "left",
         }}
       >
-        <CaretRight
+        <ChevronRight
           size={12}
           style={{
             color: "var(--muted)",

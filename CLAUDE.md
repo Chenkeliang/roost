@@ -36,7 +36,7 @@ Roost — 开源 macOS 配置备份/迁移工具。**当前处于实现前阶段
 - TypeScript(strict)· pnpm monorepo · commander(CLI)· Fastify + React + Vite + Tailwind + Radix/shadcn(web)· vitest · ESLint + Prettier。
 - Conventional Commits;新工作切 `feat_*` 分支,**禁直接提交 `main`/共享分支**;仅在变更经验证后提交。
 - 每个模块必须有三类测试:单元 / dry-run / 幂等。core 禁联网。
-- 前端:Raycast 语言,token 见 frontend.md;Phosphor 图标(禁 emoji);克制动效;强调色 coral #FF6363;字体 Geist/Geist Mono。
+- 前端:Raycast 语言,token 见 frontend.md;Lucide 图标(禁 emoji);克制动效;强调色 coral #FF6363;字体 Geist/Geist Mono。
 
 ## 命令(目标工具链——脚手架搭好后适用;当前尚无 package.json)
 - 安装:`pnpm install`

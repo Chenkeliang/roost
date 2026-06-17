@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Warning } from "@phosphor-icons/react";
+import { TriangleAlert } from "lucide-react";
 import { setGitRemote } from "../api";
 
 export function RemoteWarningBanner({ t, onConfigured }: { t: (k: string) => string; onConfigured: () => void }) {
@@ -20,7 +20,7 @@ export function RemoteWarningBanner({ t, onConfigured }: { t: (k: string) => str
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "var(--surface)", border: "1px solid #4a3a1e", borderRadius: "var(--rc)", marginBottom: 14, fontSize: 13.5, flexWrap: "wrap" }}>
-      <Warning size={16} weight="duotone" style={{ color: "var(--amber)", flexShrink: 0 }} />
+      <TriangleAlert size={16} style={{ color: "var(--amber)", flexShrink: 0 }} />
       <span>{t("onboard.remote.warning")}</span>
       <span style={{ flex: 1 }} />
       {editing ? (

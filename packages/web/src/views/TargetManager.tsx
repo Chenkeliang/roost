@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Trash } from "@phosphor-icons/react";
+import { Trash2 } from "lucide-react";
 import type { SkillTarget } from "../api";
 import { saveSkillsTargets } from "../api";
 
@@ -47,7 +47,7 @@ export function TargetManager({ initial, t, onClose, onSaved }: {
               <span className="mono" style={{ flex: 1, color: "var(--muted)" }}>{tg.path.startsWith("/") ? tg.path : `~/${tg.path}`}</span>
               {BUILTIN.has(tg.id)
                 ? <span style={{ color: "var(--muted)", fontSize: 11 }}>{t("skills.targets.builtin")}</span>
-                : <button aria-label={`remove target ${tg.id}`} onClick={() => { const next = targetsRef.current.filter((x) => x.id !== tg.id); targetsRef.current = next; setTargets(next); }} style={{ ...ic, border: 0, color: "var(--accent)" }}><Trash size={14} /></button>}
+                : <button aria-label={`remove target ${tg.id}`} onClick={() => { const next = targetsRef.current.filter((x) => x.id !== tg.id); targetsRef.current = next; setTargets(next); }} style={{ ...ic, border: 0, color: "var(--accent)" }}><Trash2 size={14} /></button>}
             </div>
           ))}
         </div>

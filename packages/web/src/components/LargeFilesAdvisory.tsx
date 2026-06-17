@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Files } from "@phosphor-icons/react";
+import { Files } from "lucide-react";
 import { excludeDotfile, addSelection } from "../api";
 
 const banner: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: "var(--surface)", border: "1px solid #4a3a1e", borderRadius: "var(--rc)", marginBottom: 14, fontSize: 13.5 };

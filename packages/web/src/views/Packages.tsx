@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Package, Cube, AppStoreLogo, Storefront, DownloadSimple, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, X } from "@phosphor-icons/react";
+import { Package, Box, Store, Download, Search, RefreshCw, Save, CircleCheck, X } from "lucide-react";
 import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
@@ -18,9 +18,9 @@ function kindOf(id: string): string { return id.slice(0, id.indexOf(":")); }
 function valOf(id: string): string { return id.slice(id.indexOf(":") + 1); }
 function KindIcon({ kind }: { kind: string }) {
   const c = { color: "var(--muted)" };
-  if (kind === "cask") return <Cube size={14} style={c} />;
-  if (kind === "mas") return <AppStoreLogo size={14} style={c} />;
-  if (kind === "tap") return <Storefront size={14} style={c} />;
+  if (kind === "cask") return <Box size={14} style={c} />;
+  if (kind === "mas") return <Store size={14} style={c} />;
+  if (kind === "tap") return <Store size={14} style={c} />;
   return <Package size={14} style={c} />;
 }
 const STATE_COLOR: Record<PackageState, string> = { installed: "var(--green)", outdated: "var(--amber)", missing: "var(--red)" };
@@ -173,7 +173,7 @@ export function Packages({ showHud }: PackagesProps) {
           ]}
         />
         <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14, marginLeft: "auto" }}>
-          {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
+          {scanning ? <RefreshCw size={14} /> : <Search size={14} />}
           {scanning ? t("packages.importing") : t("packages.scan")}
         </button>
       </div>
@@ -192,7 +192,7 @@ export function Packages({ showHud }: PackagesProps) {
               icon={<Package size={24} />}
               title={t("packages.emptyTitle")}
               subtitle={t("packages.emptySubtitle")}
-              action={<button onClick={() => void scan()} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}><MagnifyingGlass size={14} />{t("packages.scan")}</button>}
+              action={<button onClick={() => void scan()} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}><Search size={14} />{t("packages.scan")}</button>}
             />
           ) : (
             <>
@@ -209,7 +209,7 @@ export function Packages({ showHud }: PackagesProps) {
                 </label>
                 <span style={{ marginLeft: "auto", display: "inline-flex", gap: 8 }}>
                   <button onClick={() => void install(checked.size > 0 ? [...checked] : selectedList)} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
-                    <DownloadSimple size={11} />{checked.size > 0 ? t("packages.installSelected") : t("packages.installAll")}
+                    <Download size={11} />{checked.size > 0 ? t("packages.installSelected") : t("packages.installAll")}
                   </button>
                   {checked.size > 0 && (
                     <button onClick={() => void batch("remove", [...checked])} disabled={busy} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}><X size={11} />{t("common.removeSelected")}</button>
@@ -237,7 +237,7 @@ export function Packages({ showHud }: PackagesProps) {
         cands === null ? (
           <EmptyState icon={<Package size={24} />} title={t("packages.emptyTitle")} subtitle={t("packages.emptySubtitle")} />
         ) : newCands.length === 0 ? (
-          <EmptyState icon={<CheckCircle size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
+          <EmptyState icon={<CircleCheck size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
         ) : (
           <div>
             {checked.size > 0 && (
@@ -247,7 +247,7 @@ export function Packages({ showHud }: PackagesProps) {
                   {checked.size} {t("common.selected")}
                 </label>
                 <span style={{ marginLeft: "auto", display: "inline-flex", gap: 8 }}>
-                  <button onClick={() => void batch("add", [...checked])} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}><FloppyDisk size={11} />{t("common.addSelected")}</button>
+                  <button onClick={() => void batch("add", [...checked])} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}><Save size={11} />{t("common.addSelected")}</button>
                 </span>
               </div>
             )}
@@ -257,7 +257,7 @@ export function Packages({ showHud }: PackagesProps) {
                   <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
                   <KindIcon kind={kindOf(c.id)} />
                   <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.note?.startsWith("mas") ? c.note : valOf(c.id)}</span>
-                  <button onClick={() => void add(c.id)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.id}`}><FloppyDisk size={11} />{t("common.add")}</button>
+                  <button onClick={() => void add(c.id)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.id}`}><Save size={11} />{t("common.add")}</button>
                 </div>
               ))}
             </div>

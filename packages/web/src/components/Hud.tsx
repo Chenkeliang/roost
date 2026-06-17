@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { CheckCircle, WarningCircle } from "@phosphor-icons/react";
+import { CircleCheck, CircleAlert } from "lucide-react";
 
 export interface HudMessage {
   text: string;
@@ -45,9 +45,9 @@ export function Hud({ message, onDismiss }: HudProps) {
       }}
     >
       {isError ? (
-        <WarningCircle size={16} style={{ color: "var(--red)" }} />
+        <CircleAlert size={16} style={{ color: "var(--red)" }} />
       ) : (
-        <CheckCircle size={16} style={{ color: "var(--green)" }} weight="fill" />
+        <CircleCheck size={16} style={{ color: "var(--green)" }} />
       )}
       <span style={{ color: isError ? "var(--red)" : "var(--text)" }}>
         {message.text}

@@ -2273,18 +2273,30 @@ describe("backup status + settings passthrough", () => {
     }
   });
 
-  it("GET /api/file-preview → directory path refused (reason: directory)", async () => {
+  it("GET /api/file-preview → directory path returns ok:true with sorted child listing", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "roost-prev-dir-"));
     try {
       const dirPath = path.join(home, "some-dir");
       fs.mkdirSync(dirPath, { recursive: true });
+      fs.writeFileSync(path.join(dirPath, "b.txt"), "b");
+      fs.writeFileSync(path.join(dirPath, "a.txt"), "a");
+      fs.mkdirSync(path.join(dirPath, "sub"), { recursive: true });
       const ctx = (dryRun: boolean): ModuleContext => ({
         repoDir: tmpDir, home, profile: "base", dryRun, exec: makeFakeExec(),
         log: { info: () => {}, warn: () => {}, error: () => {} }, t: (k: string) => k,
       });
       const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
       const res = await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(dirPath)}` });
-      expect((res.json() as { ok: boolean; reason: string }).reason).toBe("directory");
+      const body = res.json() as { ok: boolean; content?: string; reason?: string };
+      expect(body.ok).toBe(true);
+      expect(body.reason).toBeUndefined();
+      // entries sorted; subdirectories suffixed with "/"
+      const lines = (body.content ?? "").split("\n").filter(Boolean);
+      expect(lines).toContain("a.txt");
+      expect(lines).toContain("b.txt");
+      expect(lines).toContain("sub/");
+      // sorted: a.txt < b.txt < sub/
+      expect(lines.indexOf("a.txt")).toBeLessThan(lines.indexOf("b.txt"));
       await server.close();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowSquareOut, DownloadSimple, UploadSimple, ClockCounterClockwise, X } from "@phosphor-icons/react";
+import { ExternalLink, Download, Upload, History, X } from "lucide-react";
 import { gitPush, gitPull } from "../api";
 import type { GitStatus } from "../api";
 import type { HudMessage } from "./Hud";
@@ -61,7 +61,7 @@ export function FreshnessBanners({ t, locale, gitStatus, lastCaptureAt, update, 
     <>
       {update && (
         <div style={banner} role="status">
-          <ArrowSquareOut size={15} style={{ color: "var(--amber)", flexShrink: 0 }} />
+          <ExternalLink size={15} style={{ color: "var(--amber)", flexShrink: 0 }} />
           <span>{t("fresh.update.title")} <span className="mono">{update.version}</span></span>
           <span style={{ flex: 1 }} />
           <button onClick={() => void openExternal(update.url)} style={cta}>{t("fresh.update.download")}</button>
@@ -76,7 +76,7 @@ export function FreshnessBanners({ t, locale, gitStatus, lastCaptureAt, update, 
           <span style={dot("var(--amber)")} />
           <span>{t("fresh.behind.title")} {gitStatus.behind} {t("fresh.behind.commits")}</span>
           <span style={{ flex: 1 }} />
-          <button onClick={() => void pull()} disabled={busy !== null} style={{ ...cta, opacity: busy ? 0.7 : 1, cursor: busy ? "default" : "pointer" }}><DownloadSimple size={13} />{busy === "pull" ? t("fresh.behind.pulling") : t("fresh.behind.pull")}</button>
+          <button onClick={() => void pull()} disabled={busy !== null} style={{ ...cta, opacity: busy ? 0.7 : 1, cursor: busy ? "default" : "pointer" }}><Download size={13} />{busy === "pull" ? t("fresh.behind.pulling") : t("fresh.behind.pull")}</button>
           {pullFailed && <span style={{ color: "var(--red)", fontSize: 12.5, width: "100%" }}>{t("fresh.behind.pullFailed")}</span>}
         </div>
       )}
@@ -86,14 +86,14 @@ export function FreshnessBanners({ t, locale, gitStatus, lastCaptureAt, update, 
           <span style={dot("var(--amber)")} />
           <span>{t("fresh.ahead.title")} {gitStatus.ahead} {t("fresh.ahead.commits")}</span>
           <span style={{ flex: 1 }} />
-          <button onClick={() => void push()} disabled={busy !== null} style={{ ...cta, opacity: busy ? 0.7 : 1, cursor: busy ? "default" : "pointer" }}><UploadSimple size={13} />{busy === "push" ? t("fresh.ahead.pushing") : t("fresh.ahead.push")}</button>
+          <button onClick={() => void push()} disabled={busy !== null} style={{ ...cta, opacity: busy ? 0.7 : 1, cursor: busy ? "default" : "pointer" }}><Upload size={13} />{busy === "push" ? t("fresh.ahead.pushing") : t("fresh.ahead.push")}</button>
           {pushErrKey && <span style={{ color: "var(--red)", fontSize: 12.5, width: "100%" }}>{t(pushErrKey)}</span>}
         </div>
       )}
 
       {staleDays >= STALE_DAYS && (
         <div style={banner} role="status">
-          <ClockCounterClockwise size={15} style={{ color: "var(--amber)", flexShrink: 0 }} />
+          <History size={15} style={{ color: "var(--amber)", flexShrink: 0 }} />
           <span>
             {lastCaptureAt === null
               ? t("fresh.stale.never")

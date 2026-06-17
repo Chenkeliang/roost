@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Stack, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, Link as LinkIcon, Warning, Circle, UploadSimple, Wrench, DotsThree, Tag } from "@phosphor-icons/react";
+import { Layers as Stack, Search as MagnifyingGlass, RefreshCw as ArrowsClockwise, Save as FloppyDisk, CircleCheck as CheckCircle, Link as LinkIcon, TriangleAlert as Warning, Circle, Upload as UploadSimple, Wrench, Ellipsis as DotsThree, Tag } from "lucide-react";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
@@ -57,7 +57,7 @@ function SkillTargetsPopover({ row, targets, busy, t, onToggle, onResolve, onClo
                 <button role="switch" aria-checked={on} aria-label={tg.label} disabled={busy || !row.effective.enabled}
                   onClick={() => onToggle(tg.id, !on)}
                   style={{ ...ic, border: 0, background: "transparent", padding: 0 }}>
-                  {on ? <CheckCircle size={18} weight="fill" style={{ color: "var(--green)" }} /> : <Circle size={18} style={{ color: "var(--muted)" }} />}
+                  {on ? <CheckCircle size={18} fill="currentColor" style={{ color: "var(--green)" }} /> : <Circle size={18} style={{ color: "var(--muted)" }} />}
                 </button>
                 <span style={{ flex: 1 }}>
                   {tg.label}
@@ -569,7 +569,7 @@ export function Skills() {
                         <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.id}</span>
                         {c.origin?.needsRepair && (
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#f0b352" }}>
-                            <Wrench size={11} weight="fill" />{t("skills.adopt.repair")}
+                            <Wrench size={11} />{t("skills.adopt.repair")}
                           </span>
                         )}
                         {c.origin?.conflictLocations && c.origin.conflictLocations.length > 1 && (
@@ -618,7 +618,7 @@ export function Skills() {
           >
             <div style={{ ...card, maxWidth: 420, width: "100%", padding: 18 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <Warning size={16} weight="fill" style={{ color: "var(--accent)" }} />
+                <Warning size={16} style={{ color: "var(--accent)" }} />
                 <span style={{ fontSize: 14, fontWeight: 600 }}>{t("skills.resolve.action")}</span>
               </div>
               <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.5, color: "var(--muted)" }}>{t("skills.resolve.confirm")}</p>

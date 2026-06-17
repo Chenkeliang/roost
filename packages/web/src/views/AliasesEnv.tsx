@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus,
-  Trash,
-  FloppyDisk,
-  DownloadSimple,
-  CaretUp,
-  CaretDown,
-  LockKey,
-  MagnifyingGlass,
-  PencilSimple,
-  Lightning,
+  Trash2,
+  Save,
+  Download,
+  ChevronUp,
+  ChevronDown,
+  LockKeyhole,
+  Search,
+  Pencil,
+  Zap,
   Copy,
-} from "@phosphor-icons/react";
+} from "lucide-react";
 import type {
   EnvData,
   AliasItem,
@@ -302,7 +302,7 @@ function EnvEditor({
           <Field label={t("env.field.reference")} flex>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span data-testid={`encrypted-${item.name}`} style={lockBadgeStyle}>
-                <LockKey size={11} weight="fill" />
+                <LockKeyhole size={11} fill="currentColor" />
                 {sel === "ref:op" ? "1Password" : "rbw"}
               </span>
               <input
@@ -331,7 +331,7 @@ function EnvEditor({
           <Field label={t("env.field.value")} flex>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span data-testid={`encrypted-${item.name}`} style={lockBadgeStyle}>
-                <LockKey size={11} weight="fill" />
+                <LockKeyhole size={11} fill="currentColor" />
                 {t("env.badge.encrypted")}
               </span>
               <input
@@ -435,7 +435,7 @@ function PathEditor({
               onClick={() => onMove(-1)}
               style={{ ...iconButton("var(--muted)"), opacity: canMoveUp ? 1 : 0.4 }}
             >
-              <CaretUp size={12} />
+              <ChevronUp size={12} />
             </button>
             <button
               aria-label={`move down ${item.value}`}
@@ -443,7 +443,7 @@ function PathEditor({
               onClick={() => onMove(1)}
               style={{ ...iconButton("var(--muted)"), opacity: canMoveDown ? 1 : 0.4 }}
             >
-              <CaretDown size={12} />
+              <ChevronDown size={12} />
             </button>
           </span>
         </Field>
@@ -649,7 +649,7 @@ function ImportPicker({
           disabled={picked.size === 0}
           style={{ ...iconButton("var(--accent)"), opacity: picked.size === 0 ? 0.5 : 1 }}
         >
-          <DownloadSimple size={12} />
+          <Download size={12} />
           {t("env.import.button")}{picked.size > 0 ? ` ${picked.size}` : ""}
         </button>
       </div>
@@ -994,13 +994,13 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
           maxWidth: 720,
         }}
       >
-        <LockKey size={13} weight="fill" style={{ flexShrink: 0 }} />
+        <LockKeyhole size={13} fill="currentColor" style={{ flexShrink: 0 }} />
         {t("env.secretSourcesHint")}
       </p>
 
       {/* search input (filters across all kinds) */}
       <div style={{ position: "relative", marginBottom: 13 }}>
-        <MagnifyingGlass
+        <Search
           size={16}
           style={{
             position: "absolute",
@@ -1123,7 +1123,7 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
               gap: 5,
             }}
           >
-            <DownloadSimple size={13} />
+            <Download size={13} />
             {t("env.importFromShell")}
           </button>
         </div>
@@ -1167,7 +1167,7 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
               opacity: saving ? 0.7 : 1,
             }}
           >
-            <FloppyDisk size={13} weight="fill" />
+            <Save size={13} />
             {saving ? t("env.saving") : t("env.save")}
           </button>
           <button
@@ -1190,7 +1190,7 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
               opacity: applying ? 0.7 : 1,
             }}
           >
-            <Lightning size={13} weight="fill" />
+            <Zap size={13} />
             {applying ? t("env.applying") : t("env.applyToMachine")}
           </button>
         </div>
@@ -1335,7 +1335,7 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
                   </span>
                   {ev?.secret && (
                     <span data-testid={`lock-${ev.name}`} style={lockBadgeStyle}>
-                      <LockKey size={11} weight="fill" />
+                      <LockKeyhole size={11} fill="currentColor" />
                       {ev.source?.kind === "ref"
                         ? ev.source.backend === "op"
                           ? "1Password"
@@ -1363,7 +1363,7 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
                       }}
                       style={iconButton("var(--muted)")}
                     >
-                      <PencilSimple size={12} />
+                      <Pencil size={12} />
                     </button>
                     <button
                       aria-label={`delete ${ref.kind} ${name}`}
@@ -1373,7 +1373,7 @@ export function AliasesEnv({ showHud, onOpenSettings }: AliasesEnvProps) {
                       }}
                       style={iconButton("var(--red)")}
                     >
-                      <Trash size={12} />
+                      <Trash2 size={12} />
                     </button>
                   </span>
                 </div>

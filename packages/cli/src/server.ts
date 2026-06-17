@@ -1378,7 +1378,22 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (dotEncrypt.includes(abs)) return reply.send({ ok: false, reason: "encrypted" });
     let st: fs.Stats;
     try { st = fs.lstatSync(abs); } catch { return reply.send({ ok: false, reason: "failed" }); }
-    if (st.isDirectory()) return reply.send({ ok: false, reason: "directory" });
+    if (st.isDirectory()) {
+      // Return immediate child listing: sorted, subdirs suffixed "/", capped at 200.
+      let entries: fs.Dirent[] = [];
+      try { entries = fs.readdirSync(abs, { withFileTypes: true }); } catch { return reply.send({ ok: false, reason: "failed" }); }
+      const lines: string[] = entries
+        .map((e) => e.isDirectory() ? `${e.name}/` : e.name)
+        .sort((a, b) => a.localeCompare(b));
+      const MAX = 200;
+      let content: string;
+      if (lines.length > MAX) {
+        content = lines.slice(0, MAX).join("\n") + `\n… ${lines.length - MAX} more`;
+      } else {
+        content = lines.join("\n");
+      }
+      return reply.send({ ok: true, content });
+    }
     if (!st.isFile()) return reply.send({ ok: false, reason: "failed" });
     if (st.size > 256 * 1024) return reply.send({ ok: false, reason: "too-large" });
     let buf: Buffer;

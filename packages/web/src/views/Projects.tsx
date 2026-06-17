@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { GitBranch, MagnifyingGlass, ArrowsClockwise, FloppyDisk, CheckCircle, XCircle, X } from "@phosphor-icons/react";
+import { GitBranch, Search, RefreshCw, Save, CircleCheck, CircleX, X } from "lucide-react";
 import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
@@ -143,7 +143,7 @@ export function Projects({ showHud }: ProjectsProps) {
           ]}
         />
         <button onClick={() => void scan()} disabled={scanning || !available} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14, marginLeft: "auto" }}>
-          {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
+          {scanning ? <RefreshCw size={14} /> : <Search size={14} />}
           {scanning ? t("projects.scanning") : t("projects.scan")}
         </button>
       </div>
@@ -199,7 +199,7 @@ export function Projects({ showHud }: ProjectsProps) {
               <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <span style={{ color: "var(--muted)", fontSize: 13 }}>{checked.size} {t("common.selected")}</span>
                 <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
-                  <FloppyDisk size={11} />{t("common.addSelected")}
+                  <Save size={11} />{t("common.addSelected")}
                 </button>
                 <button onClick={() => void batch("remove")} disabled={busy} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}>
                   <X size={11} />{t("common.removeSelected")}
@@ -213,16 +213,16 @@ export function Projects({ showHud }: ProjectsProps) {
                 <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
                 <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
                 <span style={{ color: "var(--muted)", fontSize: 12.5, minWidth: 150, fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.remote ?? t("common.noRemote")}</span>
-                {tested[c.id] === "ok" && <CheckCircle size={14} weight="fill" style={{ color: "var(--green)" }} />}
-                {tested[c.id] === "fail" && <XCircle size={14} weight="fill" style={{ color: "var(--red)" }} />}
+                {tested[c.id] === "ok" && <CircleCheck size={14} fill="currentColor" style={{ color: "var(--green)" }} />}
+                {tested[c.id] === "fail" && <CircleX size={14} fill="currentColor" style={{ color: "var(--red)" }} />}
                 <button onClick={() => void test(c)} disabled={!c.remote || tested[c.id] === "testing"} style={ic} aria-label={`test ${c.path}`}>{t("common.test")}</button>
                 {saved.has(c.id) ? (
                   <>
-                    <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} saved`}><CheckCircle size={11} weight="fill" />{t("projects.saved")}</span>
+                    <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} saved`}><CircleCheck size={11} fill="currentColor" />{t("projects.saved")}</span>
                     <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
                   </>
                 ) : (
-                  <button onClick={() => void save(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><FloppyDisk size={11} />{t("common.save")}</button>
+                  <button onClick={() => void save(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><Save size={11} />{t("common.save")}</button>
                 )}
               </div>
             ))}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { File, MagnifyingGlass, ArrowsClockwise, FloppyDisk, Terminal, GitBranch, Pencil, CheckCircle, X } from "@phosphor-icons/react";
+import { File, Search, RefreshCw, Save, Terminal, GitBranch, Pencil, CircleCheck, X } from "lucide-react";
 import type { Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { EmptyState } from "../components/EmptyState";
@@ -62,11 +62,11 @@ function CandidateDotfileRow({ c, isAdded, isChecked, onToggleCheck, onAdd, onRe
         </span>
         {isAdded ? (
           <>
-            <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} added`}><CheckCircle size={11} weight="fill" />{t("common.added")}</span>
+            <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} added`}><CircleCheck size={11} fill="currentColor" />{t("common.added")}</span>
             <button onClick={() => void onRemove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
           </>
         ) : (
-          <button onClick={() => void onAdd(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><FloppyDisk size={11} />{t("common.add")}</button>
+          <button onClick={() => void onAdd(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><Save size={11} />{t("common.add")}</button>
         )}
       </div>
       <FilePreviewPane preview={preview} />
@@ -221,7 +221,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
           ]}
         />
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <MagnifyingGlass size={14} style={{ position: "absolute", left: 9, top: 8, color: "var(--muted)" }} />
+          <Search size={14} style={{ position: "absolute", left: 9, top: 8, color: "var(--muted)" }} />
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -230,7 +230,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
           />
         </div>
         <button onClick={() => void scan()} disabled={scanning} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)", padding: "6px 12px", fontSize: 14 }}>
-          {scanning ? <ArrowsClockwise size={14} /> : <MagnifyingGlass size={14} />}
+          {scanning ? <RefreshCw size={14} /> : <Search size={14} />}
           {scanning ? t("dotfiles.scanning") : t("dotfiles.scan")}
         </button>
       </div>
@@ -246,7 +246,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
               style={{ flex: 1, maxWidth: 560, appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 13.5, padding: "6px 10px", borderRadius: 6, boxSizing: "border-box" }}
             />
             <button onClick={() => void addCustomPath()} disabled={!customPath.trim()} style={{ ...ic, color: "var(--accent)", padding: "6px 12px", fontSize: 14, opacity: customPath.trim() ? 1 : 0.5 }}>
-              <FloppyDisk size={14} />{t("dotfiles.addPath")}
+              <Save size={14} />{t("dotfiles.addPath")}
             </button>
           </div>
 
@@ -264,7 +264,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
         cands === null ? (
           <EmptyState icon={<File size={24} />} title={t("dotfiles.emptyTitle")} subtitle={t("dotfiles.emptySubtitle")} />
         ) : newCands.length === 0 ? (
-          <EmptyState icon={<CheckCircle size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
+          <EmptyState icon={<CircleCheck size={24} />} title={t("common.allAddedTitle")} subtitle={t("common.allAddedSubtitle")} />
         ) : (
           <div>
             {checked.size > 0 && (
@@ -280,7 +280,7 @@ export function Dotfiles({ showHud }: DotfilesProps) {
                 </label>
                 <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
                   <button onClick={() => void batch("add")} disabled={busy} style={{ ...ic, color: "var(--accent)", borderColor: "var(--accent)" }}>
-                    <FloppyDisk size={11} />{t("common.addSelected")}
+                    <Save size={11} />{t("common.addSelected")}
                   </button>
                   <button onClick={() => void batch("remove")} disabled={busy} style={{ ...ic, color: "var(--red)", borderColor: "var(--red)" }}>
                     <X size={11} />{t("common.removeSelected")}

@@ -1,20 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
-import { Lock, Prohibit, CaretRight, CaretDown, FileText, GearSix, Plugs, Plus, CheckCircle } from "@phosphor-icons/react";
+import { Lock, Ban, ChevronRight, ChevronDown, FileText, Settings, Plug, Plus, CircleCheck } from "lucide-react";
 import type { HudMessage } from "../components/Hud";
 import { Skeleton } from "../components/Skeleton";
 import { useT } from "../i18n";
 import { getAiToolsCatalog, addSelection, removeSelection, addAiCustom } from "../api";
 import type { AiCatalogTool, AiCatalogPath } from "../api";
+import { useFilePreview, PreviewCaret, FilePreviewPane } from "../components/FilePreview";
 
 export interface AiBackupProps { showHud?: (m: HudMessage) => void }
 
 function KindIcon({ kind, state }: { kind: AiCatalogPath["kind"]; state: AiCatalogPath["state"] }) {
   const c = "var(--muted)";
-  if (state === "never") return <Prohibit size={14} style={{ color: c, flexShrink: 0 }} />;
+  if (state === "never") return <Ban size={14} style={{ color: c, flexShrink: 0 }} />;
   if (kind === "memory") return <FileText size={14} style={{ color: c, flexShrink: 0 }} />;
-  if (kind === "mcp") return <Plugs size={14} style={{ color: c, flexShrink: 0 }} />;
+  if (kind === "mcp") return <Plug size={14} style={{ color: c, flexShrink: 0 }} />;
   if (kind === "data") return <FileText size={14} style={{ color: c, flexShrink: 0 }} />;
-  return <GearSix size={14} style={{ color: c, flexShrink: 0 }} />;
+  return <Settings size={14} style={{ color: c, flexShrink: 0 }} />;
 }
 
 function Dots({ done, total }: { done: number; total: number }) {
@@ -24,6 +25,38 @@ function Dots({ done, total }: { done: number; total: number }) {
         <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: i < done ? "var(--green)" : "var(--border)" }} />
       ))}
     </span>
+  );
+}
+
+function PathRow({ p, onAdd, onRemove }: { p: AiCatalogPath; onAdd: (path: string) => void; onRemove: (path: string) => void }) {
+  const { t } = useT();
+  // All paths are previewable via useFilePreview; encrypted/secret entries will
+  // return reason:"encrypted"/"secret" and FilePreviewPane renders the notice (I6).
+  const { preview, toggle } = useFilePreview(p.path, true);
+
+  const stateEl = () => {
+    if (p.state === "selected") return <span style={{ color: "var(--green)", fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4 }}><CircleCheck size={13} />{t("ai.state.backedUp")}</span>;
+    if (p.state === "pending") return <span style={{ color: "var(--amber)", fontSize: 11.5 }}>{t("ai.state.pending")}</span>;
+    if (p.state === "never") return <span style={{ color: "var(--muted)", fontSize: 11.5 }}>{t("ai.state.never")}</span>;
+    if (p.state === "dotfiles") return <span style={{ color: "var(--muted)", fontSize: 11.5 }}>{t("ai.managedByDotfiles")}</span>;
+    return <button onClick={() => onAdd(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--accent)", fontSize: 11.5, cursor: "pointer", fontFamily: "var(--font)" }}>{t("ai.state.add")}</button>;
+  };
+
+  return (
+    <div role="row" style={{ borderTop: "1px solid var(--border-soft)", opacity: p.state === "never" || p.state === "dotfiles" ? 0.5 : 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px 9px 18px", fontSize: 12.5 }}>
+        <KindIcon kind={p.kind} state={p.state} />
+        <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 400, color: "var(--text)", cursor: "pointer" }} onClick={() => void toggle()}>
+          <PreviewCaret open={preview.open} />{p.path.split("/").pop()}
+        </span>
+        {p.extract && <span style={{ fontSize: 10, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>{t("ai.extractTag")}</span>}
+        {p.encrypt && <Lock size={12} style={{ color: "var(--amber)", flexShrink: 0 }} />}
+        {p.state === "selected" || p.state === "pending"
+          ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{stateEl()}<button onClick={() => onRemove(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--muted)", fontSize: 11.5, cursor: "pointer" }}>{t("common.remove")}</button></span>
+          : stateEl()}
+      </div>
+      <FilePreviewPane preview={preview} />
+    </div>
   );
 }
 
@@ -42,7 +75,7 @@ function ToolCard({ tool, onAdd, onRemove }: { tool: AiCatalogTool; onAdd: (p: s
     return (
       <div style={{ borderBottom: "1px solid var(--border-soft)", opacity: 0.45 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 2px" }}>
-          <CaretRight size={13} style={{ color: "var(--muted)" }} />
+          <ChevronRight size={13} style={{ color: "var(--muted)" }} />
           <span style={{ fontSize: 13, fontWeight: 500 }}>{tool.label}</span>
           <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)" }}>{t("ai.notInstalled")}</span>
         </div>
@@ -50,18 +83,10 @@ function ToolCard({ tool, onAdd, onRemove }: { tool: AiCatalogTool; onAdd: (p: s
     );
   }
 
-  const stateEl = (p: AiCatalogPath) => {
-    if (p.state === "selected") return <span style={{ color: "var(--green)", fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4 }}><CheckCircle size={13} />{t("ai.state.backedUp")}</span>;
-    if (p.state === "pending") return <span style={{ color: "var(--amber)", fontSize: 11.5 }}>{t("ai.state.pending")}</span>;
-    if (p.state === "never") return <span style={{ color: "var(--muted)", fontSize: 11.5 }}>{t("ai.state.never")}</span>;
-    if (p.state === "dotfiles") return <span style={{ color: "var(--muted)", fontSize: 11.5 }}>{t("ai.managedByDotfiles")}</span>;
-    return <button onClick={() => onAdd(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--accent)", fontSize: 11.5, cursor: "pointer", fontFamily: "var(--font)" }}>{t("ai.state.add")}</button>;
-  };
-
   return (
     <div style={{ borderBottom: "1px solid var(--border-soft)" }}>
       <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 2px", cursor: "pointer" }}>
-        {open ? <CaretDown size={13} style={{ color: "var(--muted)" }} /> : <CaretRight size={13} style={{ color: "var(--muted)" }} />}
+        {open ? <ChevronDown size={13} style={{ color: "var(--muted)" }} /> : <ChevronRight size={13} style={{ color: "var(--muted)" }} />}
         <span style={{ fontSize: 13, fontWeight: 500 }}>{tool.label}</span>
         {dotfilesOnly
           ? <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)" }}>{t("ai.managedByDotfiles")}</span>
@@ -70,19 +95,11 @@ function ToolCard({ tool, onAdd, onRemove }: { tool: AiCatalogTool; onAdd: (p: s
       {open && (
         <div style={{ marginLeft: 9, borderLeft: "1px solid var(--border-soft)" }}>
           {visible.map((p) => (
-            <div key={p.path} role="row" style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px 9px 18px", borderTop: "1px solid var(--border-soft)", fontSize: 12.5, opacity: p.state === "never" || p.state === "dotfiles" ? 0.5 : 1 }}>
-              <KindIcon kind={p.kind} state={p.state} />
-              <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 400, color: "var(--text)" }}>{p.path.split("/").pop()}</span>
-              {p.extract && <span style={{ fontSize: 10, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>{t("ai.extractTag")}</span>}
-              {p.encrypt && <Lock size={12} style={{ color: "var(--amber)", flexShrink: 0 }} />}
-              {p.state === "selected" || p.state === "pending"
-                ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{stateEl(p)}<button onClick={() => onRemove(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--muted)", fontSize: 11.5, cursor: "pointer" }}>{t("common.remove")}</button></span>
-                : stateEl(p)}
-            </div>
+            <PathRow key={p.path} p={p} onAdd={onAdd} onRemove={onRemove} />
           ))}
           {backable.some((p) => p.state === "available") && (
             <div style={{ padding: "8px 2px 12px 18px", textAlign: "right" }}>
-              <button onClick={() => backable.filter((p) => p.state === "available").forEach((p) => onAdd(p.path))} style={{ appearance: "none", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e", fontWeight: 600, fontSize: 11.5, padding: "4px 11px", borderRadius: 7, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><Plus size={12} weight="bold" />{t("ai.addAll")}</button>
+              <button onClick={() => backable.filter((p) => p.state === "available").forEach((p) => onAdd(p.path))} style={{ appearance: "none", background: "var(--accent)", border: "1px solid var(--accent)", color: "#1b1b1e", fontWeight: 600, fontSize: 11.5, padding: "4px 11px", borderRadius: 7, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><Plus size={12} />{t("ai.addAll")}</button>
             </div>
           )}
         </div>
@@ -152,7 +169,7 @@ export function AiBackup({ showHud }: AiBackupProps) {
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>{t("ai.suggest.group")}</div>
           {suggestions.map((tl) => (
             <div key={tl.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderTop: "1px solid var(--border-soft)" }}>
-              <Plugs size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
+              <Plug size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
               <span className="mono" style={{ fontSize: 12.5, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{tl.paths[0]?.path ?? tl.label}</span>
               <span style={{ fontSize: 11, color: "var(--muted)", flexShrink: 0 }}>{t("ai.suggest.note")}</span>
               <button onClick={() => void onAdoptSuggestion(tl)} style={{ appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--text)", fontSize: 11.5, padding: "4px 10px", borderRadius: 7, cursor: "pointer", flexShrink: 0, fontFamily: "var(--font)" }}>{t("ai.suggest.adopt")}</button>

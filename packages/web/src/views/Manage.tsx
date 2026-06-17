@@ -6,10 +6,10 @@ import {
   GitBranch,
   Scan,
   Plus,
-  Trash,
-  CaretDown,
-  CaretRight,
-} from "@phosphor-icons/react";
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import type { DriftItem, Candidate } from "@roost/shared";
 import type { HudMessage } from "../components/Hud";
 import { useT } from "../i18n";
@@ -98,7 +98,7 @@ function AddPanel({ moduleName, selectedIds, discover, onAdd }: AddPanelProps) {
           gap: 5,
         }}
       >
-        {open ? <CaretDown size={11} /> : <CaretRight size={11} />}
+        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         <Plus size={11} />
         Add items
       </button>
@@ -233,7 +233,7 @@ function ItemRowWithRemove({ item, moduleName, onRemove }: ItemRowWithRemoveProp
             gap: 4,
           }}
         >
-          <Trash size={11} />
+          <Trash2 size={11} />
           Remove
         </button>
       )}
@@ -284,7 +284,7 @@ function ModuleSectionWithActions({
           textAlign: "left",
         }}
       >
-        {expanded ? <CaretDown size={12} style={{ color: "var(--muted)", flexShrink: 0 }} /> : <CaretRight size={12} style={{ color: "var(--muted)", flexShrink: 0 }} />}
+        {expanded ? <ChevronDown size={12} style={{ color: "var(--muted)", flexShrink: 0 }} /> : <ChevronRight size={12} style={{ color: "var(--muted)", flexShrink: 0 }} />}
         {getModuleIcon(name)}
         <span>{name}</span>
         <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 13 }}>

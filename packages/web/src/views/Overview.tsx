@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { FloppyDisk, DownloadSimple, FileCode, Package, SlidersHorizontal, GitBranch, Scan, Lock, Desktop } from "@phosphor-icons/react";
+import { Save, Download, FileCode, Package, SlidersHorizontal, GitBranch, Scan, Lock, Monitor } from "lucide-react";
 import { MachineCard } from "../components/MachineCard";
 import { StatusDot } from "../components/StatusDot";
 import { Tile } from "../components/Tile";
@@ -417,7 +417,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
               color: "var(--muted)",
             }}
           >
-            <Desktop size={18} style={{ flexShrink: 0 }} />
+            <Monitor size={18} style={{ flexShrink: 0 }} />
             <div style={{ fontSize: 14, lineHeight: 1.5 }}>
               {t("overview.noOtherMachine")}
             </div>
@@ -452,7 +452,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           }
           onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
         >
-          <FloppyDisk size={16} weight={capturing ? "duotone" : "regular"} />
+          <Save size={16} />
           {capturing ? t("overview.capturing") : t("overview.capture")}
         </button>
 
@@ -477,7 +477,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.975)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
         >
-          <DownloadSimple size={16} weight="regular" />
+          <Download size={16} />
           {t("overview.review")}
         </button>
 
@@ -513,7 +513,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
                 disabled={retrying}
                 style={{ marginLeft: "auto", appearance: "none", border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 13, padding: "5px 11px", borderRadius: "var(--rr)", cursor: retrying ? "default" : "pointer" }}
               >
-                <Lock size={12} weight="fill" style={{ marginRight: 5, verticalAlign: "-1px" }} />
+                <Lock size={12} style={{ marginRight: 5, verticalAlign: "-1px" }} />
                 {retrying ? t("overview.encrypting") : t("overview.encryptRetryAll")}
               </button>
             )}
@@ -616,7 +616,7 @@ export function Overview({ showHud, onOpenSync, onOpenSetup }: OverviewProps) {
               disabled={retrying}
               style={{ marginLeft: "auto", appearance: "none", border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontFamily: "var(--font)", fontSize: 13, padding: "5px 11px", borderRadius: "var(--rr)", cursor: retrying ? "default" : "pointer" }}
             >
-              <Lock size={12} weight="fill" style={{ marginRight: 5, verticalAlign: "-1px" }} />
+              <Lock size={12} style={{ marginRight: 5, verticalAlign: "-1px" }} />
               {retrying ? t("overview.encrypting") : t("overview.encryptRetryAll")}
             </button>
           </div>
