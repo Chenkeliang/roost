@@ -10,6 +10,7 @@ import type { SkillImportResponse, SkillScanResponse, SkillCandidate } from "../
 import type { SkillsView, SkillRow, SkillMethod } from "../api";
 import { computeCoverage, targetStatus } from "./skillsCoverage";
 import type { Coverage } from "./skillsCoverage";
+import { useFilePreview, PreviewCaret, FilePreviewPane } from "../components/FilePreview";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
 const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
@@ -124,6 +125,104 @@ function RowMenu({ row, busy, t, onRemove, onMethod, onToggleEnabled }: {
         </>
       )}
     </span>
+  );
+}
+
+function SkillTableRow({ row, sourceDir, targetIds, busy, t, onOpenPopover, onChangeMethod, onToggleEnabled, onRemove }: {
+  row: SkillRow;
+  sourceDir: string;
+  targetIds: string[];
+  busy: boolean;
+  t: (k: string) => string;
+  onOpenPopover: () => void;
+  onChangeMethod: (m: SkillMethod) => void;
+  onToggleEnabled: () => void;
+  onRemove: () => void;
+}) {
+  const { preview, toggle, setReveal } = useFilePreview(`${sourceDir}/${row.name}`, true);
+  return (
+    <>
+      <tr key={row.name}>
+        {/* dim only the content cells when disabled — NOT the actions cell,
+            else CSS opacity inherits into the ⋯ menu and makes it translucent */}
+        <td style={{ ...cellPad, opacity: row.effective.enabled ? 1 : 0.5 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Stack size={14} style={{ color: "var(--muted)" }} />
+            <span className="mono" style={{ cursor: "pointer" }} onClick={() => void toggle()}>
+              <PreviewCaret open={preview.open} />{row.name}
+            </span>
+            {row.external && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--muted)", background: "var(--raise)", border: "1px solid var(--border-soft)", borderRadius: 4, padding: "1px 5px" }}>
+                <Tag size={10} />
+                {row.external.label} {t("skills.external.suffix")}
+              </span>
+            )}
+          </span>
+        </td>
+        <td style={{ ...cellPad, opacity: row.effective.enabled ? 1 : 0.5 }}>
+          <CoverageCell cov={computeCoverage(row, targetIds)} method={row.effective.method} onOpen={onOpenPopover} t={t} />
+        </td>
+        <td style={cellPad}>
+          <RowMenu row={row} busy={busy} t={t}
+            onRemove={onRemove}
+            onMethod={onChangeMethod}
+            onToggleEnabled={onToggleEnabled} />
+        </td>
+      </tr>
+      {preview.open && (
+        <tr>
+          <td colSpan={3} style={{ padding: 0 }}>
+            <FilePreviewPane preview={preview} onReveal={setReveal} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function SkillCandidateRow({ c, location, checked, t, fromChoice, onToggleCheck, onFromChoice }: {
+  c: SkillCandidate;
+  location: string;
+  checked: boolean;
+  t: (k: string) => string;
+  fromChoice: Record<string, string>;
+  onToggleCheck: (id: string) => void;
+  onFromChoice: (id: string, loc: string) => void;
+}) {
+  const hasLocation = !!(c.origin?.location ?? location);
+  const dirPath = c.origin?.location ?? location;
+  const { preview, toggle, setReveal } = useFilePreview(
+    hasLocation ? `${dirPath}/${c.id}` : "",
+    hasLocation,
+  );
+  return (
+    <>
+      <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
+        <input type="checkbox" aria-label={`select ${c.id}`} checked={checked} onChange={() => onToggleCheck(c.id)} style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }} />
+        <Stack size={14} style={{ color: "var(--muted)" }} />
+        <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: hasLocation ? "pointer" : undefined }} onClick={hasLocation ? () => void toggle() : undefined}>
+          <PreviewCaret open={preview.open} placeholder={!hasLocation} />{c.id}
+        </span>
+        {c.origin?.needsRepair && (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#f0b352" }}>
+            <Wrench size={11} />{t("skills.adopt.repair")}
+          </span>
+        )}
+        {c.origin?.conflictLocations && c.origin.conflictLocations.length > 1 && (
+          <select
+            aria-label={`source for ${c.id}`}
+            value={fromChoice[c.id] ?? c.origin.conflictLocations[0]}
+            onChange={(e) => onFromChoice(c.id, e.target.value)}
+            style={{ ...ic, padding: "3px 6px", fontSize: 12 }}
+          >
+            {c.origin.conflictLocations.map((loc) => (
+              <option key={loc} value={loc}>{loc}</option>
+            ))}
+          </select>
+        )}
+      </div>
+      {preview.open && <FilePreviewPane preview={preview} onReveal={setReveal} />}
+    </>
   );
 }
 
@@ -410,31 +509,11 @@ export function Skills() {
                 </thead>
                 <tbody>
                   {visibleSkills.map((row) => (
-                    <tr key={row.name}>
-                      {/* dim only the content cells when disabled — NOT the actions cell,
-                          else CSS opacity inherits into the ⋯ menu and makes it translucent */}
-                      <td style={{ ...cellPad, opacity: row.effective.enabled ? 1 : 0.5 }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                          <Stack size={14} style={{ color: "var(--muted)" }} />
-                          <span className="mono">{row.name}</span>
-                          {row.external && (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--muted)", background: "var(--raise)", border: "1px solid var(--border-soft)", borderRadius: 4, padding: "1px 5px" }}>
-                              <Tag size={10} />
-                              {row.external.label} {t("skills.external.suffix")}
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td style={{ ...cellPad, opacity: row.effective.enabled ? 1 : 0.5 }}>
-                        <CoverageCell cov={computeCoverage(row, targetIds)} method={row.effective.method} onOpen={() => setPopover(row.name)} t={t} />
-                      </td>
-                      <td style={cellPad}>
-                        <RowMenu row={row} busy={busy} t={t}
-                          onRemove={() => setRemoving(row.name)}
-                          onMethod={(m) => void onChangeMethod(row.name, m)}
-                          onToggleEnabled={() => void onToggleMaster(row)} />
-                      </td>
-                    </tr>
+                    <SkillTableRow key={row.name} row={row} sourceDir={config.sourceDir} targetIds={targetIds} busy={busy} t={t}
+                      onOpenPopover={() => setPopover(row.name)}
+                      onChangeMethod={(m) => void onChangeMethod(row.name, m)}
+                      onToggleEnabled={() => void onToggleMaster(row)}
+                      onRemove={() => setRemoving(row.name)} />
                   ))}
                 </tbody>
               </table>
@@ -563,28 +642,10 @@ export function Skills() {
                   )}
                   <div style={card}>
                     {items.map((c) => (
-                      <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
-                        <input type="checkbox" aria-label={`select ${c.id}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} style={{ accentColor: "var(--accent)", width: 17, height: 17, cursor: "pointer" }} />
-                        <Stack size={14} style={{ color: "var(--muted)" }} />
-                        <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.id}</span>
-                        {c.origin?.needsRepair && (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#f0b352" }}>
-                            <Wrench size={11} />{t("skills.adopt.repair")}
-                          </span>
-                        )}
-                        {c.origin?.conflictLocations && c.origin.conflictLocations.length > 1 && (
-                          <select
-                            aria-label={`source for ${c.id}`}
-                            value={fromChoice[c.id] ?? c.origin.conflictLocations[0]}
-                            onChange={(e) => setFromChoice((m) => ({ ...m, [c.id]: e.target.value }))}
-                            style={{ ...ic, padding: "3px 6px", fontSize: 12 }}
-                          >
-                            {c.origin.conflictLocations.map((loc) => (
-                              <option key={loc} value={loc}>{loc}</option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
+                      <SkillCandidateRow key={c.id} c={c} location={location} checked={checked.has(c.id)} t={t}
+                        fromChoice={fromChoice}
+                        onToggleCheck={toggleCheck}
+                        onFromChoice={(id, loc) => setFromChoice((m) => ({ ...m, [id]: loc }))} />
                     ))}
                   </div>
                 </div>

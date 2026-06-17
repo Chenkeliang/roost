@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { Projects } from "./views/Projects";
+import * as api from "./api";
 
 vi.mock("./api", () => ({
   getIndex: vi.fn().mockResolvedValue({ index: { projects: { available: true, managed: 0 } } }),
@@ -17,10 +18,22 @@ vi.mock("./api", () => ({
   addSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { projects: ["/Users/k/work/a"] } }),
   removeSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { projects: [] } }),
   getSelection: vi.fn().mockResolvedValue({ schemaVersion: 1, modules: { projects: [] } }),
+  getFilePreview: vi.fn().mockResolvedValue({ ok: true, content: "README.md\nsrc/" }),
 }));
 
 describe("Projects", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("clicking a discovered project path calls getFilePreview with c.path and renders pane content", async () => {
+    vi.mocked(api.getFilePreview).mockResolvedValue({ ok: true, content: "PROJECT_PREVIEW_CONTENT" });
+    await act(async () => { render(<Projects showHud={vi.fn()} />); });
+    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: /scan/i })); });
+    await waitFor(() => screen.getByText(/work\/a/));
+    const pathEl = screen.getByText("/Users/k/work/a");
+    fireEvent.click(pathEl);
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/Users/k/work/a", false));
+    expect(await screen.findByText("PROJECT_PREVIEW_CONTENT")).toBeInTheDocument();
+  });
 
   it("scans on demand and groups discovered repos by host", async () => {
     await act(async () => { render(<Projects showHud={vi.fn()} />); });

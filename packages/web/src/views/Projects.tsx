@@ -7,12 +7,50 @@ import { Skeleton } from "../components/Skeleton";
 import { TabSwitch } from "../components/TabSwitch";
 import { useT } from "../i18n";
 import { getIndex, getDiscoverModule, testProjectRemote, addSelection, removeSelection, getSelection } from "../api";
+import { useFilePreview, PreviewCaret, FilePreviewPane } from "../components/FilePreview";
 
 interface ProjectsProps { showHud?: (m: HudMessage) => void; }
 type TestState = Record<string, "ok" | "fail" | "testing">;
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "var(--rc)", overflow: "hidden" };
 const ic: React.CSSProperties = { appearance: "none", border: "1px solid var(--border)", background: "var(--raise)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: 12.5, padding: "4px 8px", borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 };
+
+function ProjectCandidateRow({ c, checked, saved, tested, t, onToggleCheck, onTest, onSave, onRemove }: {
+  c: Candidate;
+  checked: boolean;
+  saved: boolean;
+  tested: "ok" | "fail" | "testing" | undefined;
+  t: (k: string) => string;
+  onToggleCheck: (id: string) => void;
+  onTest: (c: Candidate) => void;
+  onSave: (c: Candidate) => void;
+  onRemove: (id: string) => void;
+}) {
+  const { preview, toggle, setReveal } = useFilePreview(c.path, true);
+  return (
+    <>
+      <div role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
+        <input type="checkbox" aria-label={`select ${c.path}`} checked={checked} onChange={() => onToggleCheck(c.id)} />
+        <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }} onClick={() => void toggle()}>
+          <PreviewCaret open={preview.open} />{c.path}
+        </span>
+        <span style={{ color: "var(--muted)", fontSize: 12.5, minWidth: 150, fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.remote ?? t("common.noRemote")}</span>
+        {tested === "ok" && <CircleCheck size={14} fill="currentColor" style={{ color: "var(--green)" }} />}
+        {tested === "fail" && <CircleX size={14} fill="currentColor" style={{ color: "var(--red)" }} />}
+        <button onClick={() => onTest(c)} disabled={!c.remote || tested === "testing"} style={ic} aria-label={`test ${c.path}`}>{t("common.test")}</button>
+        {saved ? (
+          <>
+            <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} saved`}><CircleCheck size={11} fill="currentColor" />{t("projects.saved")}</span>
+            <button onClick={() => onRemove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
+          </>
+        ) : (
+          <button onClick={() => onSave(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><Save size={11} />{t("common.save")}</button>
+        )}
+      </div>
+      <FilePreviewPane preview={preview} onReveal={setReveal} />
+    </>
+  );
+}
 
 export function Projects({ showHud }: ProjectsProps) {
   const { t } = useT();
@@ -209,22 +247,11 @@ export function Projects({ showHud }: ProjectsProps) {
           </div>
           <div style={card}>
             {shown.map((c) => (
-              <div key={c.id} role="row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border-soft)", fontSize: 14 }}>
-                <input type="checkbox" aria-label={`select ${c.path}`} checked={checked.has(c.id)} onChange={() => toggleCheck(c.id)} />
-                <span className="mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.path}</span>
-                <span style={{ color: "var(--muted)", fontSize: 12.5, minWidth: 150, fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.remote ?? t("common.noRemote")}</span>
-                {tested[c.id] === "ok" && <CircleCheck size={14} fill="currentColor" style={{ color: "var(--green)" }} />}
-                {tested[c.id] === "fail" && <CircleX size={14} fill="currentColor" style={{ color: "var(--red)" }} />}
-                <button onClick={() => void test(c)} disabled={!c.remote || tested[c.id] === "testing"} style={ic} aria-label={`test ${c.path}`}>{t("common.test")}</button>
-                {saved.has(c.id) ? (
-                  <>
-                    <span style={{ ...ic, color: "var(--green)", border: "1px solid var(--green)", cursor: "default" }} aria-label={`${c.path} saved`}><CircleCheck size={11} fill="currentColor" />{t("projects.saved")}</span>
-                    <button onClick={() => void remove(c.id)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${c.path}`}><X size={11} />{t("common.remove")}</button>
-                  </>
-                ) : (
-                  <button onClick={() => void save(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><Save size={11} />{t("common.save")}</button>
-                )}
-              </div>
+              <ProjectCandidateRow key={c.id} c={c} checked={checked.has(c.id)} saved={saved.has(c.id)} tested={tested[c.id]} t={t}
+                onToggleCheck={toggleCheck}
+                onTest={(c) => void test(c)}
+                onSave={(c) => void save(c)}
+                onRemove={(id) => void remove(id)} />
             ))}
           </div>
         </>

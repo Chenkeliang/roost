@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { Skills } from "./views/Skills";
 import * as api from "./api";
 import type { SkillsView, SkillRow } from "./api";
@@ -23,6 +23,7 @@ vi.mock("./api", () => ({
   postSkillsImportScan: vi.fn().mockResolvedValue({ token: "t", skills: [] }),
   postSkillsImportApply: vi.fn().mockResolvedValue({ imported: [], blocked: [] }),
   saveSkillsTargets: vi.fn().mockResolvedValue({ ok: true }),
+  getFilePreview: vi.fn().mockResolvedValue({ ok: true, content: "SKILL.md\nref/" }),
 }));
 
 // Typed helpers to avoid `method: string` inference issues
@@ -270,6 +271,37 @@ describe("Skills view", () => {
     render(<Skills />);
     await screen.findByText("bar");
     expect(await screen.findByText(/~\/.foo-manager\s+managed/i)).toBeInTheDocument();
+  });
+
+  // ── file preview: managed skill row ────────────────────────────────────────
+
+  it("clicking a managed skill name calls getFilePreview with sourceDir/name and renders pane content", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(BASE_VIEW);
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: [] });
+    vi.mocked(api.getFilePreview).mockResolvedValue({ ok: true, content: "SKILL_PREVIEW_CONTENT" });
+    render(<Skills />);
+    const nameEl = await screen.findByText("foo");
+    fireEvent.click(nameEl);
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("~/.agents/skills/foo", false));
+    expect(await screen.findByText("SKILL_PREVIEW_CONTENT")).toBeInTheDocument();
+  });
+
+  // ── file preview: adopt candidate row ──────────────────────────────────────
+
+  it("clicking a candidate skill name calls getFilePreview with origin.location/id and renders pane content", async () => {
+    vi.mocked(api.getSkills).mockResolvedValue(BASE_VIEW);
+    vi.mocked(api.discoverSkills).mockResolvedValue({ candidates: TWO_CANDIDATES });
+    vi.mocked(api.getFilePreview).mockResolvedValue({ ok: true, content: "CAND_PREVIEW_CONTENT" });
+    render(<Skills />);
+    await screen.findByText("foo");
+
+    const discoveredTab = await screen.findByRole("button", { name: /^Discovered/, pressed: false });
+    discoveredTab.click();
+
+    await screen.findByText("alpha");
+    fireEvent.click(screen.getByText("alpha"));
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("~/.agents/skills/alpha", false));
+    expect(await screen.findByText("CAND_PREVIEW_CONTENT")).toBeInTheDocument();
   });
 
   it("external skill shows cede button in coverage popover (no conflict needed) that calls toggleSkill", async () => {
