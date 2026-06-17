@@ -172,7 +172,7 @@ function SkillTableRow({ row, sourceDir, targetIds, busy, t, onOpenPopover, onCh
       {preview.open && (
         <tr>
           <td colSpan={3} style={{ padding: 0 }}>
-            <FilePreviewPane preview={preview} onReveal={setReveal} />
+            <FilePreviewPane preview={preview} path={`${sourceDir}/${row.name}`} onReveal={setReveal} />
           </td>
         </tr>
       )}
@@ -221,7 +221,7 @@ function SkillCandidateRow({ c, location, checked, t, fromChoice, onToggleCheck,
           </select>
         )}
       </div>
-      {preview.open && <FilePreviewPane preview={preview} onReveal={setReveal} />}
+      {preview.open && <FilePreviewPane preview={preview} path={hasLocation ? `${dirPath}/${c.id}` : ""} onReveal={setReveal} />}
     </>
   );
 }

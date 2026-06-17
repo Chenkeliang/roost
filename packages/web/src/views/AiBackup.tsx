@@ -55,7 +55,7 @@ function PathRow({ p, onAdd, onRemove }: { p: AiCatalogPath; onAdd: (path: strin
           ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{stateEl()}<button onClick={() => onRemove(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--muted)", fontSize: 11.5, cursor: "pointer" }}>{t("common.remove")}</button></span>
           : stateEl()}
       </div>
-      <FilePreviewPane preview={preview} onReveal={setReveal} />
+      <FilePreviewPane preview={preview} path={p.path} onReveal={setReveal} />
     </div>
   );
 }

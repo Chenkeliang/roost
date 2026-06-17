@@ -1,6 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act } from "react";
 import { FilePreviewPane } from "./components/FilePreview";
+import * as api from "./api";
+
+vi.mock("./api", () => ({ getFilePreview: vi.fn() }));
 
 describe("FilePreviewPane — masked structural preview", () => {
   it("shows the masked note above the content when masked", () => {
@@ -31,5 +35,31 @@ describe("FilePreviewPane — reveal eye (ADR-0025)", () => {
   it("no eye when onReveal is not provided", () => {
     render(<FilePreviewPane preview={{ open: true, loading: false, content: '{"k":"••••"}', masked: true }} />);
     expect(screen.queryByRole("button", { name: /show value|hide value/i })).toBeNull();
+  });
+});
+
+describe("FilePreviewPane — directory tree", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders directory entries as a tree (folders + files aligned)", () => {
+    render(<FilePreviewPane path="/h/skill" preview={{ open: true, loading: false, entries: [{ name: "scripts", dir: true }, { name: "SKILL.md", dir: false }] }} />);
+    expect(screen.getByText("scripts")).toBeInTheDocument();
+    expect(screen.getByText("SKILL.md")).toBeInTheDocument();
+  });
+
+  it("expanding a folder node lazy-fetches its children", async () => {
+    (api.getFilePreview as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, entries: [{ name: "build.sh", dir: false }] });
+    render(<FilePreviewPane path="/h/skill" preview={{ open: true, loading: false, entries: [{ name: "scripts", dir: true }] }} />);
+    await act(async () => { fireEvent.click(screen.getByText("scripts")); });
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/h/skill/scripts", false));
+    expect(await screen.findByText("build.sh")).toBeInTheDocument();
+  });
+
+  it("opening a file node previews its content", async () => {
+    (api.getFilePreview as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, content: "# the skill" });
+    render(<FilePreviewPane path="/h/skill" preview={{ open: true, loading: false, entries: [{ name: "SKILL.md", dir: false }] }} />);
+    await act(async () => { fireEvent.click(screen.getByText("SKILL.md")); });
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/h/skill/SKILL.md", false));
+    expect(await screen.findByText("# the skill")).toBeInTheDocument();
   });
 });

@@ -47,7 +47,7 @@ function ProjectCandidateRow({ c, checked, saved, tested, t, onToggleCheck, onTe
           <button onClick={() => onSave(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`save ${c.path}`}><Save size={11} />{t("common.save")}</button>
         )}
       </div>
-      <FilePreviewPane preview={preview} onReveal={setReveal} />
+      <FilePreviewPane preview={preview} path={c.path} onReveal={setReveal} />
     </>
   );
 }

@@ -2296,16 +2296,18 @@ describe("backup status + settings passthrough", () => {
       });
       const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: ctx });
       const res = await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(dirPath)}` });
-      const body = res.json() as { ok: boolean; content?: string; reason?: string };
+      const body = res.json() as { ok: boolean; entries?: { name: string; dir: boolean }[]; reason?: string };
       expect(body.ok).toBe(true);
       expect(body.reason).toBeUndefined();
-      // entries sorted; subdirectories suffixed with "/"
-      const lines = (body.content ?? "").split("\n").filter(Boolean);
-      expect(lines).toContain("a.txt");
-      expect(lines).toContain("b.txt");
-      expect(lines).toContain("sub/");
-      // sorted: a.txt < b.txt < sub/
-      expect(lines.indexOf("a.txt")).toBeLessThan(lines.indexOf("b.txt"));
+      const names = (body.entries ?? []).map((e) => e.name);
+      expect(names).toContain("a.txt");
+      expect(names).toContain("b.txt");
+      expect(names).toContain("sub");
+      expect(body.entries!.find((e) => e.name === "sub")!.dir).toBe(true);
+      expect(body.entries!.find((e) => e.name === "a.txt")!.dir).toBe(false);
+      // dirs first, then files alphabetical
+      expect(names.indexOf("sub")).toBeLessThan(names.indexOf("a.txt"));
+      expect(names.indexOf("a.txt")).toBeLessThan(names.indexOf("b.txt"));
       await server.close();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });

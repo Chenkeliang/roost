@@ -42,7 +42,7 @@ function SelectedDotfileRow({ p, captured, onRemove, t }: { p: string; captured:
         <span style={{ color: captured ? "var(--green)" : "var(--muted)", fontSize: 12.5 }}>{captured ? t("common.captured") : t("common.pending")}</span>
         <button onClick={() => void onRemove(p)} style={{ ...ic, color: "var(--red)" }} aria-label={`remove ${p}`}><X size={11} />{t("common.remove")}</button>
       </div>
-      <FilePreviewPane preview={preview} onReveal={setReveal} />
+      <FilePreviewPane preview={preview} path={p} onReveal={setReveal} />
     </div>
   );
 }
@@ -69,7 +69,7 @@ function CandidateDotfileRow({ c, isAdded, isChecked, onToggleCheck, onAdd, onRe
           <button onClick={() => void onAdd(c)} style={{ ...ic, color: "var(--accent)" }} aria-label={`add ${c.path}`}><Save size={11} />{t("common.add")}</button>
         )}
       </div>
-      <FilePreviewPane preview={preview} onReveal={setReveal} />
+      <FilePreviewPane preview={preview} path={c.path} onReveal={setReveal} />
     </div>
   );
 }
