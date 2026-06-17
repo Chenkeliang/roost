@@ -1364,9 +1364,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // catalog encrypt-marked entries, dotfiles-encrypt-marked paths, and files
   // detected to contain plaintext secrets are all refused — secrets never show
   // in the UI. The secret-scan is defense in depth for unmarked files.
-  server.get<{ Querystring: { path?: string } }>("/api/file-preview", async (req, reply) => {
+  server.get<{ Querystring: { path?: string; reveal?: string } }>("/api/file-preview", async (req, reply) => {
     const p = req.query.path?.trim();
     if (!p) return reply.status(400).send({ error: "path is required" });
+    const reveal = req.query.reveal === "1" || req.query.reveal === "true";
     const home = makeCtx(true).home;
     const abs = p.startsWith("~/") ? path.join(home, p.slice(2)) : p;
     const previewPolicy = aiPathPolicies(repoDir, home).get(abs);
@@ -1382,7 +1383,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         if (s.isFile() && s.size <= 256 * 1024) {
           const b = fs.readFileSync(abs);
           if (!b.subarray(0, 8192).includes(0)) {
-            const masked = maskJsonStructure(b.toString("utf8"));
+            const text = b.toString("utf8");
+            // ADR-0025: explicit, local-only reveal of the plaintext. Default is masked.
+            if (reveal) return reply.send({ ok: true, content: text, revealed: true });
+            const masked = maskJsonStructure(text);
             if (masked !== null) return reply.send({ ok: true, content: masked, masked: true });
           }
         }

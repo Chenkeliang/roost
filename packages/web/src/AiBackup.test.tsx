@@ -125,7 +125,7 @@ describe("AiBackup", () => {
     expect(screen.queryByText("# Claude rules")).not.toBeInTheDocument();
     // Click to open preview
     fireEvent.click(fileNameEl.closest("span")!);
-    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/h/.claude/CLAUDE.md"));
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/h/.claude/CLAUDE.md", false));
     expect(await screen.findByText("# Claude rules")).toBeInTheDocument();
     // Click again to close
     fireEvent.click(fileNameEl.closest("span")!);
@@ -143,7 +143,7 @@ describe("AiBackup", () => {
     fireEvent.click(await screen.findByText("Claude Code"));
     const fileNameEl = await screen.findByText("settings.json");
     fireEvent.click(fileNameEl.closest("span")!);
-    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/h/.claude/settings.json"));
+    await waitFor(() => expect(api.getFilePreview).toHaveBeenCalledWith("/h/.claude/settings.json", false));
     // FilePreviewPane renders the encrypted reason text
     expect(await screen.findByText(/encrypted entry|加密项/)).toBeInTheDocument();
   });

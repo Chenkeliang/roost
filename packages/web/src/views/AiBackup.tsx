@@ -32,7 +32,7 @@ function PathRow({ p, onAdd, onRemove }: { p: AiCatalogPath; onAdd: (path: strin
   const { t } = useT();
   // All paths are previewable via useFilePreview; encrypted/secret entries will
   // return reason:"encrypted"/"secret" and FilePreviewPane renders the notice (I6).
-  const { preview, toggle } = useFilePreview(p.path, true);
+  const { preview, toggle, setReveal } = useFilePreview(p.path, true);
 
   const stateEl = () => {
     if (p.state === "selected") return <span style={{ color: "var(--green)", fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4 }}><CircleCheck size={13} />{t("ai.state.backedUp")}</span>;
@@ -55,7 +55,7 @@ function PathRow({ p, onAdd, onRemove }: { p: AiCatalogPath; onAdd: (path: strin
           ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{stateEl()}<button onClick={() => onRemove(p.path)} style={{ appearance: "none", border: "none", background: "none", color: "var(--muted)", fontSize: 11.5, cursor: "pointer" }}>{t("common.remove")}</button></span>
           : stateEl()}
       </div>
-      <FilePreviewPane preview={preview} />
+      <FilePreviewPane preview={preview} onReveal={setReveal} />
     </div>
   );
 }

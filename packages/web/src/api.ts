@@ -166,8 +166,8 @@ export interface AiCatalogPath {
   extract?: boolean;
 }
 export interface AiCatalogTool { id: string; label: string; paths: AiCatalogPath[]; suggest?: boolean }
-export function getFilePreview(p: string): Promise<{ ok: boolean; content?: string; masked?: boolean; reason?: "encrypted" | "secret" | "binary" | "too-large" | "directory" | "failed" }> {
-  return apiFetch(`/api/file-preview?path=${encodeURIComponent(p)}`);
+export function getFilePreview(p: string, reveal = false): Promise<{ ok: boolean; content?: string; masked?: boolean; revealed?: boolean; reason?: "encrypted" | "secret" | "binary" | "too-large" | "directory" | "failed" }> {
+  return apiFetch(`/api/file-preview?path=${encodeURIComponent(p)}${reveal ? "&reveal=1" : ""}`);
 }
 
 export function getAiToolsCatalog(): Promise<{ tools: AiCatalogTool[] }> {

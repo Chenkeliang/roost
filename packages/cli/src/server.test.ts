@@ -2664,3 +2664,24 @@ describe("GET /api/file-preview — masked structural preview (I6)", () => {
     expect(body.content).not.toContain("node");
   });
 });
+
+describe("GET /api/file-preview?reveal=1 — local plaintext reveal (ADR-0025)", () => {
+  it("masks by default but reveals the local plaintext on explicit reveal (repo copy untouched)", async () => {
+    const file = path.join(tmpDir, "secret.json");
+    fs.writeFileSync(file, JSON.stringify({ mcpServers: { ctx7: { env: { API_KEY: "sk-REVEAL" } } } }), "utf8");
+    saveSelection(tmpDir, { ...emptySelection(), modules: { "dotfiles-encrypt": [file] } });
+    const server = buildServer({ repoDir: tmpDir, registry: new ModuleRegistry(), makeCtx: (d) => makeCtx(tmpDir, d) });
+    const get = async (q: string) =>
+      (await server.inject({ method: "GET", url: `/api/file-preview?path=${encodeURIComponent(file)}${q}` })).json() as { ok: boolean; content?: string; masked?: boolean; revealed?: boolean };
+    const masked = await get("");
+    const revealed = await get("&reveal=1");
+    await server.close();
+    // default: masked, no secret value
+    expect(masked.masked).toBe(true);
+    expect(masked.content).not.toContain("sk-REVEAL");
+    // explicit reveal: real local plaintext
+    expect(revealed.ok).toBe(true);
+    expect(revealed.revealed).toBe(true);
+    expect(revealed.content).toContain("sk-REVEAL");
+  });
+});
