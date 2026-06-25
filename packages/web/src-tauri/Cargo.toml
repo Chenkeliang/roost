@@ -1,6 +1,6 @@
 [package]
 name = "roost-desktop"
-version = "0.2.1"
+version = "0.2.2"
 description = "Roost desktop shell (Tauri v2)"
 authors = ["Roost contributors"]
 license = "MIT"
