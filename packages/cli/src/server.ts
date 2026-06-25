@@ -61,6 +61,7 @@ import {
   skillsModule,
   materializeSource,
   unadoptSkills,
+  managedSkillNames,
   loadRoostSettings,
   saveRoostSettings,
   cloneRepo,
@@ -278,15 +279,24 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
   };
 
+  // Skills live in roost/skills.yaml + repo/skills, NOT selection.yaml, so captureAll
+  // (which keys off the selection) would skip them — silently dropping edits to managed
+  // skills from the global capture. Fold the managed set in so the global capture
+  // ("捕获") backs them up too.
+  const captureSelection = (ctx: ModuleContext) => {
+    const sel = loadSelection(repoDir);
+    const skills = managedSkillNames(ctx);
+    return skills.length ? { ...sel, modules: { ...sel.modules, skills } } : sel;
+  };
+
   // ── auto-backup scheduler (ADR-0020) ─────────────────────────────────────────
   const autoBackup = createAutoBackup({
     loadSettings: () => loadRoostSettings(repoDir),
     isRepo: async () =>
       (await makeCtx(true).exec.run("git", ["-C", repoDir, "rev-parse", "--is-inside-work-tree"])).code === 0,
     runCapture: async () => {
-      const sel = loadSelection(repoDir);
       const ctx = makeCtx(false);
-      const changes = await captureAll(registry, ctx, sel);
+      const changes = await captureAll(registry, ctx, captureSelection(ctx));
       await finalizeCapture(ctx.exec, repoDir, ctx.home, summarizeCapture(changes));
       cache.invalidateAll();
       return {
@@ -658,9 +668,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   server.post("/api/capture", async (_req, reply) => {
     try {
       cache.invalidateAll();
-      const sel = loadSelection(repoDir);
       const ctx = makeCtx(false);
-      const changes = await captureAll(registry, ctx, sel);
+      const changes = await captureAll(registry, ctx, captureSelection(ctx));
       await finalizeCapture(ctx.exec, repoDir, ctx.home, summarizeCapture(changes));
       return reply.send({ changes });
     } catch (err) {

@@ -1940,6 +1940,39 @@ describe("POST /api/skills/capture (adopt + decouple)", () => {
   });
 });
 
+describe("POST /api/capture (global) backs up edited skills", () => {
+  it("re-captures a drifted managed skill even though skills aren't in selection.yaml", async () => {
+    const reg = new ModuleRegistry();
+    reg.register(skillsModule);
+    const aHome = fs.mkdtempSync(path.join(os.tmpdir(), "roost-capskill-home-"));
+    const aRepo = fs.mkdtempSync(path.join(os.tmpdir(), "roost-capskill-repo-"));
+    try {
+      // A managed skill already in the repo (the stale captured copy)…
+      fs.mkdirSync(path.join(aRepo, "skills", "foo"), { recursive: true });
+      fs.writeFileSync(path.join(aRepo, "skills", "foo", "SKILL.md"), "# OLD");
+      // …whose local source was edited since → drift.
+      const srcDir = path.join(aHome, ".agents", "skills", "foo");
+      fs.mkdirSync(srcDir, { recursive: true });
+      fs.writeFileSync(path.join(srcDir, "SKILL.md"), "# NEW");
+
+      const ctxFn = (dryRun: boolean): ModuleContext => ({
+        repoDir: aRepo, home: aHome, profile: "base", dryRun,
+        exec: { async run() { return { code: 0, stdout: "", stderr: "" }; } },
+        log: { info() {}, warn() {}, error() {} }, t: (k) => k,
+      });
+      const server = buildServer({ repoDir: aRepo, registry: reg, makeCtx: ctxFn });
+
+      const res = await server.inject({ method: "POST", url: "/api/capture" });
+      expect(res.statusCode).toBe(200);
+      // The global 捕获 must pick up the edited skill: repo now matches source.
+      expect(fs.readFileSync(path.join(aRepo, "skills", "foo", "SKILL.md"), "utf8")).toBe("# NEW");
+    } finally {
+      fs.rmSync(aHome, { recursive: true, force: true });
+      fs.rmSync(aRepo, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("POST /api/skills/catalog", () => {
   it("saves custom targets that loadSkillsTargets then returns", async () => {
     const reg = new ModuleRegistry();

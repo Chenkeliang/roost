@@ -62,6 +62,13 @@ function repoSkillsDir(ctx: ModuleContext): string {
   return path.join(ctx.repoDir, "skills");
 }
 
+// The skills Roost manages live in repo/skills + roost/skills.yaml, NOT selection.yaml.
+// Callers that drive captureAll (which keys off the selection) fold this in so editing
+// a managed skill is backed up by the global capture.
+export function managedSkillNames(ctx: ModuleContext): string[] {
+  return listSkillDirs(repoSkillsDir(ctx));
+}
+
 // Remove a Roost-created distribution ONLY if we still own it. Returns true if
 // removed; false if the path was left untouched (user replaced it / gone).
 function removeOwnedLink(ctx: ModuleContext, link: SkillLink): boolean {

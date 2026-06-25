@@ -170,7 +170,7 @@ export type {
   SkillLink,
   SkillMethod,
 } from "./skills-config.js";
-export { skillsModule, resolveSkillConflict, materializeSource, unadoptSkills } from "./modules/skills.js";
+export { skillsModule, resolveSkillConflict, materializeSource, unadoptSkills, managedSkillNames } from "./modules/skills.js";
 export { aitoolsModule } from "./modules/aitools.js";
 export { DEFAULT_ROOST_SETTINGS, loadRoostSettings, saveRoostSettings } from "./settings.js";
 export { summarizeCapture } from "./capture-summary.js";
