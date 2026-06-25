@@ -239,7 +239,9 @@ export const skillsModule = {
   },
 
   async capture(ctx: ModuleContext, sel: Selection, opts?: { from?: Record<string, string> }): Promise<ChangeSet> {
-    const names = sel.modules.skills ?? [];
+    // Explicit selection (adopt flow) wins; otherwise re-capture the managed set so
+    // edits to already-managed skills are picked up (managed skills aren't in selection.yaml).
+    const names = sel.modules.skills?.length ? sel.modules.skills : listSkillDirs(repoSkillsDir(ctx));
     const written: string[] = [];
     const blocked: string[] = [];
     const blockedDetail: BlockedItem[] = [];
@@ -276,8 +278,10 @@ export const skillsModule = {
     return { module: "skills", written, encrypted: [], blocked, blockedDetail };
   },
 
-  async status(ctx: ModuleContext, sel: Selection): Promise<DriftReport> {
-    const names = sel.modules.skills ?? [];
+  async status(ctx: ModuleContext, _sel: Selection): Promise<DriftReport> {
+    // Managed skills are tracked in roost/skills.yaml + repo/skills (NOT selection.yaml),
+    // so drift must iterate the captured set — keying off sel.modules.skills detected nothing.
+    const names = listSkillDirs(repoSkillsDir(ctx));
     const cfg = loadSkillsConfig(ctx.repoDir);
     const items: DriftItem[] = names.map((name) => {
       const repoH = hashSkillDir(path.join(repoSkillsDir(ctx), name));

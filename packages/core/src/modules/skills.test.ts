@@ -437,3 +437,27 @@ describe("unadoptSkills (forget, keep local)", () => {
     expect(fs.existsSync(path.join(repo, "skills", "ua2"))).toBe(true);
   });
 });
+
+describe("skills drift/capture key off the managed set, not selection.yaml", () => {
+  it("status reports drift for a managed skill whose source content changed (empty selection)", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# repo version");            // captured/managed copy
+    mkSkill(path.join(home, ".agents", "skills"), "foo", "# edited locally"); // live source, edited
+    const rep = await skillsModule.status(ctx(), sel([]));
+    expect(rep.items.find((i) => i.id === "foo")?.state).toBe("drift");
+  });
+
+  it("status reports synced when managed skill matches its source (empty selection)", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# same");
+    mkSkill(path.join(home, ".agents", "skills"), "foo", "# same");
+    const rep = await skillsModule.status(ctx(), sel([]));
+    expect(rep.items.find((i) => i.id === "foo")?.state).toBe("synced");
+  });
+
+  it("capture with empty selection re-captures managed skills (picks up source edits)", async () => {
+    mkSkill(path.join(repo, "skills"), "foo", "# old repo");
+    mkSkill(path.join(home, ".agents", "skills"), "foo", "# new source");
+    const cs = await skillsModule.capture(ctx(), sel([]));
+    expect(cs.written).toContain("foo");
+    expect(fs.readFileSync(path.join(repo, "skills", "foo", "SKILL.md"), "utf8")).toBe("# new source");
+  });
+});
